@@ -15,7 +15,8 @@ export type AuditEventType =
   | "SAVE_ARTICLE"
   | "CONTACT_MESSAGE"
   | "PAGE_ERROR"
-  | "AVATAR_UPDATED";
+  | "AVATAR_UPDATED"
+  | "ACCOUNT_SELF_DELETED";
 
 export async function logEvent(input: {
   type: AuditEventType;

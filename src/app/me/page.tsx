@@ -7,6 +7,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AvatarUploader } from "@/components/avatar-uploader";
+import { AccountDangerZone } from "@/components/account-danger-zone";
 import { formatArabicDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -174,6 +175,11 @@ export default async function MePage() {
           <p className="mt-6 text-center text-[11px]" style={{ color: "var(--ink-muted)" }}>
             كل تعليق يمرّ بفلترة أخلاقية من ثلاث مستويات — {approvedCount > 0 ? `و${approvedCount} من تعليقاتك هنا منشورة` : "المراجعة تحمي مساحة الحوار للجميع"}.
           </p>
+        </section>
+
+        {/* منطقة حذف الحساب — وعد سياسة الخصوصية مُطبّق حرفيًا */}
+        <section className="mx-auto mt-4 max-w-3xl px-4 pb-24 sm:px-6">
+          <AccountDangerZone />
         </section>
       </main>
       <Footer />

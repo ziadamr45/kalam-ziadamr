@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { parseBlocks } from "@/lib/content-blocks";
-import { LEGAL_DEFAULTS, LEGAL_TITLES, type LegalSlug } from "@/lib/legal-defaults";
+import {
+  LEGAL_DEFAULTS,
+  LEGAL_DEFAULTS_UPDATED_AT,
+  LEGAL_TITLES,
+  type LegalSlug,
+} from "@/lib/legal-defaults";
+import { formatArabicDate } from "@/lib/utils";
 
 /**
  * عارض الصفحات القانونية الموحد — يقرأ المحتوى المُدار من لوحة التحكم،
@@ -11,14 +17,27 @@ import { LEGAL_DEFAULTS, LEGAL_TITLES, type LegalSlug } from "@/lib/legal-defaul
 
 export const LEGAL_SLUGS: LegalSlug[] = ["privacy", "terms", "dialogue-ethics"];
 
+/**
+ * يقرأ محتوى الصفحة + تاريخ آخر تحديث الفعلي:
+ * إن وُجدت نسخة محفوظة في قاعدة البيانات → updatedAt منها (يتجدد تلقائيًا مع كل حفظ إداري)
+ * وإلا → تاريخ آخر تدقيق للنص الافتراضي
+ */
 export async function getLegalContent(slug: LegalSlug) {
   try {
     const row = await prisma.legalPage.findUnique({ where: { slug } });
     if (row?.content?.trim()) {
-      return { title: row.title || LEGAL_TITLES[slug], content: row.content };
+      return {
+        title: row.title || LEGAL_TITLES[slug],
+        content: row.content,
+        updatedAt: row.updatedAt as Date,
+      };
     }
   } catch {}
-  return { title: LEGAL_TITLES[slug], content: LEGAL_DEFAULTS[slug] };
+  return {
+    title: LEGAL_TITLES[slug],
+    content: LEGAL_DEFAULTS[slug],
+    updatedAt: new Date(LEGAL_DEFAULTS_UPDATED_AT),
+  };
 }
 
 export function legalMetadata(slug: LegalSlug): Metadata {
@@ -30,7 +49,7 @@ export function legalMetadata(slug: LegalSlug): Metadata {
 
 export async function LegalPageView({ slug }: { slug: LegalSlug }) {
   if (!LEGAL_SLUGS.includes(slug)) notFound();
-  const { title, content } = await getLegalContent(slug);
+  const { title, content, updatedAt } = await getLegalContent(slug);
   const blocks = parseBlocks(content);
 
   return (
@@ -41,7 +60,7 @@ export async function LegalPageView({ slug }: { slug: LegalSlug }) {
         </h1>
         <div className="mx-auto mt-6 h-[3px] w-16 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
         <p className="mt-4 text-xs" style={{ color: "var(--ink-muted)" }}>
-          آخر تحديث لهذه الصفحة يظهر تلقائيًا لحظة اعتماد أي تعديل إداري.
+          تاريخ آخر تحديث فعلي لهذه الصفحة معروض في أسفلها — ويتجدد تلقائيًا لحظة اعتماد أي تعديل إداري.
         </p>
       </header>
 
@@ -60,6 +79,14 @@ export async function LegalPageView({ slug }: { slug: LegalSlug }) {
           return <p key={block.id}>{block.text}</p>;
         })}
       </div>
+
+      {/* التاريخ الفعلي لآخر تحديث — وعدٌ نصّي مُطبَّق برمجيًا: يتجدد تلقائيًا مع كل حفظ إداري */}
+      <p
+        className="mt-12 border-t pt-6 text-center text-xs leading-7"
+        style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+      >
+        آخر تحديث: {formatArabicDate(updatedAt)}
+      </p>
     </section>
   );
 }
