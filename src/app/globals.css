@@ -50,6 +50,34 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "kern", "liga", "calt";
+  /* منع التمرير الأفقي نهائيًا — لا عنصر يخرج عن عرض الشاشة مهما كانت صغرها */
+  overflow-x: clip;
+  max-width: 100vw;
+}
+
+/* ضمان شامل: لا صورة ولا جدول ولا كتلة كود تكسر عرض الموبايل */
+img,
+video,
+canvas,
+audio,
+iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+/* أهداف لمس مريحة للإبهام — الحد الأدنى المعتمد 44px على الأجهزة اللمسية */
+@media (pointer: coarse) {
+  button:not(.no-touch-grow),
+  a[role="button"],
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* تفاعل لمسي نظيف بدل hover الغريب على الموبايل */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 ::selection {
@@ -81,18 +109,40 @@ body {
 }
 
 /* ============================================================
-   جسم المقال — هندسة الطباعة العربية
+   جسم المقال — هندسة الطباعة العربية المتكيفة مع كل شاشة
    ============================================================ */
 .article-body {
   font-family: var(--font-body), "Amiri", serif;
-  font-size: 1.1875rem;
+  /* تكيف سلس: 1.06rem على أصغر الهواتف → 1.1875rem على اللابتوبات وأكبر */
+  font-size: clamp(1.06rem, 0.98rem + 0.4vw, 1.1875rem);
   line-height: 2.4;
   letter-spacing: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: manual;
 }
 
 .article-body.is-tashkeel {
-  font-size: 1.375rem;
+  font-size: clamp(1.2rem, 1.1rem + 0.5vw, 1.375rem);
   line-height: 2.85;
+}
+
+/* هوامش مريحة للإبهام والعين على الهواتف — تنبسط على الشاشات الأكبر */
+@media (max-width: 640px) {
+  .article-body {
+    padding-inline: 2px;
+  }
+
+  .article-body p {
+    /* ضبط فقرات النص على الموبايل: مسافة تنفس أوضح دون تشتيت */
+    margin-bottom: 1.5em;
+    text-align: justify;
+  }
+
+  .article-body h2 {
+    font-size: 1.28rem;
+    margin: 1.7em 0 0.8em;
+  }
 }
 
 .article-body p {
@@ -108,7 +158,7 @@ body {
 .article-body h2 {
   font-family: var(--font-ui), "Readex Pro", sans-serif;
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: clamp(1.28rem, 1.1rem + 0.7vw, 1.5rem);
   line-height: 1.8;
   margin: 2em 0 0.9em;
   color: var(--ink);
@@ -309,4 +359,42 @@ body.immersion .page-chrome {
   margin-inline-end: 0.6rem;
   background: var(--accent);
   opacity: 0.55;
+}
+
+/* ============================================================
+   الهواتف المحمولة — ضبط نهائي للكتل الخاصة على الشاشات الصغيرة
+   ============================================================ */
+@media (max-width: 640px) {
+  /* الآيات: تقليل الحشو البصري مع الحفاظ على الوقار */
+  .quran-block {
+    padding: 1.7rem 1.05rem 1rem;
+    margin: 1.9rem auto;
+  }
+
+  .hadith-block {
+    padding: 1.2rem 1.15rem 0.9rem;
+    margin: 1.9rem 0;
+  }
+
+  .article-body blockquote {
+    padding: 1em 1.1em;
+    font-size: 1.02em;
+  }
+
+  /* المشغل الصوتي: أزرار واسعة اللمس لا تتداخل */
+  .audio-controls {
+    gap: 0.5rem;
+  }
+
+  .audio-controls button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* منع أي كتلة نصية طويلة من كسر العرض — الروابط الطويلة والكلمات المستعربة */
+.article-body p,
+.article-body blockquote,
+.article-body li {
+  overflow-wrap: anywhere;
 }

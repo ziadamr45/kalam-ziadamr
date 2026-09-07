@@ -11,6 +11,19 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error);
+    /* رفع الخطأ لحظيًا إلى لوحة الأدمن — يعلم صاحب المنصة بأي عطَل فورًا */
+    try {
+      fetch("/api/errors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: error.message || "خطأ غير معروف",
+          stack: error.stack?.slice(0, 3000) || null,
+          path: window.location.pathname,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {}
   }, [error]);
 
   return (
@@ -21,6 +34,8 @@ export default function GlobalError({
         </h1>
         <p className="font-body mt-4 leading-9" style={{ color: "var(--ink-muted)" }}>
           شيء ما لم يعمل كما يجب.. جرّب مرة أخرى.
+          <br />
+          إن تكرر الأمر فقد وصل إشعاره للإدارة بالفعل وسنعالجه سريعًا.
         </p>
         <button
           onClick={reset}

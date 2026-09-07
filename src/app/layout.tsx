@@ -41,36 +41,52 @@ const naskh = Noto_Naskh_Arabic({
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kalam-ziadamr.vercel.app";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: "كلام له لازمة",
-    template: "%s | كلام له لازمة",
-  },
-  description:
-    "مش كل كلام لازم يتقال.. بس فيه كلام له لازمة. منصة فكرية ومعرفية عربية: مقالات رصينة، بلا ضجيج، بلا إعلانات — كلام يستحق وقّتك.",
-  keywords: ["مقالات", "فكر", "ثقافة", "كلام له لازمة", "مقالات عربية"],
-  openGraph: {
-    type: "website",
-    locale: "ar_EG",
-    url: SITE_URL,
-    siteName: "كلام له لازمة",
-    title: "كلام له لازمة",
-    description: "مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.",
-    images: [{ url: "/og-default.png", width: 1200, height: 630 }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "كلام له لازمة",
-    description: "مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.",
-    images: ["/og-default.png"],
-  },
-  icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/apple-touch-icon.png",
-  },
-  manifest: "/manifest.webmanifest",
-};
+/* الوصف والعنوان الوصفي يُدارَان من لوحة التحكم (إعدادات الموقع) */
+async function getMeta() {
+  try {
+    const { getSiteConfig } = await import("@/lib/site-config");
+    const cfg = await getSiteConfig();
+    return { title: cfg.SITE_META_TITLE || "كلام له لازمة", desc: cfg.SITE_META_DESC };
+  } catch {
+    return {
+      title: "كلام له لازمة",
+      desc: "مش كل كلام لازم يتقال.. بس فيه كلام له لازمة. منصة فكرية ومعرفية عربية: مقالات رصينة، بلا ضجيج، بلا إعلانات — كلام يستحق وقّتك.",
+    };
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { title, desc } = await getMeta();
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: title,
+      template: `%s | ${title.includes("كلام له لازمة") ? "كلام له لازمة" : title}`,
+    },
+    description: desc,
+    keywords: ["مقالات", "فكر", "ثقافة", "كلام له لازمة", "مقالات عربية"],
+    openGraph: {
+      type: "website",
+      locale: "ar_EG",
+      url: SITE_URL,
+      siteName: "كلام له لازمة",
+      title,
+      description: desc,
+      images: [{ url: "/og-default.png", width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: desc,
+      images: ["/og-default.png"],
+    },
+    icons: {
+      icon: "/icons/icon-192.png",
+      apple: "/icons/apple-touch-icon.png",
+    },
+    manifest: "/manifest.webmanifest",
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: [

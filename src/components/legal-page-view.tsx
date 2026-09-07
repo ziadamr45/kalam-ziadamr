@@ -1,0 +1,65 @@
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { prisma } from "@/lib/prisma";
+import { parseBlocks } from "@/lib/content-blocks";
+import { LEGAL_DEFAULTS, LEGAL_TITLES, type LegalSlug } from "@/lib/legal-defaults";
+
+/**
+ * عارض الصفحات القانونية الموحد — يقرأ المحتوى المُدار من لوحة التحكم،
+ * وإن لم يُحرَّر بعد يعرض النص الافتراضي الرصين المضمّن في الكود.
+ */
+
+export const LEGAL_SLUGS: LegalSlug[] = ["privacy", "terms", "dialogue-ethics"];
+
+export async function getLegalContent(slug: LegalSlug) {
+  try {
+    const row = await prisma.legalPage.findUnique({ where: { slug } });
+    if (row?.content?.trim()) {
+      return { title: row.title || LEGAL_TITLES[slug], content: row.content };
+    }
+  } catch {}
+  return { title: LEGAL_TITLES[slug], content: LEGAL_DEFAULTS[slug] };
+}
+
+export function legalMetadata(slug: LegalSlug): Metadata {
+  return {
+    title: LEGAL_TITLES[slug],
+    description: `الصفحة الرسمية لـ${LEGAL_TITLES[slug]} في منصة كلام له لازمة — واضحة، رصينة، بلا حشو.`,
+  };
+}
+
+export async function LegalPageView({ slug }: { slug: LegalSlug }) {
+  if (!LEGAL_SLUGS.includes(slug)) notFound();
+  const { title, content } = await getLegalContent(slug);
+  const blocks = parseBlocks(content);
+
+  return (
+    <section className="mx-auto max-w-3xl px-4 pb-24 pt-28 sm:px-6">
+      <header className="page-chrome text-center">
+        <h1 className="font-body text-3xl font-bold leading-[1.8] sm:text-4xl" style={{ color: "var(--ink)" }}>
+          {title}
+        </h1>
+        <div className="mx-auto mt-6 h-[3px] w-16 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
+        <p className="mt-4 text-xs" style={{ color: "var(--ink-muted)" }}>
+          آخر تحديث لهذه الصفحة يظهر تلقائيًا لحظة اعتماد أي تعديل إداري.
+        </p>
+      </header>
+
+      <div className="article-body mt-12" style={{ color: "var(--ink)" }}>
+        {blocks.map((block) => {
+          if (block.kind === "h2") return <h2 key={block.id}>{block.text}</h2>;
+          if (block.kind === "quote") return <blockquote key={block.id}>{block.text}</blockquote>;
+          if (block.kind === "list")
+            return (
+              <ul key={block.id}>
+                {block.items.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            );
+          return <p key={block.id}>{block.text}</p>;
+        })}
+      </div>
+    </section>
+  );
+}

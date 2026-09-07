@@ -30,6 +30,16 @@ function GoogleMark() {
   );
 }
 
+/* رسائل ودية لكل خطأ وارد من NextAuth — بلا شاشات سوداء أو أخطاء صامتة */
+const AUTH_ERRORS: Record<string, string> = {
+  Configuration:
+    "حدث خلل لحظي في إعدادات الدخول على الخادم — جرّب تحديث الصفحة، وإن تكرر فسنعلم به فورًا ونصلحه.",
+  AccessDenied:
+    "هذا الحساب محظور من المشاركة في المنصة. إن كان في رأيك خطأً فتواصل معنا من صفحة اتصل بنا.",
+  Verification: "انتهت صلاحية رابط الدخول — جرّب مرة أخرى من فضلك.",
+  Default: "تعذّر إكمال تسجيل الدخول — تحقق من اتصالك وجرّب مرة أخرى.",
+};
+
 function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
@@ -39,6 +49,7 @@ function LoginInner() {
 
   /* الوجهة بعد الدخول: ?callback=... أو الصفحة الرئيسية */
   const callback = params.get("callback") || "/";
+  const authError = params.get("error");
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -56,7 +67,8 @@ function LoginInner() {
     try {
       await signIn("google", { redirectTo: callback.startsWith("/") ? callback : "/" });
     } catch {
-      setBusy(false);
+      /* تحويل ناعم بدل خطأ صامت — الخطأ يظهر كرسالة ودية في نفس الصفحة */
+      router.replace("/login?error=Configuration");
     }
   };
 
@@ -67,7 +79,7 @@ function LoginInner() {
         كلام له لازمة
       </p>
       <h1
-        className="mt-4 font-body text-3xl font-bold leading-[1.7]"
+        className="mt-4 font-body text-2xl font-bold leading-[1.7] sm:text-3xl"
         style={{ color: "var(--ink)" }}
       >
         اقرأ.. حاور.. واحفظ ما يلهمك
@@ -78,7 +90,30 @@ function LoginInner() {
         وتشارك في حوار نقي — بلا مزعجين وبلا حسابات وهمية.
       </p>
 
-      <div className="mt-10 w-full rounded-3xl border p-8 shadow-lift"
+      {/* إشعار الخطأ الودي — بدل شاشة الخادم المعطلة */}
+      {authError && (
+        <div
+          className="mt-6 w-full rounded-2xl border p-4 text-right text-xs leading-7"
+          style={{ background: "#FEF2F2", borderColor: "#FECACA", color: "#991B1B" }}
+          role="alert"
+        >
+          <strong className="block font-bold">تعذّر تسجيل الدخول</strong>
+          {AUTH_ERRORS[authError] || AUTH_ERRORS.Default}
+          <div className="mt-2 flex gap-3">
+            <button
+              onClick={() => router.replace("/login")}
+              className="rounded-lg bg-[#991B1B] px-3 py-1.5 text-[11px] font-bold text-white"
+            >
+              المحاولة مجددًا
+            </button>
+            <Link href="/contact" className="rounded-lg border border-[#FECACA] px-3 py-1.5 text-[11px] font-bold">
+              إبلاغ الإدارة
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8 w-full rounded-3xl border p-6 shadow-lift sm:p-8"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
         {googleReady === null ? (
@@ -90,7 +125,7 @@ function LoginInner() {
             <button
               onClick={handleGoogle}
               disabled={busy}
-              className="group flex w-full items-center justify-center gap-3 rounded-2xl border px-5 py-3.5 text-sm font-bold transition-all duration-300 hover:shadow-lift disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-3 rounded-2xl border px-5 py-3.5 text-sm font-bold transition-all duration-300 hover:shadow-lift disabled:opacity-60"
               style={{
                 background: "var(--bg)",
                 borderColor: "var(--border)",
@@ -100,10 +135,21 @@ function LoginInner() {
               <GoogleMark />
               {busy ? "جارٍ التحويل.." : "المتابعة بحساب Google"}
             </button>
+            {/* الموافقة القانونية الكاملة — ثلاثة روابط منفصلة لكل مساره */}
             <p className="mt-5 text-[11px] leading-6" style={{ color: "var(--ink-muted)" }}>
-              بالمتابعة أنت توافق على <Link href="/about" className="underline" style={{ color: "var(--accent-strong)" }}>أخلاقيات الحوار</Link> في المنصة.
-              <br />
-              لن نرسل لك رسائل مزعجة — بريدك للتحقق فقط.
+              بتسجيلك للدخول، فإنك تؤكد موافقتك على{" "}
+              <Link href="/terms" className="underline" style={{ color: "var(--accent-strong)" }}>
+                شروط الاستخدام
+              </Link>{" "}
+              و{" "}
+              <Link href="/privacy" className="underline" style={{ color: "var(--accent-strong)" }}>
+                سياسة الخصوصية
+              </Link>
+              ، والتزامك التام بـ{" "}
+              <Link href="/dialogue-ethics" className="underline" style={{ color: "var(--accent-strong)" }}>
+                أخلاقيات الحوار والتعليق
+              </Link>{" "}
+              الخاصة بالمنصة.
             </p>
           </>
         ) : (

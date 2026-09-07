@@ -17,6 +17,7 @@ import {
   getMyVote,
 } from "@/lib/db-queries";
 import { auth } from "@/lib/auth";
+import { getSiteConfig } from "@/lib/site-config";
 import { formatArabicDate } from "@/lib/utils";
 import { formatReadingTime } from "@/lib/readingTime";
 
@@ -64,12 +65,17 @@ export default async function ArticlePage({
   const article = await getArticleBySlug(slug);
   if (!article) notFound();
 
-  const [related, comments, counts, session] = await Promise.all([
+  const [related, comments, counts, session, siteCfg] = await Promise.all([
     getRelatedArticles(article.id, article.sectionId, 3),
     getApprovedComments(article.id),
     getInteractionCounts(article.id),
     auth(),
+    getSiteConfig(),
   ]);
+
+  /* سيادة الأدمن: تعطيل التشكيل إذا عطّله عامًا أو لهذا المقال تحديدًا */
+  const tashkeelAllowed =
+    siteCfg.TASHKEEL_ENABLED && article.tashkeelEnabled;
 
   const myVote = await getMyVote(article.id, {
     userId: session?.user?.id ?? null,
@@ -142,6 +148,7 @@ export default async function ArticlePage({
               coverImage: article.coverImage,
               readingTimeSec: article.readingTimeSec,
             }}
+            tashkeelAllowed={tashkeelAllowed}
           />
 
           {/* التفاعل والمشاركة */}
@@ -159,19 +166,29 @@ export default async function ArticlePage({
             </div>
           </div>
 
-          {/* التعليقات */}
-          <CommentsSection
-            articleId={article.id}
-            articleSlug={article.slug}
-            initialComments={comments.map((c) => ({
-              id: c.id,
-              content: c.content,
-              createdAt: c.createdAt.toISOString(),
-              authorName: c.user?.name || c.guestName || "قارئ",
-              authorImage: c.user?.image || null,
-            }))}
-            isLoggedIn={Boolean(session?.user)}
-          />
+          {/* التعليقات — مع مفتاح الإيقاف الفوري (Kill Switch) من لوحة التحكم */}
+          {siteCfg.COMMENTS_ENABLED ? (
+            <CommentsSection
+              articleId={article.id}
+              articleSlug={article.slug}
+              initialComments={comments.map((c) => ({
+                id: c.id,
+                content: c.content,
+                createdAt: c.createdAt.toISOString(),
+                authorName: c.user?.name || c.guestName || "قارئ",
+                authorImage: c.user?.image || null,
+              }))}
+              isLoggedIn={Boolean(session?.user)}
+            />
+          ) : (
+            <section className="page-chrome mt-12 border-t pt-10 text-center" style={{ borderColor: "var(--border)" }}>
+              <p className="rounded-2xl border border-dashed px-6 py-8 text-sm leading-8" style={{ color: "var(--ink-muted)", borderColor: "var(--border)" }}>
+                الحوار متوقف مؤقتًا بقرار إداري.. القراءة متاحة كالعادة —
+                <br />
+                وسيعود الكلام حين تكون له لازمة.
+              </p>
+            </section>
+          )}
         </article>
 
         {/* مقالات ذات صلة */}

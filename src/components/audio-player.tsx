@@ -143,7 +143,7 @@ export function AudioPlayer({
         onError={clearHighlight}
       />
 
-      <div className="flex items-center gap-3">
+      <div className="audio-controls flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           onClick={toggle}
           aria-label={playing ? "إيقاف مؤقت" : "تشغيل"}

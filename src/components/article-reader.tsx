@@ -29,16 +29,23 @@ type ReaderArticle = {
 
 /* المحلل الموحد: src/lib/content-blocks.ts (فقرات + آيات + أحاديث) */
 
-export function ArticleReader({ article }: { article: ReaderArticle }) {
-  /* تبديل التشكيل الفوري */
+export function ArticleReader({
+  article,
+  tashkeelAllowed = true,
+}: {
+  article: ReaderArticle;
+  tashkeelAllowed?: boolean;
+}) {
+  /* تبديل التشكيل الفوري — مرهون بإذن الأدمن (عامًا + لهذا المقال) */
   const [tashkeel, setTashkeel] = useState(false);
   useEffect(() => {
     try {
-      setTashkeel(window.localStorage.getItem("kalam_tashkeel") === "on");
+      setTashkeel(tashkeelAllowed && window.localStorage.getItem("kalam_tashkeel") === "on");
     } catch {}
-  }, []);
+  }, [tashkeelAllowed]);
 
   const toggleTashkeel = useCallback(() => {
+    if (!tashkeelAllowed) return;
     setTashkeel((prev) => {
       const next = !prev;
       try {
@@ -46,7 +53,7 @@ export function ArticleReader({ article }: { article: ReaderArticle }) {
       } catch {}
       return next;
     });
-  }, []);
+  }, [tashkeelAllowed]);
 
   /* المختصر المفيد */
   const [showSummary, setShowSummary] = useState(false);
@@ -151,56 +158,60 @@ export function ArticleReader({ article }: { article: ReaderArticle }) {
 
   return (
     <div className="relative">
-      {/* شريط الأدوات: التشكيل + المختصر + الحفظ + الاقتباس */}
-      <div className="page-chrome sticky top-16 z-20 mx-auto -mx-2 mt-8 flex flex-wrap items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-sm shadow-soft backdrop-blur-md"
+      {/* شريط الأدوات: التشكيل + المختصر + الحفظ + الاقتباس — أهداف لمس مريحة على الموبايل */}
+      <div className="page-chrome sticky top-16 z-20 mx-auto -mx-2 mt-8 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 rounded-2xl border px-2 py-2 text-sm shadow-soft backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2.5"
         style={{ background: "color-mix(in srgb, var(--surface) 90%, transparent)", borderColor: "var(--border)" }}
       >
-        {/* مفتاح التشكيل */}
-        <button
-          onClick={toggleTashkeel}
-          role="switch"
-          aria-checked={tashkeel}
-          className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-all hover:bg-[var(--accent-soft)]"
-          style={{ color: tashkeel ? "var(--accent-strong)" : "var(--ink-muted)" }}
-          title="تبديل النص المشكول بالحركات الكاملة"
-        >
-          <span
-            className="relative inline-block h-5 w-9 rounded-full transition-colors duration-300"
-            style={{ background: tashkeel ? "var(--accent)" : "var(--border)" }}
+        {/* مفتاح التشكيل — يختفي كليًا إذا عطّله الأدمن */}
+        {tashkeelAllowed && (
+          <button
+            onClick={toggleTashkeel}
+            role="switch"
+            aria-checked={tashkeel}
+            className="flex min-h-11 items-center gap-2 rounded-full px-4 py-2 transition-all hover:bg-[var(--accent-soft)] sm:min-h-9 sm:px-3 sm:py-1.5"
+            style={{ color: tashkeel ? "var(--accent-strong)" : "var(--ink-muted)" }}
+            title="تبديل النص المشكول بالحركات الكاملة"
           >
             <span
-              className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ease-fluid"
-              style={{ right: tashkeel ? "2px" : "18px" }}
-            />
-          </span>
-          التشكيل
-        </button>
+              className="relative inline-block h-5 w-9 rounded-full transition-colors duration-300"
+              style={{ background: tashkeel ? "var(--accent)" : "var(--border)" }}
+            >
+              <span
+                className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ease-fluid"
+                style={{ right: tashkeel ? "2px" : "18px" }}
+              />
+            </span>
+            التشكيل
+          </button>
+        )}
 
-        <span aria-hidden style={{ color: "var(--border)" }}>|</span>
+        {tashkeelAllowed && (
+          <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
+        )}
 
         {/* المختصر المفيد */}
         <button
           onClick={() => setShowSummary((v) => !v)}
-          className="rounded-full px-3 py-1.5 transition-all hover:bg-[var(--accent-soft)]"
+          className="min-h-11 rounded-full px-4 py-2 transition-all hover:bg-[var(--accent-soft)] sm:min-h-9 sm:px-3 sm:py-1.5"
           style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
         >
           المختصر المفيد
         </button>
 
-        <span aria-hidden style={{ color: "var(--border)" }}>|</span>
+        <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
 
         {/* حفظ في مكتبتي */}
         <button
           onClick={handleSave}
           disabled={saved || saveBusy}
-          className="rounded-full px-3 py-1.5 transition-all hover:bg-[var(--accent-soft)] disabled:opacity-60"
+          className="min-h-11 rounded-full px-4 py-2 transition-all hover:bg-[var(--accent-soft)] disabled:opacity-60 sm:min-h-9 sm:px-3 sm:py-1.5"
           style={{ color: saved ? "var(--accent-strong)" : "var(--ink-muted)" }}
           title={loggedIn ? "يُحفظ في حسابك (متزامن عبر أجهزتك) + لقطة داخل جهازك للقراءة دون إنترنت" : "حفظ داخل جهازك — سجّل الدخول لتتزامن محفوظاتك عبر أجهزتك"}
         >
           {saved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}
         </button>
 
-        <span aria-hidden style={{ color: "var(--border)" }}>|</span>
+        <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
 
         {/* مولد الاقتباسات */}
         <QuoteGenerator

@@ -74,12 +74,12 @@ export function InteractionSlot({
   );
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex w-full items-center justify-center gap-3 sm:w-auto">
       <button
         onClick={() => vote(1)}
         disabled={busy}
         aria-pressed={myVote === 1}
-        className="flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-fluid hover:-translate-y-0.5 disabled:opacity-50"
+        className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-fluid hover:-translate-y-0.5 disabled:opacity-50 sm:flex-none"
         style={
           myVote === 1
             ? { background: "var(--accent)", borderColor: "var(--accent)", color: "#fff" }
@@ -97,7 +97,7 @@ export function InteractionSlot({
         onClick={() => vote(-1)}
         disabled={busy}
         aria-pressed={myVote === -1}
-        className="flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-fluid hover:translate-y-0.5 disabled:opacity-50"
+        className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-fluid hover:translate-y-0.5 disabled:opacity-50 sm:flex-none"
         style={
           myVote === -1
             ? { background: "var(--ink-muted)", borderColor: "var(--ink-muted)", color: "#fff" }

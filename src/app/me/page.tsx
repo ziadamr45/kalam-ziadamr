@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { SignOutButton } from "@/components/sign-out-button";
+import { AvatarUploader } from "@/components/avatar-uploader";
 import { formatArabicDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -65,25 +66,8 @@ export default async function MePage() {
             className="flex flex-col items-center gap-6 rounded-3xl border p-8 shadow-lift sm:flex-row sm:text-right"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
           >
-            {user.image ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={user.image}
-                alt={user.name || "صورة الحساب"}
-                width={88}
-                height={88}
-                referrerPolicy="no-referrer"
-                className="h-22 w-22 rounded-full border-4 object-cover"
-                style={{ borderColor: "var(--accent-soft)" }}
-              />
-            ) : (
-              <span
-                className="flex h-22 w-22 items-center justify-center rounded-full text-3xl font-bold"
-                style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-              >
-                {(user.name || "ق").charAt(0)}
-              </span>
-            )}
+            {/* محرر الحساب: رفع صورة سحابي بمعاينة لحظية (Cloudinary) */}
+            <AvatarUploader currentImage={user.image} />
 
             <div className="min-w-0 flex-1">
               <h1 className="font-body text-2xl font-bold" style={{ color: "var(--ink)" }}>
