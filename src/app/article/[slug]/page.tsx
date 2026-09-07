@@ -145,6 +145,7 @@ export default async function ArticlePage({
               audioUrl: article.audioUrl,
               audioDurationSec: article.audioDurationSec,
               audioCues: article.audioCues,
+              audioWords: article.audioWords,
               coverImage: article.coverImage,
               readingTimeSec: article.readingTimeSec,
             }}

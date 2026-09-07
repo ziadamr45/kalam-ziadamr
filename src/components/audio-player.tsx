@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { get, set } from "idb-keyval";
 import { easternDigits } from "@/lib/utils";
 
 type Cue = { t: number; id: string };
 type BlockMeta = { id: string; words: number };
+type WordTiming = { w: string; s: number; e: number };
 
 function fmtTime(sec: number): string {
   if (!isFinite(sec) || sec < 0) sec = 0;
@@ -14,20 +16,36 @@ function fmtTime(sec: number): string {
 }
 
 /**
- * المشغل الصوتي فائق الذكاء — تشغيل القراءة الصوتية مع إبراز
- * الفقرة المقروءة آنيًا (توقيتات يدوية عبر audioCues أو توزيع تناسبي
- * بعدد كلمات الفقرات).
+ * المشغل الصوتي الكاريوكي — قراءة الصوت مع تظليل الكلمة المقروءة لحظيًا،
+ * تمرير تلقائي يبقي الفقرة في منتصف الشاشة، ونقر أي كلمة يقفز بها الصوت إليها.
+ *
+ * - وضع الكلمات: مصفوفة audioWords [{w,s,e}] المولّدة بالذكاء الاصطناعي.
+ * - وضع الفقرات: audioCues اليدوية أو توزيع تناسبي (توافقية رفع يدوي).
+ * - Media Session: تحكم الشاشة المقفلة والخلفية على الهواتف.
+ * - كاش محلي (IndexedDB): الزائر المتكرر لا يعيد تحميل الصوت إطلاقًا.
  */
 export function AudioPlayer({
   src,
   durationSec,
   cues,
   blocks,
+  words,
+  slug,
+  syncKey,
+  title,
+  sectionName,
+  coverImage,
 }: {
   src: string;
   durationSec: number | null;
   cues: Cue[] | null;
   blocks: BlockMeta[];
+  words?: WordTiming[] | null;
+  slug: string;
+  syncKey?: string;
+  title?: string;
+  sectionName?: string | null;
+  coverImage?: string | null;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -36,66 +54,241 @@ export function AudioPlayer({
   const [rate, setRate] = useState(1);
   const [follow, setFollow] = useState(true);
 
-  /* خريطة توقيتات الفقرات: يدوية أو تناسبية بالكلمات */
+  const wordElsRef = useRef<Map<number, Element> | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+  const cachedRef = useRef(false);
+  const activeWordRef = useRef<number>(-1);
+
+  const wordList = useMemo(
+    () => (words && words.length > 0 ? [...words].sort((a, b) => a.s - b.s) : null),
+    [words],
+  );
+
+  /* ==================== كاش الصوت المحلي (IndexedDB) ==================== */
+
+  const resolveSrc = useCallback(async (): Promise<string> => {
+    try {
+      const blob = (await get(`kalam-audio:${slug}`)) as Blob | undefined;
+      if (blob && blob.size > 0) {
+        cachedRef.current = true;
+        const url = URL.createObjectURL(blob);
+        objectUrlRef.current = url;
+        return url;
+      }
+    } catch {}
+    return src;
+  }, [slug, src]);
+
+  const cacheAudio = useCallback(async () => {
+    if (cachedRef.current) return;
+    try {
+      cachedRef.current = true;
+      const res = await fetch(src, { mode: "cors" });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      if (blob.size > 0 && blob.size < 40 * 1024 * 1024) {
+        await set(`kalam-audio:${slug}`, blob);
+      }
+    } catch {}
+  }, [slug, src]);
+
+  /* ==================== عناصر الكلمات (إعادة بناء عند تبديل التشكيل) ==================== */
+
+  useEffect(() => {
+    wordElsRef.current = null;
+    activeWordRef.current = -1;
+    return () => {
+      wordElsRef.current = null;
+    };
+  }, [syncKey]);
+
+  const wordElements = useCallback((): Map<number, Element> => {
+    if (!wordElsRef.current) {
+      const map = new Map<number, Element>();
+      try {
+        document.querySelectorAll("#article-body span[data-wi]").forEach((el) => {
+          const wi = Number((el as HTMLElement).dataset.wi);
+          if (!Number.isNaN(wi)) map.set(wi, el);
+        });
+      } catch {}
+      wordElsRef.current = map;
+    }
+    return wordElsRef.current;
+  }, []);
+
+  /* ==================== إبراز الكلمة الحالية + التمرير الانسيابي ==================== */
+
+  const setActiveWord = useCallback(
+    (idx: number) => {
+      const prev = activeWordRef.current;
+      if (prev === idx) return;
+      const els = wordElements();
+
+      if (prev >= 0) {
+        els.get(prev)?.classList.remove("audio-word-active");
+        els.get(prev)?.closest("[id^='blk-']")?.classList.remove("audio-active");
+      }
+      activeWordRef.current = idx;
+
+      const el = idx >= 0 ? els.get(idx) : null;
+      if (el) {
+        el.classList.add("audio-word-active");
+        const blockEl = el.closest("[id^='blk-']");
+        blockEl?.classList.add("audio-active");
+
+        /* تمرير تلقائي هادئ: يتحرك فقط حين تخرج الكلمة من النطاق المريح */
+        if (follow) {
+          const rect = el.getBoundingClientRect();
+          const topBand = window.innerHeight * 0.22;
+          const bottomBand = window.innerHeight * 0.78;
+          if (rect.top < topBand || rect.bottom > bottomBand) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }
+      } else if (idx < 0) {
+        document.querySelectorAll(".audio-word-active").forEach((n) => n.classList.remove("audio-word-active"));
+        document.querySelectorAll("#article-body .audio-active").forEach((n) => n.classList.remove("audio-active"));
+      }
+    },
+    [follow, wordElements],
+  );
+
+  /** البحث الثنائي عن الكلمة المقروءة الآن */
+  const activeWordIndex = useCallback(
+    (t: number): number => {
+      if (!wordList) return -1;
+      let lo = 0;
+      let hi = wordList.length - 1;
+      let found = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const w = wordList[mid];
+        if (t < w.s) hi = mid - 1;
+        else if (t > w.e) lo = mid + 1;
+        else {
+          found = mid;
+          break;
+        }
+      }
+      if (found === -1 && lo > 0 && lo <= wordList.length) found = lo - 1;
+      return found;
+    },
+    [wordList],
+  );
+
+  /* ==================== وضع الفقرات (توافقية الرفع اليدوي) ==================== */
+
   const timings = useMemo(() => {
     const totalWords = blocks.reduce((a, b) => a + b.words, 0) || 1;
     const dur = duration || durationSec || 0;
-
+    const map = new Map<string, number>();
     if (cues && cues.length > 0) {
-      const map = new Map<string, number>();
       for (const c of cues) map.set(c.id, c.t);
       return map;
     }
-
-    const map = new Map<string, number>();
+    if (wordList) return map; // وضع الكلمات لا يحتاج توقيتات فقرات
     let acc = 0;
     for (const b of blocks) {
       map.set(b.id, dur * (acc / totalWords));
       acc += b.words;
     }
     return map;
-  }, [cues, blocks, duration, durationSec]);
+  }, [cues, blocks, duration, durationSec, wordList]);
 
-  /* إبراز الفقرة الحالية */
-  useEffect(() => {
-    if (!playing && current === 0) return;
-    const entries = [...timings.entries()].sort((a, b) => a[1] - b[1]);
-    let activeId: string | null = null;
-    for (const [id, t] of entries) {
-      if (current + 0.35 >= t) activeId = id;
-      else break;
-    }
-    document.querySelectorAll(".audio-active").forEach((el) => el.classList.remove("audio-active"));
-    if (activeId) {
-      const el = document.getElementById(activeId);
-      if (el) {
-        el.classList.add("audio-active");
-        if (follow) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const setActiveBlock = useCallback(
+    (t: number) => {
+      if (wordList) return;
+      if (!playing && current === 0) return;
+      const entries = [...timings.entries()].sort((a, b) => a[1] - b[1]);
+      let activeId: string | null = null;
+      for (const [id, start] of entries) {
+        if (t + 0.35 >= start) activeId = id;
+        else break;
+      }
+      document.querySelectorAll("#article-body .audio-active").forEach((el) => el.classList.remove("audio-active"));
+      if (activeId) {
+        const el = document.getElementById(activeId);
+        if (el) {
+          el.classList.add("audio-active");
+          if (follow) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
         }
       }
-    }
-  }, [current, playing, timings, follow]);
+    },
+    [current, follow, playing, timings, wordList],
+  );
 
-  const clearHighlight = useCallback(() => {
-    document.querySelectorAll(".audio-active").forEach((el) => el.classList.remove("audio-active"));
-  }, []);
+  /* ==================== Media Session — التحكم من الخلفية وقفل الشاشة ==================== */
 
-  const toggle = useCallback(() => {
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: title || "قراءة صوتية — كلام له لازمة",
+        artist: "كلام له لازمة",
+        album: sectionName || "مقالات المنصة",
+        artwork: coverImage ? [{ src: coverImage, sizes: "512x512", type: "image/jpeg" }] : [],
+      });
+      navigator.mediaSession.setActionHandler("play", () => audioRef.current?.play());
+      navigator.mediaSession.setActionHandler("pause", () => audioRef.current?.pause());
+      navigator.mediaSession.setActionHandler("seekbackward", () => skipRef.current?.(-10));
+      navigator.mediaSession.setActionHandler("seekforward", () => skipRef.current?.(10));
+      navigator.mediaSession.setActionHandler("seekto", (d) => {
+        if (d.seekTime != null && audioRef.current) {
+          audioRef.current.currentTime = d.seekTime;
+        }
+      });
+    } catch {}
+    return () => {
+      try {
+        navigator.mediaSession.metadata = null;
+      } catch {}
+    };
+  }, [coverImage, sectionName, title]);
+
+  const updatePositionState = useCallback(
+    (t: number) => {
+      try {
+        if ("mediaSession" in navigator && "setPositionState" in navigator.mediaSession && duration) {
+          navigator.mediaSession.setPositionState({
+            duration,
+            playbackRate: rate,
+            position: Math.min(t, duration),
+          });
+        }
+      } catch {}
+    },
+    [duration, rate],
+  );
+
+  /* ==================== تحكم التشغيل ==================== */
+
+  const toggle = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
+      if (!audio.src) audio.src = await resolveSrc();
       audio.play().catch(() => {});
     } else {
       audio.pause();
     }
-  }, []);
+  }, [resolveSrc]);
 
-  const skip = useCallback((delta: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = Math.max(0, Math.min((duration || 0) - 0.5, audio.currentTime + delta));
-  }, [duration]);
+  const skipRef = useRef<(delta: number) => void>(null);
+
+  const skip = useCallback(
+    (delta: number) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.currentTime = Math.max(0, Math.min((duration || 0) - 0.5, audio.currentTime + delta));
+    },
+    [duration],
+  );
+
+  useEffect(() => {
+    skipRef.current = skip;
+  }, [skip]);
 
   const cycleRate = useCallback(() => {
     setRate((r) => {
@@ -108,16 +301,63 @@ export function AudioPlayer({
   const onTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    setCurrent(audio.currentTime);
-  }, []);
+    const t = audio.currentTime;
+    setCurrent(t);
+    updatePositionState(t);
+    if (wordList) {
+      const idx = activeWordIndex(t);
+      setActiveWord(idx);
+    } else {
+      setActiveBlock(t);
+    }
+  }, [activeWordIndex, setActiveBlock, setActiveWord, updatePositionState, wordList]);
 
-  const seekFromBar = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const audio = audioRef.current;
-    if (!audio || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = 1 - (e.clientX - rect.left) / rect.width; // RTL
-    audio.currentTime = Math.max(0, Math.min(duration - 0.2, ratio * duration));
-  }, [duration]);
+  const seekFromBar = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const audio = audioRef.current;
+      if (!audio || !duration) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const ratio = 1 - (e.clientX - rect.left) / rect.width; // RTL
+      audio.currentTime = Math.max(0, Math.min(duration - 0.2, ratio * duration));
+    },
+    [duration],
+  );
+
+  /* القفز بالنقر على أي كلمة داخل المقال */
+  useEffect(() => {
+    if (!wordList) return;
+    const handler = (e: Event) => {
+      const target = (e.target as HTMLElement | null)?.closest?.("[data-wi]") as HTMLElement | null;
+      if (!target) return;
+      const wi = Number(target.dataset.wi);
+      const word = wordList[wi];
+      const audio = audioRef.current;
+      if (!word || !audio) return;
+      if (!audio.src) {
+        resolveSrc().then((u) => {
+          audio.src = u;
+          audio.currentTime = word.s;
+          audio.play().catch(() => {});
+        });
+        return;
+      }
+      audio.currentTime = word.s;
+      if (audio.paused) audio.play().catch(() => {});
+    };
+    const body = document.getElementById("article-body");
+    body?.addEventListener("click", handler);
+    return () => body?.removeEventListener("click", handler);
+  }, [resolveSrc, wordList]);
+
+  /* تنظيف الإبراز عند التفكيك */
+  useEffect(() => {
+    return () => {
+      document.querySelectorAll(".audio-word-active, #article-body .audio-active").forEach((n) =>
+        n.classList.remove("audio-word-active", "audio-active"),
+      );
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
 
   return (
     <div
@@ -127,7 +367,6 @@ export function AudioPlayer({
     >
       <audio
         ref={audioRef}
-        src={src}
         preload="metadata"
         onLoadedMetadata={(e) => {
           const d = e.currentTarget.duration;
@@ -138,10 +377,19 @@ export function AudioPlayer({
         onPause={() => setPlaying(false)}
         onEnded={() => {
           setPlaying(false);
-          clearHighlight();
+          setActiveWord(-1);
+          document.querySelectorAll("#article-body .audio-active").forEach((el) => el.classList.remove("audio-active"));
+          void cacheAudio(); /* تخزين محلي للزائر المتكرر — بلا استهلاك شبكة إضافي */
         }}
-        onError={clearHighlight}
+        onError={() => setActiveWord(-1)}
       />
+
+      {wordList ? (
+        <p className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+          <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} aria-hidden />
+          قراءة متزامنة كلمة بكلمة — انقر أي كلمة ليبدأ الصوت منها
+        </p>
+      ) : null}
 
       <div className="audio-controls flex flex-wrap items-center gap-2 sm:gap-3">
         <button
@@ -202,7 +450,7 @@ export function AudioPlayer({
           onClick={() => setFollow((f) => !f)}
           className={`rounded-full p-2 transition-colors hover:bg-[var(--accent-soft)] ${follow ? "" : "opacity-40"}`}
           style={{ color: "var(--accent-strong)" }}
-          title="تتبع الفقرة المقروءة تلقائيًا"
+          title="تتبع القراءة تلقائيًا"
           aria-pressed={follow}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12l7 7 7-7" /></svg>

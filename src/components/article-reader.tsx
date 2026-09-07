@@ -23,9 +23,29 @@ type ReaderArticle = {
   audioUrl: string | null;
   audioDurationSec: number | null;
   audioCues: unknown;
+  audioWords: unknown;
   coverImage: string | null;
   readingTimeSec: number;
 };
+
+/* امتداد الكلمات — يبقي المسافات كما هي (بلا أي تغيير في التصميم) ويمنح كل كلمة فهرسها العام */
+function Words({ text, start }: { text: string; start: number }) {
+  const parts = text.split(/(\s+)/);
+  let wi = start;
+  return (
+    <>
+      {parts.map((p, i) => {
+        if (!p.trim()) return p;
+        const idx = wi++;
+        return (
+          <span key={i} data-wi={idx} className="audio-word">
+            {p}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 /* المحلل الموحد: src/lib/content-blocks.ts (فقرات + آيات + أحاديث) */
 
@@ -60,6 +80,27 @@ export function ArticleReader({
 
   const source = tashkeel ? article.contentWithTashkeel || article.content : article.content;
   const blocks = useMemo(() => parseBlocks(source), [source]);
+
+  /* فهرس البداية العام لكل كتلة — يمتد عبر كل الكتل حتى الآيات والأحاديث (تُقرأ لكن لا تُظلل كلمةً كلمة) */
+  const wordOffsets = useMemo(() => {
+    const map = new Map<string, number>();
+    let acc = 0;
+    for (const b of blocks) {
+      map.set(b.id, acc);
+      acc += blockWordCount(b);
+    }
+    return map;
+  }, [blocks]);
+
+  const audioWords = useMemo(
+    () =>
+      Array.isArray(article.audioWords)
+        ? (article.audioWords as { w: string; s: number; e: number }[])
+        : null,
+    [article.audioWords],
+  );
+  /* مفتاح إعادة مسح عناصر الكلمات في المشغل عند أي تغيير في العرض */
+  const syncKey = `${article.id}:${tashkeel ? "t" : "p"}:${blocks.length}:${source.length}`;
 
   /* الحفظ: في مكتبة الحساب المتزامنة + لقطة الجهاز للقراءة دون اتصال */
   const { status } = useSession();
@@ -266,6 +307,11 @@ export function ArticleReader({
             durationSec={article.audioDurationSec}
             cues={Array.isArray(article.audioCues) ? (article.audioCues as { t: number; id: string }[]) : null}
             blocks={blocks.map((b) => ({ id: b.id, words: blockWordCount(b) }))}
+            words={audioWords}
+            slug={article.slug}
+            syncKey={syncKey}
+            title={article.title}
+            coverImage={article.coverImage}
           />
         </div>
       )}
@@ -277,26 +323,34 @@ export function ArticleReader({
         style={{ color: "var(--ink)" }}
       >
         {blocks.map((block) => {
+          const start = wordOffsets.get(block.id) ?? 0;
           if (block.kind === "h2") {
             return (
               <h2 key={block.id} id={block.id}>
-                {block.text}
+                <Words text={block.text} start={start} />
               </h2>
             );
           }
           if (block.kind === "quote") {
             return (
               <blockquote key={block.id} id={block.id}>
-                {block.text}
+                <Words text={block.text} start={start} />
               </blockquote>
             );
           }
           if (block.kind === "list") {
+            let acc = start;
             return (
               <ul key={block.id} id={block.id}>
-                {block.items.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
+                {block.items.map((item, i) => {
+                  const itemStart = acc;
+                  acc += item.split(/\s+/).filter(Boolean).length;
+                  return (
+                    <li key={i}>
+                      <Words text={item} start={itemStart} />
+                    </li>
+                  );
+                })}
               </ul>
             );
           }
@@ -323,7 +377,7 @@ export function ArticleReader({
           }
           return (
             <p key={block.id} id={block.id}>
-              {block.text}
+              <Words text={block.text} start={start} />
             </p>
           );
         })}

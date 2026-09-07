@@ -211,6 +211,25 @@ iframe {
   box-shadow: -6px 0 0 0 var(--accent-soft);
 }
 
+/* المزامنة الكاريوكية — كلمات قابلة للنقر وتظليل الكلمة المقروءة لحظيًا */
+.article-body .audio-word {
+  cursor: pointer;
+  border-radius: 0.35em;
+  transition: background 0.18s ease, color 0.18s ease;
+  scroll-margin-top: 40vh;
+}
+@media (hover: hover) {
+  .article-body .audio-word:hover {
+    background: var(--accent-soft);
+  }
+}
+.article-body .audio-word-active {
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 0.25em var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
 /* وضع الغمر — إخفاء كل ما عدا المقال */
 body.immersion .site-header,
 body.immersion .site-footer,
