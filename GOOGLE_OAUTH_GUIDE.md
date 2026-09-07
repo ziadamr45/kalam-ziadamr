@@ -1,0 +1,96 @@
+# الدليل الإرشادي خطوة بخطوة — تسجيل الدخول بحساب Google
+
+> يستغرق الإعداد **أقل من 5 دقائق** بعد اكتمال نشر المنصة على Vercel.
+
+---
+
+## الخطوة 1: افتح Google Cloud Console
+
+1. ادخل إلى: **https://console.cloud.google.com**
+2. سجّل الدخول بحساب Google الخاص بك (يُفضَّل حسابك الأساسي).
+3. من شريط التنقل العلوي، اضغط على قائمة المشاريع (Project Selector) ثم **«مشروع جديد / New Project»**.
+4. أدخل اسم المشروع: `Kalam Ziadamr` واضغط **Create / إنشاء**.
+5. بعد الإنشاء، تأكد من تحديد المشروع من القائمة العلوية.
+
+## الخطوة 2: تهيئة شاشة موافقة OAuth
+
+1. من القائمة الجانبية: **APIs & Services → OAuth consent screen**.
+2. اختر User Type: **External / خارجي** ثم اضغط **Create**.
+3. املأ الحقول الإلزامية:
+   - **App name**: `كلام له لازمة`
+   - **User support email**: بريدك الإلكتروني
+   - **Developer contact information**: بريدك الإلكتروني
+4. اضغط **Save and Continue** عبر كل الخطوات التالية (Scopes — لا تضف شيئًا، Test users — اتركها فارغة في وضع Production).
+
+## الخطوة 3: تفعيل Google+ APIs (نظام الهوية)
+
+1. من القائمة الجانبية: **APIs & Services → Library**.
+2. ابحث عن `Google Identity Services` أو `Google+ API` واضغط **Enable**.
+
+## الخطوة 4: إنشاء بيانات الاعتماد (Client ID & Secret)
+
+1. من القائمة الجانبية: **APIs & Services → Credentials**.
+2. اضغط **+ Create Credentials → OAuth client ID**.
+3. Application type: **Web application**.
+4. Name: `Kalam Production`.
+5. **Authorized JavaScript origins** — أضف:
+   - `http://localhost:3000` (للتجربة المحلية)
+   - `https://kalam-ziadamr.vercel.app` (رابط منصتك على Vercel — انسخه من لوحة Vercel)
+6. **Authorized redirect URIs** — أضف (مهم جدًا، بلا اختلاف حرف واحد):
+   - `https://kalam-ziadamr.vercel.app/api/auth/callback/google`
+   - `http://localhost:3000/api/auth/callback/google`
+7. اضغط **Create**.
+8. ستظهر نافذة فيها:
+   - **Client ID** — يبدو مثل: `1234567890-abcdefg.apps.googleusercontent.com`
+   - **Client Secret** — يبدو مثل: `GOCSPX-xxxxxxxxxxxxxxxx`
+
+> انسخهما الآن وضعهما في مكان آمن.
+
+## الخطوة 5: إضافة القيم في Vercel
+
+1. افتح مشروع المنصة العامة في Vercel → **Settings → Environment Variables**.
+2. أضف المتغيرين التاليين (لبيئات Production وPreview):
+
+| المتغير | القيمة |
+|---------|--------|
+| `GOOGLE_CLIENT_ID` | القيمة المنسوخة من الخطوة 4 |
+| `GOOGLE_CLIENT_SECRET` | القيمة المنسوخة من الخطوة 4 |
+
+3. تأكد أيضًا من وجود هذه المتغيرات مسبقًا:
+
+| المتغير | القيمة |
+|---------|--------|
+| `NEXTAUTH_URL` | `https://kalam-ziadamr.vercel.app` (نفس رابط منصتك حرفيًا) |
+| `NEXTAUTH_SECRET` | ولّدها بـ `openssl rand -base64 32` |
+
+## الخطوة 6: إعادة النشر والتفعيل
+
+1. بعد إضافة المتغيرات: **Deployments → أحدث نشر → Redeploy** (النشر الجديد وحده يلتقط المتغيرات).
+2. افتح موقعك، اضغط «دخول بحساب Google» في منطقة التعليقات.
+3. يجب أن تفتح نافذة Google ثم يعود الزائر مسجلًا — انتهيت.
+
+## الخطوة 7 (محليًا إن رغبت)
+
+```bash
+# في ملف .env.local للمنصة العامة
+GOOGLE_CLIENT_ID="..."       # من الخطوة 4
+GOOGLE_CLIENT_SECRET="..."   # من الخطوة 4
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="..."        # openssl rand -base64 32
+```
+
+---
+
+## استكشاف الأخطاء السريع
+
+| الرسالة | السبب والحل |
+|---------|-------------|
+| `redirect_uri_mismatch` | رابط الـ callback في Google Console لا يطابق رابط منصتك حرفيًا (تحقق من https وبلا سlash زائد) |
+| `Access blocked: app has not completed verification` | شاشة الموافقة في وضع Testing — انشر التطبيق: OAuth consent screen → **PUBLISH APP** |
+| `NEXTAUTH_URL mismatch` | تأكد أن `NEXTAUTH_URL` في Vercel يساوي رابط المنصة تمامًا |
+| يعمل محليًا ولا يعمل على Vercel | أضف رابط Vercel إلى **Authorized JavaScript origins** وأعد النشر |
+
+## ملاحظة أمنية
+
+- لا تشارك `GOOGLE_CLIENT_SECRET` في أي كود أو مستودع — هو متغير بيئة فقط.
+- يمكنك لاحقًا تقييد الدخول بنطاقات بريد معينة من شاشة الموافقة إن أردت.
