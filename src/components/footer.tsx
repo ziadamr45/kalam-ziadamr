@@ -1,6 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { SECTIONS } from "@/lib/sections";
-import { getSiteConfig } from "@/lib/site-config";
+
+/*
+ * التذييل مكون آمن يعمل في كل الصفحات (Server وClient على حد سواء).
+ * القاعدة الذهبية: لا يجوز أن يكون أي مكوّن مستورد داخل صفحة "use client"
+ * من نوع async — React 19 يرمي الخطأ #482 فورًا عندئذٍ.
+ * لذلك: النص الافتراضي يُرسم فورًا (ثابت بين السيرفر والعميل = لا مشاكل
+ * hydration)، ثم يُستبدل بعد التحميل بنص التذييل المُدار من لوحة التحكم.
+ */
+const DEFAULT_FOOTER_TEXT = "نُشر بعناية.. لكلام له لازمة.";
 
 /* روابط صاحب المنصة الرسمية — كل منصاته في مكان واحد */
 const SOCIALS: { label: string; href: string; icon: React.ReactNode }[] = [
@@ -83,12 +94,22 @@ const SOCIALS: { label: string; href: string; icon: React.ReactNode }[] = [
   },
 ];
 
-export async function Footer() {
-  /* نص التذييل يُدار من لوحة التحكم — مع قيمة افتراضية عند تعذر القراءة */
-  let footerText = "نُشر بعناية.. لكلام له لازمة.";
-  try {
-    footerText = (await getSiteConfig()).FOOTER_TEXT || footerText;
-  } catch {}
+export function Footer() {
+  const [footerText, setFooterText] = useState(DEFAULT_FOOTER_TEXT);
+
+  /* جلب نص التذييل المُدار من لوحة التحكم — بعد الرسم الأول حتى لا نكسر الترطيب */
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/public-config", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d?.FOOTER_TEXT) setFooterText(d.FOOTER_TEXT);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <footer className="site-footer mt-auto border-t" style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}>
@@ -184,7 +205,7 @@ export async function Footer() {
           className="mt-10 border-t pt-6 text-center text-xs leading-6"
           style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
         >
-          {footerText || "نُشر بعناية.. لكلام له لازمة."} © {new Date().getFullYear()}
+          {footerText} © {new Date().getFullYear()}
         </div>
       </div>
     </footer>
