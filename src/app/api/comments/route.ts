@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeComment } from "@/lib/moderation";
+import { aiModerate } from "@/lib/ai-moderation";
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -51,11 +52,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "تم إيقاف المشاركة لهذا الحساب" }, { status: 403 });
     }
 
-    /* الفلترة الأخلاقية متعددة المستويات */
+    /* الفلترة الأخلاقية متعددة المستويات (قواعد محلية لحظية) */
     const verdict = analyzeComment(content);
 
     if (verdict.status === "REJECT") {
       return NextResponse.json({ error: verdict.reasons[0], rejected: true }, { status: 422 });
+    }
+
+    /* الرقابة الأخلاقية الفورية بالذكاء الاصطناعي — نداء خفيف قبل الحفظ،
+       ومعاييره الصارمة: الألفاظ النابية، التجريح الشخصي، الشريعة والقيم الإسلامية،
+       العادات والتقاليد العربية والمصرية الأصيلة، وحجب السبام.
+       عند أي عطل تُهمل النتيجة وتكمل الفلترة المحلية ومراجعة التحرير عملهما. */
+    const ai = await aiModerate(content);
+    if (ai.checked && !ai.approved) {
+      return NextResponse.json(
+        {
+          error: `${ai.reason} — راجع بنود صفحة «أخلاقيات الحوار والتعليق»`,
+          rejected: true,
+        },
+        { status: 422 },
+      );
     }
 
     const article = await prisma.article.findUnique({

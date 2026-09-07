@@ -7,6 +7,7 @@ import { BackToTop } from "@/components/back-to-top";
 import { ArticleCard } from "@/components/article-card";
 import { ArticleReader } from "@/components/article-reader";
 import { CommentsSection } from "@/components/comments-section";
+import { DiscussCompanion } from "@/components/discuss-companion";
 import { InteractionSlot } from "@/components/interaction-buttons";
 import {
   getArticleBySlug,
@@ -151,6 +152,9 @@ export default async function ArticlePage({
             }}
             tashkeelAllowed={tashkeelAllowed}
           />
+
+          {/* الرفيق الفكري — ناقش أفكار المقال (حصة صارمة من الخادم) */}
+          <DiscussCompanion articleId={article.id} articleTitle={article.title} />
 
           {/* التفاعل والمشاركة */}
           <div className="page-chrome mt-10 border-t pt-8" style={{ borderColor: "var(--border)" }}>
