@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
 import { QuranBlock, HadithBlock } from "@/components/quran-hadith-blocks";
@@ -53,13 +54,29 @@ export function ArticleReader({ article }: { article: ReaderArticle }) {
   const source = tashkeel ? article.contentWithTashkeel || article.content : article.content;
   const blocks = useMemo(() => parseBlocks(source), [source]);
 
-  /* الحفظ للقراءة دون اتصال */
+  /* الحفظ: في مكتبة الحساب المتزامنة + لقطة الجهاز للقراءة دون اتصال */
+  const { status } = useSession();
+  const loggedIn = status === "authenticated";
   const [saved, setSaved] = useState(false);
-  useEffect(() => {
-    isArticleSaved(article.id).then(setSaved).catch(() => {});
-  }, [article.id]);
+  const [saveBusy, setSaveBusy] = useState(false);
 
-  const handleSaveOffline = useCallback(async () => {
+  useEffect(() => {
+    let alive = true;
+    isArticleSaved(article.id).then((v) => { if (alive) setSaved(v); }).catch(() => {});
+    if (status === "authenticated") {
+      fetch("/api/saves")
+        .then((r) => (r.ok ? r.json() : { saves: [] }))
+        .then((d) => {
+          if (alive && (d.saves ?? []).some((s: { id: string }) => s.id === article.id)) setSaved(true);
+        })
+        .catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [article.id, status]);
+
+  const handleSave = useCallback(async () => {
+    if (saveBusy || saved) return;
+    setSaveBusy(true);
     const snapshot: OfflineArticle = {
       id: article.id,
       slug: article.slug,
@@ -73,10 +90,20 @@ export function ArticleReader({ article }: { article: ReaderArticle }) {
       sectionSlug: null,
     };
     try {
+      /* الحفظ المحلي (لقطة دون اتصال) في كل الأحوال */
       await saveOfflineArticle(snapshot);
+      /* الحفظ في مكتبة الحساب المتزامنة للمسجلين */
+      if (loggedIn) {
+        await fetch("/api/saves", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ articleId: article.id }),
+        }).catch(() => {});
+      }
       setSaved(true);
     } catch {}
-  }, [article]);
+    setSaveBusy(false);
+  }, [article, saved, saveBusy, loggedIn]);
 
   /* تتبع القراءة: زيارة، إكمال، بقاء */
   const viewIdRef = useRef<string | null>(null);
@@ -162,15 +189,15 @@ export function ArticleReader({ article }: { article: ReaderArticle }) {
 
         <span aria-hidden style={{ color: "var(--border)" }}>|</span>
 
-        {/* حفظ دون اتصال */}
+        {/* حفظ في مكتبتي */}
         <button
-          onClick={handleSaveOffline}
-          disabled={saved}
+          onClick={handleSave}
+          disabled={saved || saveBusy}
           className="rounded-full px-3 py-1.5 transition-all hover:bg-[var(--accent-soft)] disabled:opacity-60"
           style={{ color: saved ? "var(--accent-strong)" : "var(--ink-muted)" }}
-          title="حفظ المقال داخل جهازك للقراءة دون إنترنت"
+          title={loggedIn ? "يُحفظ في حسابك (متزامن عبر أجهزتك) + لقطة داخل جهازك للقراءة دون إنترنت" : "حفظ داخل جهازك — سجّل الدخول لتتزامن محفوظاتك عبر أجهزتك"}
         >
-          {saved ? "محفوظ للقراءة دون اتصال ✓" : "حفظ للقراءة دون اتصال"}
+          {saved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}
         </button>
 
         <span aria-hidden style={{ color: "var(--border)" }}>|</span>

@@ -162,6 +162,7 @@ export default async function ArticlePage({
           {/* التعليقات */}
           <CommentsSection
             articleId={article.id}
+            articleSlug={article.slug}
             initialComments={comments.map((c) => ({
               id: c.id,
               content: c.content,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/providers";
+import { AccountMenu } from "@/components/account-menu";
 import { SECTIONS } from "@/lib/sections";
 
 /* أيقونة قمر/شمس */
@@ -165,6 +166,8 @@ export function Header() {
           >
             <ThemeIcon dark={theme === "dark"} />
           </button>
+
+          <AccountMenu />
         </nav>
       </div>
     </header>
