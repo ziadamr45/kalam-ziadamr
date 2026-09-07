@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+/* رسالة التحقق المعتمدة — نفس صياغة السيرفر حرفيًا */
+const VALIDATION_MESSAGE =
+  "الاسم والرسالة حقلان إلزاميان، ويشترط أن تكون رسالتك أطول من سطر واحد؛ ليثمر حوارك نفعًا.";
+
 export function ContactForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -14,6 +18,18 @@ export function ContactForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (state === "sending") return;
+
+    /* فحص المعايير المعتمدة قبل الإرسال: الاسم إجباري،
+       والرسالة سطران فأكثر أو 50 حرفًا على الأقل، والبريد اختياري */
+    const trimmedName = name.trim();
+    const trimmedBody = body.trim();
+    const contentLines = trimmedBody.split("\n").filter((l) => l.trim().length > 0).length;
+    if (trimmedName.length < 2 || (contentLines < 2 && trimmedBody.length < 50)) {
+      setErrorMsg(VALIDATION_MESSAGE);
+      setState("error");
+      return;
+    }
+
     setState("sending");
     setErrorMsg("");
     try {
@@ -106,7 +122,7 @@ export function ContactForm() {
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-bold" style={{ color: "var(--ink)" }}>
-            البريد الإلكتروني (للرد عليك)
+            البريد الإلكتروني (اختياري — للرد عليك)
           </label>
           <input
             type="email"
@@ -150,7 +166,7 @@ export function ContactForm() {
           placeholder="اكتب رسالتك بهدوء.. ستصل مباشرة إلى لوحة تحكم صاحب المنصة."
         />
         <p className="mt-1 text-[11px]" style={{ color: "var(--ink-muted)" }}>
-          {body.length} / 3000 حرف
+          {body.length} / 3000 حرف — اكتب سطرين على الأقل أو 50 حرفًا ليثمر حوارك نفعًا
         </p>
       </div>
 

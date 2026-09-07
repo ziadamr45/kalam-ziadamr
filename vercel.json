@@ -1,3 +1,9 @@
 {
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/api/cron/publish-scheduled",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

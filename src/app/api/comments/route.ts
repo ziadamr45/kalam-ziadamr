@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeComment } from "@/lib/moderation";
 import { aiModerate } from "@/lib/ai-moderation";
+import { pushAdmins } from "@/lib/push";
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
 
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!article) {
       return NextResponse.json({ error: "المقال غير موجود" }, { status: 404 });
@@ -93,6 +94,16 @@ export async function POST(request: Request) {
         riskScore: verdict.riskScore,
         guestFp: fp || null,
       },
+    });
+
+    /* إشعار ويب فوري لهاتف صاحب المنصة — تعليق جديد وارد يحتاج مراجعة */
+    void pushAdmins({
+      title: `تعليق جديد وارد على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
+      body: `${session.user.name ?? "قارئ"}: ${content.trim().slice(0, 110)}${
+        content.trim().length > 110 ? "…" : ""
+      }`,
+      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments`,
+      tag: "new-comment",
     });
 
     return NextResponse.json({ ok: true, message: "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير" });

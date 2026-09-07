@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/providers";
 import { AccountMenu } from "@/components/account-menu";
+import { NotificationBell, DrawerNotifications } from "@/components/notification-bell";
 import { SECTIONS } from "@/lib/sections";
 
 /* أيقونة قمر/شمس */
@@ -182,6 +183,9 @@ export function Header() {
               <ThemeIcon dark={theme === "dark"} />
             </button>
 
+            {/* جرس الإشعارات — بجانب صورة الحساب (للحاسوب والتابلت) */}
+            <NotificationBell />
+
             <AccountMenu />
           </nav>
 
@@ -265,6 +269,10 @@ export function Header() {
               الرئيسية
               <span aria-hidden style={{ color: "var(--border)" }}>←</span>
             </Link>
+
+            {/* بند الإشعارات البارز — داخل الدرج حصريًا على الهواتف
+                تفاديًا للتزاحم في الهيدر العلوي وكسر التصميم */}
+            <DrawerNotifications />
 
             <p className="mb-2 mt-5 px-4 text-xs font-bold" style={{ color: "var(--ink-muted)" }}>
               الأقسام
