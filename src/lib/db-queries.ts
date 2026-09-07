@@ -8,9 +8,15 @@ import { prisma } from "@/lib/prisma";
 
 export type ArticleWithSection = Article & { section: Section | null };
 
+/**
+ * شرط "متاح للنشر الآن" — النشر الكسول بلا Cron:
+ * المنشور فعلًا + المجدول الذي حان موعده (يظهر تلقائيًا لحظة استحقاقه).
+ */
 const publishedWhere: Prisma.ArticleWhereInput = {
-  status: "PUBLISHED",
-  publishedAt: { lte: new Date() },
+  OR: [
+    { status: "PUBLISHED", publishedAt: { lte: new Date() } },
+    { status: "SCHEDULED", scheduledAt: { lte: new Date() } },
+  ],
 };
 
 /** أحدث المقالات المنشورة */
