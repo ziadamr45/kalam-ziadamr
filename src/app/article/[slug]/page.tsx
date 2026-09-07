@@ -168,6 +168,7 @@ export default async function ArticlePage({
               content: c.content,
               createdAt: c.createdAt.toISOString(),
               authorName: c.user?.name || c.guestName || "قارئ",
+              authorImage: c.user?.image || null,
             }))}
             isLoggedIn={Boolean(session?.user)}
           />

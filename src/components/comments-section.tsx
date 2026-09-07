@@ -12,6 +12,7 @@ type PublicComment = {
   content: string;
   createdAt: string;
   authorName: string;
+  authorImage: string | null;
 };
 
 const REPORT_REASONS = ["إساءة أو لغة غير لائقة", "إعلان أو سبام", "مخالفة القيم", "سبب آخر"];
@@ -170,12 +171,25 @@ export function CommentsSection({
           >
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full font-bold"
-                  style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                >
-                  {c.authorName.charAt(0)}
-                </span>
+                {c.authorImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={c.authorImage}
+                    alt={c.authorName}
+                    width={36}
+                    height={36}
+                    referrerPolicy="no-referrer"
+                    className="h-9 w-9 rounded-full border-2 object-cover"
+                    style={{ borderColor: "var(--accent-soft)" }}
+                  />
+                ) : (
+                  <span
+                    className="flex h-9 w-9 items-center justify-center rounded-full font-bold"
+                    style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                  >
+                    {c.authorName.charAt(0)}
+                  </span>
+                )}
                 <div>
                   <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
                     {c.authorName}

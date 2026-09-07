@@ -118,7 +118,7 @@ export async function getApprovedComments(articleId: string) {
       where: { articleId, status: "APPROVED" },
       orderBy: { createdAt: "desc" },
       take: 100,
-      include: { user: { select: { name: true } } },
+      include: { user: { select: { name: true, image: true } } },
     });
   } catch {
     return [];
