@@ -199,3 +199,114 @@ body.immersion .page-chrome {
     scroll-behavior: auto !important;
   }
 }
+
+/* =====================================================================
+   الآيات القرآنية والأحاديث النبوية — تنسيق هندسي وطباعي مخصص
+   ===================================================================== */
+
+.quran-block {
+  position: relative;
+  margin: 2.4rem auto;
+  max-width: 96%;
+  padding: 2.2rem 1.6rem 1.2rem;
+  text-align: center;
+  border-radius: 1.4rem;
+  background:
+    radial-gradient(120% 90% at 50% 0%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      color-mix(in srgb, var(--accent-soft) 45%, transparent) 55%,
+      transparent 100%);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.quran-ornament {
+  position: absolute;
+  top: 0.55rem;
+  right: 1.1rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--accent) 65%, transparent);
+  user-select: none;
+}
+
+.quran-text {
+  font-family: var(--font-quran), "Amiri Quran", "Amiri", serif;
+  font-size: clamp(1.45rem, 1.1rem + 1.2vw, 1.85rem);
+  line-height: 2.45;
+  color: var(--ink);
+  margin: 0;
+}
+
+.is-tashkeel .quran-text {
+  line-height: 2.75;
+}
+
+.quran-bracket {
+  color: var(--accent);
+  font-size: 1.25em;
+  user-select: none;
+}
+
+.quran-ref {
+  margin-top: 0.95rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+}
+
+.quran-ref-dot {
+  margin: 0 0.5rem;
+  color: var(--accent);
+}
+
+.hadith-block {
+  position: relative;
+  margin: 2.4rem 0;
+  padding: 1.5rem 1.7rem 1.1rem;
+  border-radius: 1.2rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--accent);
+}
+
+.hadith-text {
+  font-family: var(--font-naskh), "Amiri", serif;
+  font-size: clamp(1.2rem, 1rem + 0.8vw, 1.45rem);
+  line-height: 2.15;
+  color: var(--ink);
+  margin: 0;
+}
+
+.is-tashkeel .hadith-text {
+  line-height: 2.45;
+}
+
+.hadith-bracket {
+  color: var(--accent);
+  font-size: 1.3em;
+  user-select: none;
+}
+
+.hadith-ref {
+  margin-top: 0.85rem;
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.hadith-ref::before {
+  content: "";
+  display: inline-block;
+  width: 1.6rem;
+  height: 1px;
+  vertical-align: middle;
+  margin-inline-end: 0.6rem;
+  background: var(--accent);
+  opacity: 0.55;
+}

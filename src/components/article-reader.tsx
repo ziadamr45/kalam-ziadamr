@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
+import { QuranBlock, HadithBlock } from "@/components/quran-hadith-blocks";
 import { trackView, trackComplete, trackDwell } from "@/lib/analytics";
 import {
   saveOfflineArticle,
   isArticleSaved,
 } from "@/lib/indexeddb";
+import { parseBlocks, blockWordCount, type Block } from "@/lib/content-blocks";
 import type { OfflineArticle } from "@/types/offline";
 
 type ReaderArticle = {
@@ -24,39 +26,7 @@ type ReaderArticle = {
   readingTimeSec: number;
 };
 
-/* ============ فقرات المحتوى من النص الخام ============ */
-type Block =
-  | { kind: "p"; id: string; text: string }
-  | { kind: "h2"; id: string; text: string }
-  | { kind: "quote"; id: string; text: string }
-  | { kind: "list"; id: string; items: string[] };
-
-function parseBlocks(raw: string): Block[] {
-  const blocks: Block[] = [];
-  const chunks = raw.split(/\n\n+/);
-  let idx = 0;
-
-  for (const chunk of chunks) {
-    const trimmed = chunk.trim();
-    if (!trimmed) continue;
-    const id = `blk-${idx++}`;
-
-    if (trimmed.startsWith("## ")) {
-      blocks.push({ kind: "h2", id, text: trimmed.slice(3).trim() });
-    } else if (trimmed.startsWith("> ")) {
-      blocks.push({ kind: "quote", id, text: trimmed.replace(/^>\s?/gm, "").trim() });
-    } else if (/^-\s/m.test(trimmed) && trimmed.split("\n").every((l) => /^-\s/.test(l.trim()))) {
-      blocks.push({
-        kind: "list",
-        id,
-        items: trimmed.split("\n").map((l) => l.replace(/^-\s*/, "").trim()),
-      });
-    } else {
-      blocks.push({ kind: "p", id, text: trimmed.replace(/\n/g, " ") });
-    }
-  }
-  return blocks;
-}
+/* المحلل الموحد: src/lib/content-blocks.ts (فقرات + آيات + أحاديث) */
 
 export function ArticleReader({ article }: { article: ReaderArticle }) {
   /* تبديل التشكيل الفوري */
@@ -257,7 +227,7 @@ export function ArticleReader({ article }: { article: ReaderArticle }) {
             src={article.audioUrl}
             durationSec={article.audioDurationSec}
             cues={Array.isArray(article.audioCues) ? (article.audioCues as { t: number; id: string }[]) : null}
-            blocks={blocks.map((b) => ({ id: b.id, words: b.kind === "list" ? b.items.join(" ").split(/\s+/).length : b.text.split(/\s+/).length }))}
+            blocks={blocks.map((b) => ({ id: b.id, words: blockWordCount(b) }))}
           />
         </div>
       )}
@@ -290,6 +260,27 @@ export function ArticleReader({ article }: { article: ReaderArticle }) {
                   <li key={i}>{item}</li>
                 ))}
               </ul>
+            );
+          }
+          if (block.kind === "quran") {
+            return (
+              <QuranBlock
+                key={block.id}
+                id={block.id}
+                text={block.text}
+                sura={block.sura}
+                ayah={block.ayah}
+              />
+            );
+          }
+          if (block.kind === "hadith") {
+            return (
+              <HadithBlock
+                key={block.id}
+                id={block.id}
+                text={block.text}
+                narrator={block.narrator}
+              />
             );
           }
           return (

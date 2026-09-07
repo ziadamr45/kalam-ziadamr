@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Amiri, Readex_Pro } from "next/font/google";
+import {
+  Amiri,
+  Readex_Pro,
+  Amiri_Quran,
+  Noto_Naskh_Arabic,
+} from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
@@ -15,6 +20,22 @@ const readex = Readex_Pro({
   subsets: ["arabic", "latin"],
   weight: ["300", "400", "500", "600", "700"],
   variable: "--font-ui",
+  display: "swap",
+});
+
+/* خط الرسم العثماني الفاخر للآيات القرآنية */
+const amiriQuran = Amiri_Quran({
+  weight: "400",
+  subsets: ["arabic"],
+  variable: "--font-quran",
+  display: "swap",
+});
+
+/* خط النسخ الكلاسيكي الرصين للأحاديث النبوية */
+const naskh = Noto_Naskh_Arabic({
+  weight: ["400", "700"],
+  subsets: ["arabic"],
+  variable: "--font-naskh",
   display: "swap",
 });
 
@@ -71,7 +92,7 @@ export default function RootLayout({
       lang="ar"
       dir="rtl"
       suppressHydrationWarning
-      className={`${amiri.variable} ${readex.variable}`}
+      className={`${amiri.variable} ${readex.variable} ${amiriQuran.variable} ${naskh.variable}`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 type SizePreset = { key: string; label: string; w: number; h: number };
 type CardTheme = "paper" | "night";
+type CardVariant = "normal" | "quran" | "hadith";
 
 const SIZES: SizePreset[] = [
   { key: "story", label: "ستوري ١٠٨٠×١٩٢٠", w: 1080, h: 1920 },
@@ -20,13 +21,14 @@ const THEMES: Record<CardTheme, { bg: string; ink: string; accent: string; muted
 /**
  * رسم بطاقة الاقتباس على Canvas بدعم RTL كامل:
  * لف كلمات، علامتا اقتباس، خط نحاسي، تذييل الهوية.
+ * متمايز للآيات (﴿ ﴾ + خط الرسم العثماني) وللأحاديث (خط النسخ الكلاسيكي).
  */
 function drawQuoteCard(
   canvas: HTMLCanvasElement,
   quote: string,
   preset: SizePreset,
   theme: CardTheme,
-  scale: number,
+  variant: CardVariant,
 ) {
   const t = THEMES[theme];
   const W = preset.w;
@@ -67,12 +69,16 @@ function drawQuoteCard(
 
   // نص الاقتباس — لف الكلمات بمقاس متكيّف
   const maxW = W - m * 2 - Math.round(W * 0.09);
-  let fontSize = Math.round(Math.min(W, H) * 0.062);
+  const lineHFactor = variant === "quran" ? 2.15 : 1.85;
+  let fontSize = Math.round(Math.min(W, H) * (variant === "quran" ? 0.058 : 0.062));
   const minFontSize = Math.round(Math.min(W, H) * 0.026);
   let lines: string[] = [];
 
   const wrap = (fs: number): string[] => {
-    ctx.font = `700 ${fs}px Amiri, serif`;
+    ctx.font =
+      variant === "quran"
+        ? `400 ${fs}px "Amiri Quran", "Amiri", serif`
+        : `700 ${fs}px "Amiri", serif`;
     const words = quote.split(/\s+/);
     const out: string[] = [];
     let line = "";
@@ -91,26 +97,36 @@ function drawQuoteCard(
 
   for (;;) {
     lines = wrap(fontSize);
-    const lineH = fontSize * 1.85;
+    const lineH = fontSize * lineHFactor;
     const needed = lines.length * lineH + fontSize;
     if (needed <= H - m * 2 - Math.round(H * 0.16) || fontSize <= minFontSize) break;
     fontSize = Math.round(fontSize * 0.94);
   }
 
-  const lineH = fontSize * 1.85;
+  const lineH = fontSize * lineHFactor;
   const blockH = lines.length * lineH;
   const startY = H / 2 - blockH / 2 + fontSize * 0.4;
 
-  // علامتا الاقتباس الزخرفيتان
+  // علامتا الاقتباس — قرآنية ﴿ أو راقية «
+  const openMark = variant === "quran" ? "﴿" : "«";
+  const closeMark = variant === "quran" ? "﴾" : "»";
   ctx.fillStyle = t.accent;
   ctx.globalAlpha = 0.9;
-  ctx.font = `700 ${Math.round(fontSize * 1.6)}px Amiri, serif`;
-  ctx.fillText("«", W / 2, startY - fontSize * 1.5);
+  ctx.font =
+    variant === "quran"
+      ? `400 ${Math.round(fontSize * 1.5)}px "Amiri Quran", "Amiri", serif`
+      : `700 ${Math.round(fontSize * 1.6)}px Amiri, serif`;
+  ctx.fillText(openMark, W / 2, startY - fontSize * 1.5);
   ctx.globalAlpha = 1;
 
   // السطور
   ctx.fillStyle = t.ink;
-  ctx.font = `700 ${fontSize}px Amiri, serif`;
+  ctx.font =
+    variant === "quran"
+      ? `400 ${fontSize}px "Amiri Quran", "Amiri", serif`
+      : variant === "hadith"
+        ? `700 ${fontSize * 0.92}px "Noto Naskh Arabic", "Amiri", serif`
+        : `700 ${fontSize}px Amiri, serif`;
   ctx.shadowColor = theme === "night" ? "rgba(0,0,0,0.4)" : "rgba(28,25,23,0.06)";
   ctx.shadowBlur = 0;
   lines.forEach((line, i) => {
@@ -119,8 +135,11 @@ function drawQuoteCard(
 
   // علامة الإغلاق
   ctx.fillStyle = t.accent;
-  ctx.font = `700 ${Math.round(fontSize * 1.6)}px Amiri, serif`;
-  ctx.fillText("»", W / 2, startY + blockH + fontSize * 0.5);
+  ctx.font =
+    variant === "quran"
+      ? `400 ${Math.round(fontSize * 1.5)}px "Amiri Quran", "Amiri", serif`
+      : `700 ${Math.round(fontSize * 1.6)}px Amiri, serif`;
+  ctx.fillText(closeMark, W / 2, startY + blockH + fontSize * 0.5);
 
   // الخط الفاصل النحاسي
   const ruleY = H - Math.round(H * 0.11);
@@ -139,8 +158,6 @@ function drawQuoteCard(
   ctx.fillStyle = t.muted;
   ctx.font = `400 ${Math.round(Math.min(W, H) * 0.02)}px "Readex Pro", "Amiri", sans-serif`;
   ctx.fillText("مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.", W / 2, ruleY + Math.round(H * 0.088));
-
-  void scale;
 }
 
 function roundRect(
@@ -170,6 +187,7 @@ export function QuoteGenerator({
   containerSelector: string;
 }) {
   const [selectedText, setSelectedText] = useState("");
+  const [variant, setVariant] = useState<CardVariant>("normal");
   const [chipPos, setChipPos] = useState<{ x: number; y: number } | null>(null);
   const [open, setOpen] = useState(false);
   const [size, setSize] = useState<SizePreset>(SIZES[1]);
@@ -201,6 +219,17 @@ export function QuoteGenerator({
         setChipPos(null);
         return;
       }
+      /* كشف السياق: هل التحديد داخل آية أو حديث؟ */
+      const node = range.startContainer;
+      const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement | null);
+      const closest = el?.closest?.(".quran-block, .hadith-block");
+      setVariant(
+        closest?.classList.contains("quran-block")
+          ? "quran"
+          : closest?.classList.contains("hadith-block")
+            ? "hadith"
+            : "normal",
+      );
       const rect = range.getBoundingClientRect();
       setSelectedText(text);
       setChipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
@@ -216,7 +245,7 @@ export function QuoteGenerator({
     let cancelled = false;
     const render = () => {
       if (cancelled || !canvasRef.current) return;
-      drawQuoteCard(canvasRef.current, selectedText, size, theme, 1);
+      drawQuoteCard(canvasRef.current, selectedText, size, theme, variant);
     };
     if (document.fonts?.ready) {
       document.fonts.ready.then(render).catch(render);
@@ -226,7 +255,7 @@ export function QuoteGenerator({
     return () => {
       cancelled = true;
     };
-  }, [open, selectedText, size, theme]);
+  }, [open, selectedText, size, theme, variant]);
 
   const download = useCallback(() => {
     const canvas = canvasRef.current;
@@ -311,7 +340,11 @@ export function QuoteGenerator({
             >
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-ui font-bold" style={{ color: "var(--ink)" }}>
-                  بطاقة الاقتباس
+                  {variant === "quran"
+                    ? "بطاقة الآية الكريمة"
+                    : variant === "hadith"
+                      ? "بطاقة الحديث الشريف"
+                      : "بطاقة الاقتباس"}
                 </h3>
                 <button
                   onClick={() => setOpen(false)}
