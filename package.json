@@ -16,7 +16,7 @@
     "idb-keyval": "6.2.2",
     "jose": "5.9.6",
     "next": "15.5.4",
-    "next-auth": "5.0.0-beta.29",
+    "next-auth": "5.0.0-beta.32",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
