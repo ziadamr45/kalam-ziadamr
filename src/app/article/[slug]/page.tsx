@@ -8,7 +8,10 @@ import { ArticleCard } from "@/components/article-card";
 import { ArticleReader } from "@/components/article-reader";
 import { CommentsSection } from "@/components/comments-section";
 import { DiscussCompanion } from "@/components/discuss-companion";
+import { ImpactReadTracker } from "@/components/impact-read-tracker";
 import { InteractionSlot } from "@/components/interaction-buttons";
+import { displayName, displayAvatar } from "@/lib/identity";
+import { requiredReadSeconds } from "@/lib/impact";
 import {
   getArticleBySlug,
   getPublishedSlugs,
@@ -171,6 +174,13 @@ export default async function ArticlePage({
             </div>
           </div>
 
+          {/* رقيب القراءة المتأنية — +10 أثر عند الالتزام الحقيقي بالنص */}
+          <ImpactReadTracker
+            articleId={article.id}
+            requiredSeconds={requiredReadSeconds(article.content)}
+            isLoggedIn={Boolean(session?.user?.id)}
+          />
+
           {/* التعليقات — مع مفتاح الإيقاف الفوري (Kill Switch) من لوحة التحكم */}
           {siteCfg.COMMENTS_ENABLED ? (
             <CommentsSection
@@ -180,8 +190,10 @@ export default async function ArticlePage({
                 id: c.id,
                 content: c.content,
                 createdAt: c.createdAt.toISOString(),
-                authorName: c.user?.name || c.guestName || "قارئ",
-                authorImage: c.user?.image || null,
+                authorName: displayName(c.user),
+                authorImage: displayAvatar(c.user),
+                authorRank: c.user?.intellectualRank ?? null,
+                isInspiring: c.isInspiring,
               }))}
               isLoggedIn={Boolean(session?.user)}
             />

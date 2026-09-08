@@ -103,12 +103,12 @@ export function AccountMenu() {
           </div>
           <nav className="p-2 text-sm">
             <Link
-              href="/me"
+              href="/profile"
               onClick={() => setOpen(false)}
               className="block rounded-xl px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
               style={{ color: "var(--ink)" }}
             >
-              حسابي وتعليقاتي
+              ملفي ورصيد أثري
             </Link>
             <Link
               href="/saved"

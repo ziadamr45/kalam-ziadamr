@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/providers";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationBell, DrawerNotifications } from "@/components/notification-bell";
+import { BrandMark } from "@/components/brand-mark";
 import { SECTIONS } from "@/lib/sections";
 
 /* أيقونة قمر/شمس */
@@ -97,8 +98,13 @@ export function Header() {
       >
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex flex-col leading-tight" onClick={() => setDrawerOpen(false)}>
-            <span className="font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
-              كلام له لازمة
+            {/* العلامة الميكروية — الكشيدة النحاسية جزء عضوي من كتابة العنوان
+                في موضع الهوية الرئيسي حصريًا، بحجم محسوب لا يزدحم الهيدر */}
+            <span className="flex items-center gap-1.5">
+              <BrandMark size={17} />
+              <span className="font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
+                كلام له لازمة
+              </span>
             </span>
             <span className="text-[10px]" style={{ color: "var(--ink-muted)" }}>
               مش كل كلام لازم يتقال..
@@ -241,7 +247,8 @@ export function Header() {
         >
           <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
             <div>
-              <p className="font-ui font-bold" style={{ color: "var(--ink)" }}>
+              <p className="flex items-center gap-1.5 font-ui font-bold" style={{ color: "var(--ink)" }}>
+                <BrandMark size={16} />
                 كلام له لازمة
               </p>
               <p className="text-[10px]" style={{ color: "var(--ink-muted)" }}>
@@ -302,7 +309,7 @@ export function Header() {
               {[
                 { href: "/about", label: "عن المنصة" },
                 { href: "/saved", label: "قراءاتي المحفوظة" },
-                { href: "/me", label: "حسابي" },
+                { href: "/profile", label: "ملفي ورصيد أثري" },
                 { href: "/contact", label: "اتصل بنا" },
               ].map((l) => (
                 <Link

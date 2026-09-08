@@ -60,7 +60,7 @@ export async function DELETE() {
     /* إعادة توليد الصفحات التي ظهرت فيها تعليقاته */
     const slugs = [...new Set(approved.map((c) => c.article.slug))];
     for (const slug of slugs) revalidatePath(`/article/${slug}`);
-    revalidatePath("/me");
+    revalidatePath("/profile");
 
     return NextResponse.json({ ok: true });
   } catch {

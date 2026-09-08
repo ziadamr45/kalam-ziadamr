@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { geminiChat, geminiConfigured, ChatTurn, GeminiError } from "@/lib/gemini-chat";
+import { aiQuotaForScore, AI_QUOTA_BASE } from "@/lib/ranks";
 
 /**
  * ============================================================
@@ -11,12 +12,14 @@ import { geminiChat, geminiConfigured, ChatTurn, GeminiError } from "@/lib/gemin
  * - حقن السياق المزدوج: متن المقال كاملًا + التغذية الفكرية السرية (authorIntent)
  *   التي لا تُغادر الخادم أبدًا ولا تُعاد في أي استجابة.
  * - حماية الموارد: حصة صارمة لكل قارئ في كل مقال + مانع اندفاع لحظي.
+ * - ميزة الرصيد المرتفع: حصة النقاش تتمدد مع ترقية رتبة «رصيد الأثر»
+ *   (عقل رصين 9 رسائل — أهل الكلمة 12 رسالة لكل مقال).
  */
 
 export const maxDuration = 30;
 
-/** الحصة الصارمة: 6 رسائل لكل قارئ لكل مقال (وسط النطاق 5–7 المطلوب) */
-const MAX_PER_READER_PER_ARTICLE = 6;
+/** الحصة الأساسية: 6 رسائل لكل قارئ لكل مقال — تتمدد مع الرتبة الفكرية */
+const BASE_PER_READER_PER_ARTICLE = AI_QUOTA_BASE;
 /** مانع الاندفاع: 10 رسائل كحد أقصى في الدقيقة للقارئ نفسه */
 const BURST_PER_MINUTE = 10;
 
@@ -33,13 +36,29 @@ function quotaKey(articleId: string, readerKey: string): string {
   return `${articleId}:${readerKey}`;
 }
 
-function remainingFor(articleId: string, readerKey: string): number {
-  const q = quotaBuckets.get(quotaKey(articleId, readerKey));
-  if (!q || q.day !== todayKey()) return MAX_PER_READER_PER_ARTICLE;
-  return Math.max(0, MAX_PER_READER_PER_ARTICLE - q.count);
+/** حصة القارئ: الأساس + تمديد الرتبة للمسجلين بحساب حقيقي غير محظور */
+async function limitFor(readerKey: string): Promise<number> {
+  if (readerKey.startsWith("u:")) {
+    try {
+      const u = await prisma.user.findUnique({
+        where: { id: readerKey.slice(2) },
+        select: { impactScore: true, banned: true },
+      });
+      if (u && !u.banned) return aiQuotaForScore(u.impactScore);
+    } catch {}
+  }
+  return BASE_PER_READER_PER_ARTICLE;
 }
 
-function consumeQuota(articleId: string, readerKey: string): number {
+async function remainingFor(articleId: string, readerKey: string): Promise<number> {
+  const limit = await limitFor(readerKey);
+  const q = quotaBuckets.get(quotaKey(articleId, readerKey));
+  if (!q || q.day !== todayKey()) return limit;
+  return Math.max(0, limit - q.count);
+}
+
+async function consumeQuota(articleId: string, readerKey: string): Promise<number> {
+  const limit = await limitFor(readerKey);
   const key = quotaKey(articleId, readerKey);
   const day = todayKey();
   const q = quotaBuckets.get(key);
@@ -48,7 +67,7 @@ function consumeQuota(articleId: string, readerKey: string): number {
   } else {
     q.count += 1;
   }
-  return Math.max(0, MAX_PER_READER_PER_ARTICLE - quotaBuckets.get(key)!.count);
+  return Math.max(0, limit - quotaBuckets.get(key)!.count);
 }
 
 function allowBurst(readerKey: string): boolean {
@@ -128,8 +147,8 @@ export async function GET(request: Request) {
   const readerKey = getReaderKey(session, fp);
 
   return NextResponse.json({
-    limit: MAX_PER_READER_PER_ARTICLE,
-    remaining: remainingFor(articleId, readerKey),
+    limit: await limitFor(readerKey),
+    remaining: await remainingFor(articleId, readerKey),
   });
 }
 
@@ -168,7 +187,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const remaining = remainingFor(articleId, readerKey);
+    const remaining = await remainingFor(articleId, readerKey);
     if (remaining <= 0) {
       return NextResponse.json(
         { error: "استُهلكت حصة النقاش لهذا المقال — شكرًا لحوارك الراقي", exhausted: true },
@@ -225,12 +244,12 @@ export async function POST(request: Request) {
     }
 
     gcBuckets();
-    const remainingAfter = consumeQuota(articleId, readerKey);
+    const remainingAfter = await consumeQuota(articleId, readerKey);
 
     return NextResponse.json({
       reply,
       remaining: remainingAfter,
-      limit: MAX_PER_READER_PER_ARTICLE,
+      limit: await limitFor(readerKey),
     });
   } catch (err) {
     if (err instanceof GeminiError) {

@@ -256,6 +256,7 @@ export function ArticleReader({
 
         {/* مولد الاقتباسات */}
         <QuoteGenerator
+          articleId={article.id}
           articleTitle={article.title}
           articleSlug={article.slug}
           containerSelector="#article-body"

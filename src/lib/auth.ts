@@ -138,15 +138,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         if (session.user && token.uid) {
           session.user.id = String(token.uid);
-          /* الصورة الحية من قاعدة البيانات — لو حدّث المستخدم صورته تظهر فورًا */
+          /* الهوية المعروضة حيًا من قاعدة البيانات:
+             الاسم المخصص والصورة الشخصية أولًا ثم بيانات Google الأصلية —
+             فيتكيف الهيدر والقوائم فور أي تعديل من صفحة الملف الشخصي */
           const dbUser = await prisma.user.findUnique({
             where: { id: String(token.uid) },
-            select: { image: true },
+            select: { image: true, name: true, customName: true, customImage: true },
           });
-          if (dbUser?.image) session.user.image = dbUser.image;
+          if (dbUser) {
+            session.user.image = dbUser.customImage?.trim() || dbUser.image || null;
+            session.user.name = dbUser.customName?.trim() || dbUser.name || null;
+          }
         }
       } catch {
-        // جلسة ناقصة الصورة أفضل من انهيار
+        // جلسة ناقصة الهوية أفضل من انهيار
       }
       return session;
     },

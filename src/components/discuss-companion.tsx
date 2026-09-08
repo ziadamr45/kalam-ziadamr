@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
 
 /**
@@ -31,6 +32,8 @@ export function DiscussCompanion({
   const [limit, setLimit] = useState<number>(6);
   const [error, setError] = useState("");
   const [exhausted, setExhausted] = useState(false);
+  const [impactNote, setImpactNote] = useState("");
+  const { data: session } = useSession();
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -173,6 +176,22 @@ export function DiscussCompanion({
         if (rem <= 0) setExhausted(true);
       }
       persistSession(finalMessages, rem);
+
+      /* ============ خطاف «النقاش الفكري العميق» +5 أثر ============
+         تُمنح مرة واحدة لكل مقال عند بلوغ الحوار ثالث رسالة مسترسلة
+         للمستخدم المسجل (حوار كامل مثمر لا سؤال عابر). */
+      const userTurns = finalMessages.filter((m) => m.role === "user").length;
+      if (session?.user?.id && userTurns === 3) {
+        try {
+          const ir = await fetch("/api/impact/award", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ actionType: "AI_DISCUSS", articleId, userTurns }),
+          });
+          const idata = await ir.json().catch(() => null);
+          if (idata?.awarded) setImpactNote(`+${idata.points} رصيد أثر لحوارك المثمر`);
+        } catch {}
+      }
     } catch {
       setError("انقطع الاتصال — أعد المحاولة");
       setMessages(messages);
@@ -262,6 +281,15 @@ export function DiscussCompanion({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {impactNote && (
+                <span
+                  className="hidden rounded-full px-3 py-1 text-[11px] font-bold sm:inline"
+                  style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                  title="سُجّل في رصيد أثرك الفكري"
+                >
+                  ✦ {impactNote}
+                </span>
+              )}
               {remaining !== null && (
                 <span
                   className="rounded-full px-3 py-1 text-[11px] font-bold tabular-nums"
@@ -269,7 +297,7 @@ export function DiscussCompanion({
                     background: "var(--bg-soft)",
                     color: remaining <= 1 ? "#DC2626" : "var(--ink-muted)",
                   }}
-                  title="الرسائل المتبقية في حصة هذا المقال"
+                  title="الرسائل المتبقية في حصة هذا المقال — تتمدد حصتك مع ترقية رتبتك"
                 >
                   متبقٍ {arabicNum(remaining)} من {arabicNum(limit)}
                 </span>

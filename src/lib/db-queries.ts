@@ -111,14 +111,25 @@ export async function getRelatedArticles(
   }
 }
 
-/** التعليقات المعتمدة لمقال */
+/** التعليقات المعتمدة لمقال — بالهوية المعروضة والرتبة، و«التعليق الملهم» مثبتًا أعلى القائمة */
 export async function getApprovedComments(articleId: string) {
   try {
     return await prisma.comment.findMany({
       where: { articleId, status: "APPROVED" },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ isInspiring: "desc" }, { createdAt: "desc" }],
       take: 100,
-      include: { user: { select: { name: true, image: true } } },
+      include: {
+        user: {
+          select: {
+            name: true,
+            image: true,
+            customName: true,
+            customImage: true,
+            impactScore: true,
+            intellectualRank: true,
+          },
+        },
+      },
     });
   } catch {
     return [];

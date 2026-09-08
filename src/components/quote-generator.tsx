@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSession } from "next-auth/react";
 
 type SizePreset = { key: string; label: string; w: number; h: number };
 type CardTheme = "paper" | "night";
@@ -178,14 +179,17 @@ function roundRect(
 }
 
 export function QuoteGenerator({
+  articleId,
   articleTitle,
   articleSlug,
   containerSelector,
 }: {
+  articleId: string;
   articleTitle: string;
   articleSlug: string;
   containerSelector: string;
 }) {
+  const { data: session } = useSession();
   const [selectedText, setSelectedText] = useState("");
   const [variant, setVariant] = useState<CardVariant>("normal");
   const [chipPos, setChipPos] = useState<{ x: number; y: number } | null>(null);
@@ -257,6 +261,24 @@ export function QuoteGenerator({
     };
   }, [open, selectedText, size, theme, variant]);
 
+  /**
+   * خطاف «حفظ ومشاركة الاقتباس» (+3 أثر — مرتان يوميًا بسقف خادمي):
+   * صامت تمامًا للزائر وفاشل التسجيل — لا يمس تجربة المشاركة أبدًا.
+   */
+  const [impactNote, setImpactNote] = useState("");
+  const trackImpact = useCallback(async () => {
+    if (!session?.user?.id) return;
+    try {
+      const res = await fetch("/api/impact/award", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionType: "QUOTE_SHARE", articleId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.awarded) setImpactNote(`+${data.points} سُجّلت في رصيد أثرك`);
+    } catch {}
+  }, [articleId, session?.user?.id]);
+
   const download = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -265,7 +287,8 @@ export function QuoteGenerator({
     a.download = `quote-kalam-${articleSlug}-${size.key}.png`;
     a.click();
     trackShareBySlug(articleSlug, "quote-download", selectedText.length);
-  }, [articleSlug, size.key, selectedText.length]);
+    void trackImpact();
+  }, [articleSlug, size.key, selectedText.length, trackImpact]);
 
   const shareNative = useCallback(async () => {
     const canvas = canvasRef.current;
@@ -274,6 +297,7 @@ export function QuoteGenerator({
       canvas.toBlob((b) => resolve(b), "image/png"),
     );
     trackShareBySlug(articleSlug, "quote-share", selectedText.length);
+    void trackImpact();
     if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], "quote.png", { type: "image/png" })] })) {
       try {
         await navigator.share({
@@ -289,7 +313,7 @@ export function QuoteGenerator({
       await navigator.clipboard.writeText(`«${selectedText}» — كلام له لازمة`);
       alert("تم نسخ الاقتباس.. الصقه حيث تريد.");
     } catch {}
-  }, [articleSlug, articleTitle, selectedText]);
+  }, [articleSlug, articleTitle, selectedText, trackImpact]);
 
   return (
     <>
@@ -417,6 +441,12 @@ export function QuoteGenerator({
                   مشاركة
                 </button>
               </div>
+
+              {impactNote && (
+                <p className="mt-3 text-center text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
+                  ✦ {impactNote}
+                </p>
+              )}
             </div>
           </div>,
           document.body,

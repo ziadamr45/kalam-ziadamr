@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { analyzeComment } from "@/lib/moderation";
 import { aiModerate } from "@/lib/ai-moderation";
 import { pushAdmins } from "@/lib/push";
+import { awardImpact, IMPACT_POINTS } from "@/lib/impact";
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -83,11 +84,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "المقال غير موجود" }, { status: 404 });
     }
 
-    await prisma.comment.create({
+    const trimmed = content.trim();
+    const created = await prisma.comment.create({
       data: {
         articleId,
         userId: session.user.id,
-        content: content.trim(),
+        content: trimmed,
         status: "PENDING",
         flagged: verdict.flagged,
         flagReasons: verdict.reasons,
@@ -96,17 +98,43 @@ export async function POST(request: Request) {
       },
     });
 
+    /* ============ «التعليق الهادف المعتمد» +15 نقطة أثر ============
+       تُمنح للتعليق الذي اجتاز الفلترة الأخلاقية متعددة المستويات أعلاه
+       واستوفى شروط الطول والمضمون (40 حرفًا فأكثر، بخطورة منخفضة)،
+       بسقف يومي 3 تعليقات محتسبة حمايةً من تربية النقاط. */
+    let impact: Awaited<ReturnType<typeof awardImpact>> | null = null;
+    if (trimmed.length >= 40 && verdict.riskScore < 0.4) {
+      try {
+        impact = await awardImpact({
+          userId: session.user.id,
+          actionType: "COMMENT_APPROVED",
+          points: IMPACT_POINTS.COMMENT_APPROVED,
+          articleId,
+          dedupKey: `COMMENT:${created.id}`,
+          dailyCap: 3,
+        });
+      } catch {
+        impact = null; // المنح زينة لا يعطل إرسال التعليق أبدًا
+      }
+    }
+
     /* إشعار ويب فوري لهاتف صاحب المنصة — تعليق جديد وارد يحتاج مراجعة */
     void pushAdmins({
       title: `تعليق جديد وارد على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
-      body: `${session.user.name ?? "قارئ"}: ${content.trim().slice(0, 110)}${
-        content.trim().length > 110 ? "…" : ""
+      body: `${session.user.name ?? "قارئ"}: ${trimmed.slice(0, 110)}${
+        trimmed.length > 110 ? "…" : ""
       }`,
       url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments`,
       tag: "new-comment",
     });
 
-    return NextResponse.json({ ok: true, message: "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير" });
+    return NextResponse.json({
+      ok: true,
+      message: "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير",
+      impact: impact?.awarded
+        ? { points: impact.points, impactScore: impact.impactScore, rank: impact.rank, rankUp: impact.rankUp }
+        : null,
+    });
   } catch {
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }

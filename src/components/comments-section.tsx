@@ -6,6 +6,7 @@ import Link from "next/link";
 import { analyzeComment } from "@/lib/moderation";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
 import { formatArabicDate } from "@/lib/utils";
+import { RankBadge } from "@/components/rank-badge";
 
 type PublicComment = {
   id: string;
@@ -13,6 +14,8 @@ type PublicComment = {
   createdAt: string;
   authorName: string;
   authorImage: string | null;
+  authorRank: string | null;
+  isInspiring: boolean;
 };
 
 const REPORT_REASONS = ["إساءة أو لغة غير لائقة", "إعلان أو سبام", "مخالفة القيم", "سبب آخر"];
@@ -36,6 +39,7 @@ export function CommentsSection({
   const [reportFor, setReportFor] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
   const [reportSent, setReportSent] = useState<string | null>(null);
+  const [impactNote, setImpactNote] = useState<string>("");
 
   const loggedIn = isLoggedIn && Boolean(session?.user);
 
@@ -76,6 +80,9 @@ export function CommentsSection({
       }
       setStatus("sent");
       setContent("");
+      if (data?.impact?.awarded) {
+        setImpactNote(`+${data.impact.points} رصيد أثر — ${data.impact.rankUp ? `وترقيت إلى «${data.impact.rank}»` : `رصيدك الآن ${data.impact.impactScore}`}`);
+      }
     } catch {
       setStatus("error");
     }
@@ -139,6 +146,11 @@ export function CommentsSection({
           {status === "sent" && (
             <p className="mt-3 text-sm font-semibold" style={{ color: "var(--accent-strong)" }}>
               تعليقك وصل وسيظهر بعد مراجعة فريق التحرير. شكرًا لكلامك المؤدَّب.
+              {impactNote && (
+                <span className="mt-1 block text-xs" style={{ color: "var(--ink-muted)" }}>
+                  ✦ {impactNote}
+                </span>
+              )}
             </p>
           )}
         </form>
@@ -167,8 +179,20 @@ export function CommentsSection({
           <li
             key={c.id}
             className="rounded-2xl border p-5 shadow-soft"
-            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+            style={
+              c.isInspiring
+                ? { background: "var(--accent-soft)", borderColor: "var(--accent)" }
+                : { background: "var(--surface)", borderColor: "var(--border)" }
+            }
           >
+            {c.isInspiring && (
+              <p className="mb-3 flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M12 2l2.6 6.2L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.4-.8L12 2z" />
+                </svg>
+                تعليق فكري ملهم — مثبَّت أعلى الحوار بتمييز التحرير
+              </p>
+            )}
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 {c.authorImage ? (
@@ -191,9 +215,12 @@ export function CommentsSection({
                   </span>
                 )}
                 <div>
-                  <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
-                    {c.authorName}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
+                      {c.authorName}
+                    </p>
+                    {c.authorRank && c.authorRank !== "قارئ متأمل" && <RankBadge rank={c.authorRank} />}
+                  </div>
                   <p className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
                     {formatArabicDate(c.createdAt)}
                   </p>
