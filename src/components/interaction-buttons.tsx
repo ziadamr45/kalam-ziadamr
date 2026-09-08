@@ -1,28 +1,46 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
 import { easternDigits } from "@/lib/utils";
 
 /**
  * أزرار الإعجاب/عدم الإعجاب — تحديث تفاؤلي فوري بلا إعادة تحميل،
  * تصويت واحد لكل زائر، إلغاء التصويت بالنقر على نفس الزر.
+ * الصفحة ISR ثابتة — لذا يجلب المكوّن تصويت الزائر الحالي بنفسه عبر
+ * GET /api/interactions فور التركيب بدل اعتماد بيانات الخادم الثابتة.
  */
 export function InteractionSlot({
   articleId,
   initialLikes,
   initialDislikes,
-  initialMyVote,
 }: {
   articleId: string;
   initialLikes: number;
   initialDislikes: number;
-  initialMyVote: number | null;
 }) {
   const [likes, setLikes] = useState(initialLikes);
   const [dislikes, setDislikes] = useState(initialDislikes);
-  const [myVote, setMyVote] = useState<number | null>(initialMyVote);
+  const [myVote, setMyVote] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /* جلب تصويت الزائر الحالي من الخادم — الصفحة نفسها مخزّنة ثابتًا (ISR) */
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams({ articleId, fp: getVisitorFingerprint() });
+    fetch(`/api/interactions?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { likes?: number; dislikes?: number; myVote?: number | null } | null) => {
+        if (cancelled || !data) return;
+        if (typeof data.likes === "number") setLikes(data.likes);
+        if (typeof data.dislikes === "number") setDislikes(data.dislikes);
+        setMyVote(data.myVote ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [articleId]);
 
   const vote = useCallback(
     async (value: 1 | -1) => {

@@ -57,6 +57,16 @@ export function AudioPlayer({
   /* جلسة صوتية نشطة (بدأ التشغيل ولم ينتهِ) — تحكم ظهور الكبسولة العائمة */
   const [sessionActive, setSessionActive] = useState(false);
 
+  /* بث حالة الكبسولة للعناصر العائمة الأخرى — زر العودة للأعلى يرتفع فوقها تلقائيًا */
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("kalam:audio-capsule", { detail: { active: sessionActive } }),
+    );
+    return () => {
+      window.dispatchEvent(new CustomEvent("kalam:audio-capsule", { detail: { active: false } }));
+    };
+  }, [sessionActive]);
+
   const wordElsRef = useRef<Map<number, Element> | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const cachedRef = useRef(false);

@@ -29,7 +29,9 @@ export function CommentsSection({
   articleId: string;
   articleSlug?: string;
   initialComments: PublicComment[];
-  isLoggedIn: boolean;
+  /* الصفحة ISR ثابتة — الحالة الفعلية للجلسة تُقرأ من useSession أدناه؛
+     الخاصية متروكة اختيارية للتوافق وتعمل كمفتاح قسر عند تمرير false */
+  isLoggedIn?: boolean;
 }) {
   const { data: session } = useSession();
   const [comments] = useState(initialComments);
@@ -41,7 +43,7 @@ export function CommentsSection({
   const [reportSent, setReportSent] = useState<string | null>(null);
   const [impactNote, setImpactNote] = useState<string>("");
 
-  const loggedIn = isLoggedIn && Boolean(session?.user);
+  const loggedIn = (isLoggedIn ?? true) && Boolean(session?.user);
 
   /* الفلترة اللحظية قبل الإرسال */
   const onContentChange = (value: string) => {

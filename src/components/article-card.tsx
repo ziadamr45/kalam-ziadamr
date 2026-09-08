@@ -16,6 +16,9 @@ export function ArticleCard({ article, index = 0 }: { article: ArticleCardData; 
   return (
     <Link
       href={`/article/${article.slug}`}
+      /* تحميل مسبق ذكي: بمجرد ظهور البطاقة في الشاشة يجهز كود وبيانات المقال
+         في الخلفية — النقر يفتح المقال فورًا في أجزاء من الثانية */
+      prefetch={true}
       className="group block rounded-2xl border p-6 shadow-soft transition-all duration-500 ease-fluid hover:-translate-y-1 hover:shadow-lift animate-fade-up"
       style={{
         background: "var(--surface)",

@@ -18,6 +18,43 @@ function allow(fp: string): boolean {
   return true;
 }
 
+/* قراءة خفيفة لحالة التصويت — تستخدمها صفحة المقال الثابتة (ISR) لجلب
+   تصويت الزائر الحالي وتحديث الأرقام بعد تركيب الصفحة في المتصفح */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const articleId = searchParams.get("articleId");
+    const fp = searchParams.get("fp");
+    if (!articleId) {
+      return NextResponse.json({ error: "معرف المقال مطلوب" }, { status: 400 });
+    }
+
+    const session = await auth();
+    const userId = session?.user?.id || null;
+
+    const grouped = await prisma.interaction.groupBy({
+      by: ["value"],
+      where: { articleId },
+      _count: { value: true },
+    });
+    const likes = grouped.find((g) => g.value === 1)?._count.value ?? 0;
+    const dislikes = grouped.find((g) => g.value === -1)?._count.value ?? 0;
+
+    let myVote: number | null = null;
+    if (userId || fp) {
+      const where = userId
+        ? { articleId_userId: { articleId, userId } }
+        : { articleId_visitorFp: { articleId, visitorFp: fp as string } };
+      const mine = await prisma.interaction.findUnique({ where, select: { value: true } });
+      myVote = mine?.value ?? null;
+    }
+
+    return NextResponse.json({ likes, dislikes, myVote });
+  } catch {
+    return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {

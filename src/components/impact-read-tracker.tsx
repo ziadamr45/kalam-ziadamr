@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 
 /**
  * ============================================================
@@ -17,12 +18,13 @@ import { useEffect, useRef } from "react";
 export function ImpactReadTracker({
   articleId,
   requiredSeconds,
-  isLoggedIn,
 }: {
   articleId: string;
   requiredSeconds: number;
-  isLoggedIn: boolean;
 }) {
+  /* الصفحة ISR ثابتة — حالة الجلسة تُقرأ هنا من العميل مباشرة */
+  const { data: session } = useSession();
+  const isLoggedIn = Boolean(session?.user);
   const dwell = useRef(0);
   const maxScroll = useRef(0);
   const fired = useRef(false);

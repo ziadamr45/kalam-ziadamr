@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import NextTopLoader from "nextjs-toploader";
 import {
   Amiri,
   Readex_Pro,
@@ -114,6 +115,16 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
       </head>
       <body className="font-ui min-h-screen flex flex-col antialiased">
+        {/* شريط التقدم العلوي الفوري — شريط ذهبي نحيف يظهر لحظة لمس أي رابط
+            ليمنح القارئ إشعارًا بصريًا فوريًا بأن الطلب قيد الاستجابة */}
+        <NextTopLoader
+          color="var(--accent)"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          speed={300}
+          height={3}
+          showSpinner={false}
+        />
         <Providers>
           {children}
         </Providers>

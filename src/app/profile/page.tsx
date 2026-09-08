@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -234,9 +235,9 @@ export default async function ProfilePage() {
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
                       {l.article?.slug ? (
-                        <a href={`/article/${l.article.slug}`} className="hover:underline">
+                        <Link href={`/article/${l.article.slug}`} prefetch={true} className="hover:underline">
                           {l.article.title}
-                        </a>
+                        </Link>
                       ) : (
                         formatArabicDate(l.createdAt)
                       )}
@@ -321,13 +322,14 @@ export default async function ProfilePage() {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       {c.article?.slug ? (
-                        <a
+                        <Link
                           href={`/article/${c.article.slug}`}
+                          prefetch={true}
                           className="text-xs font-bold hover:underline"
                           style={{ color: "var(--accent-strong)" }}
                         >
                           {c.article.title}
-                        </a>
+                        </Link>
                       ) : (
                         <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
                           مقال محذوف

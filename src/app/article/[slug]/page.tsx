@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
@@ -18,21 +19,38 @@ import {
   getRelatedArticles,
   getApprovedComments,
   getInteractionCounts,
-  getMyVote,
+  getPublishedSlugs,
 } from "@/lib/db-queries";
-import { auth } from "@/lib/auth";
 import { getSiteConfig } from "@/lib/site-config";
 import { formatArabicDate } from "@/lib/utils";
 import { formatReadingTime } from "@/lib/readingTime";
 
 /**
- * عرض ديناميكي كامل — لا توليد ثابت ولا كاش للمقالات:
- * 1) لا تُخزَّن صفحة 404 زائفة أبدًا في الكاش لحظة استعلام مبكر أو فاشل.
- * 2) المقال المنشور حديثًا يُقرأ فورًا دون انتظار إعادة التحقق.
- * 3) استعلام حي من Neon في كل زيارة يعكس حالة النشر اللحظية.
+ * ISR — توليد ثابت تدريجي بكاش سريع يُحدّث كل دقيقة (أداء فوري بلا ضغط على Neon):
+ * 1) الصفحة تُخدَّم وتُعاد استخدامها لمدة 60 ثانية — زمن استجابة شبه صفري بلا
+ *    استيقاظ بارد لقاعدة البيانات في كل نقرة.
+ * 2) أي تعديل إداري (نشر/تعديل/حذف) يستدعي إعادة تحقق فورية On-Demand عبر
+ *    جسر revalidatePublicPaths من لوحة التحكم — فلا تأخير يُذكر رغم الكاش.
+ * 3) بيانات الجلسة الشخصية (تصويتي/تسجيل الدخول) انتقلت للعميل تمامًا:
+ *    InteractionSlot يجلب التصويت عبر GET /api/interactions، والتعليقات
+ *    ورقيب القراءة يعرفان حالة الجلسة عبر useSession — فتبقى الصفحة قابلة للكاش.
  */
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
+
+/**
+ * توليد ثابت لصفحات كل المقالات المنشورة عند البناء — تُخدَّم مسبقًا فتُفتح
+ * فور النقر في أجزاء من الثانية. المقالات الجديدة بعد النشر تُبنى عند أول
+ * طلب وتُخزّن (ISR)، ثم تُعاد ترندرتها فوريًا عبر On-Demand Revalidation
+ * من لوحة التحكم لحظة أي تعديل.
+ */
+export async function generateStaticParams() {
+  try {
+    const slugs = await getPublishedSlugs();
+    return slugs.map((s) => ({ slug: s.slug }));
+  } catch {
+    return [];
+  }
+}
 
 export async function generateMetadata({
   params,
@@ -75,22 +93,16 @@ export default async function ArticlePage({
   const article = await getArticleBySlug(slug);
   if (!article) notFound();
 
-  const [related, comments, counts, session, siteCfg] = await Promise.all([
+  const [related, comments, counts, siteCfg] = await Promise.all([
     getRelatedArticles(article.id, article.sectionId, 3),
     getApprovedComments(article.id),
     getInteractionCounts(article.id),
-    auth(),
     getSiteConfig(),
   ]);
 
   /* سيادة الأدمن: تعطيل التشكيل إذا عطّله عامًا أو لهذا المقال تحديدًا */
   const tashkeelAllowed =
     siteCfg.TASHKEEL_ENABLED && article.tashkeelEnabled;
-
-  const myVote = await getMyVote(article.id, {
-    userId: session?.user?.id ?? null,
-    visitorFp: null,
-  });
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -108,20 +120,21 @@ export default async function ArticlePage({
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <ReadingProgress />
       <SiteHeader />
-      <BackToTop offsetClass="bottom-24" />
+      <BackToTop />
 
       <main className="flex-1">
         <article className="mx-auto max-w-3xl px-4 pt-28 pb-28 sm:px-6">
           {/* تصنيف القسم */}
           {article.section && (
             <div className="page-chrome mb-6 text-center">
-              <a
+              <Link
                 href={`/section/${article.section.slug}`}
+                prefetch={true}
                 className="inline-block rounded-full px-4 py-1.5 text-xs font-semibold transition-transform hover:scale-105"
                 style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
               >
                 {article.section.name}
-              </a>
+              </Link>
             </div>
           )}
 
@@ -175,16 +188,14 @@ export default async function ArticlePage({
                 articleId={article.id}
                 initialLikes={counts.likes}
                 initialDislikes={counts.dislikes}
-                initialMyVote={myVote}
               />
             </div>
           </div>
 
-          {/* رقيب القراءة المتأنية — +10 أثر عند الالتزام الحقيقي بالنص */}
+          {/* رقيب القراءة المتأنية — +10 أثر عند الالتزام الحقيقي بالنص (الجلسة عبر useSession) */}
           <ImpactReadTracker
             articleId={article.id}
             requiredSeconds={requiredReadSeconds(article.content)}
-            isLoggedIn={Boolean(session?.user?.id)}
           />
 
           {/* التعليقات — مع مفتاح الإيقاف الفوري (Kill Switch) من لوحة التحكم */}
@@ -201,7 +212,6 @@ export default async function ArticlePage({
                 authorRank: c.user?.intellectualRank ?? null,
                 isInspiring: c.isInspiring,
               }))}
-              isLoggedIn={Boolean(session?.user)}
             />
           ) : (
             <section className="page-chrome mt-12 border-t pt-10 text-center" style={{ borderColor: "var(--border)" }}>
