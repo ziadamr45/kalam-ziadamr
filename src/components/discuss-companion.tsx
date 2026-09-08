@@ -14,7 +14,6 @@ import { getVisitorFingerprint } from "@/lib/fingerprint";
 type ChatMessage = { role: "user" | "model"; text: string };
 
 const HISTORY_KEY = (articleId: string) => `kalam_discuss_${articleId}`;
-const HISTORY_TURNS_TO_SEND = 8;
 
 export function DiscussCompanion({
   articleId,
@@ -133,11 +132,14 @@ export function DiscussCompanion({
       const res = await fetch("/api/ai/discuss", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        /* سياق الحوار متعدد الأدوار: كامل السجل التراكمي (user/model) بترتيبه الزمني —
+           دون الرسالة الحالية التي تُرسل في حقل message منفصلة
+           (مطابقة لدلالة sendMessage الرسمية: history + رسالة جديدة) */
         body: JSON.stringify({
           articleId,
           message: text,
           fp: getVisitorFingerprint(),
-          history: nextMessages.slice(-HISTORY_TURNS_TO_SEND).map((m) => ({
+          history: messages.map((m) => ({
             role: m.role === "model" ? "model" : "user",
             text: m.text,
           })),
