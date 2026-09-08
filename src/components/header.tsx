@@ -223,10 +223,12 @@ export function Header() {
         </div>
       </header>
 
-      {/* درج التنقل المتنقل — من اليمين بحركة ناعمة */}
+      {/* درج التنقل المتنقل — ينزلق من اليسار موافقًا لموضع زر الهمبرجر،
+          مع بقاء محاذاة النصوص والروابط لليمين (RTL) */}
       <div
         className={`fixed inset-0 z-[55] md:hidden ${drawerOpen ? "" : "pointer-events-none"}`}
         aria-hidden={!drawerOpen}
+        inert={!drawerOpen}
       >
         {/* الطبقة المعتمة */}
         <div
@@ -236,12 +238,12 @@ export function Header() {
           }`}
         />
 
-        {/* الدرجة الجانبية */}
+        {/* الدرجة الجانبية — مثبتة على اليسار (left-0) وتنزلق من نفس جهة الزر */}
         <aside
-          className={`absolute inset-y-0 right-0 flex w-[86%] max-w-sm flex-col shadow-lift transition-transform duration-300 ease-fluid ${
-            drawerOpen ? "translate-x-0" : "translate-x-full"
+          className={`absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col shadow-lift transition-transform duration-300 ease-fluid ${
+            drawerOpen ? "translate-x-0" : "-translate-x-full"
           }`}
-          style={{ background: "var(--surface)", borderTopRightRadius: 0 }}
+          style={{ background: "var(--surface)", borderTopLeftRadius: 0 }}
           role="dialog"
           aria-label="قائمة التنقل"
         >
@@ -255,11 +257,13 @@ export function Header() {
                 مش كل كلام لازم يتقال..
               </p>
             </div>
+            {/* زر الإغلاق — أعلى يسار الدرج (نفس جهة زر الهمبرجر) لاتصال مكاني
+                بديهي: فُتح من هناك فأُغلق من هناك، بمساحة لمس 44px مريحة ليد واحدة */}
             <button
               onClick={() => setDrawerOpen(false)}
               aria-label="إغلاق القائمة"
-              className="rounded-full p-2.5 transition-colors active:bg-[var(--accent-soft)]"
-              style={{ color: "var(--ink-muted)" }}
+              className="flex h-11 w-11 items-center justify-center rounded-full border transition-colors hover:bg-[var(--accent-soft)] active:bg-[var(--accent-soft)]"
+              style={{ color: "var(--ink)", borderColor: "var(--border)", background: "var(--bg-soft)" }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
