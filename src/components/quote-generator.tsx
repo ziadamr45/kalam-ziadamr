@@ -272,7 +272,12 @@ function drawQuoteCard(
   ctx.fillStyle = goldGrad;
   ctx.globalAlpha = 0.95;
   markFont(1.55);
+  /* الرسم بإشارة ltr صريحة: direction=rtl العامة للبطاقة تعكس الشكل المرئي للقوسين
+     في بعض المتصفحات — نثبّت الشكل المرئي المطلوب حرفيًا: أعلى » وأسفل « */
+  ctx.save();
+  ctx.direction = "ltr";
   ctx.fillText(topMark, W / 2, groupTop + fontSize * 1.15);
+  ctx.restore();
   ctx.globalAlpha = 1;
 
   ctx.fillStyle = "#FFFFFF"; // أبيض ناصع
@@ -294,7 +299,10 @@ function drawQuoteCard(
 
   ctx.fillStyle = goldGrad;
   markFont(1.55);
+  ctx.save();
+  ctx.direction = "ltr"; // ثبات الشكل المرئي: « كسفلي مهما اختلف اتجاه البطاقة
   ctx.fillText(bottomMark, W / 2, startY + (lines.length - 1) * lineH + fontSize * 1.55);
+  ctx.restore();
 
   /* ============ ٦) الفوتر — فاصل ذهبي كامل + كتلة نص يمين + بلاطة QR يسار ============ */
   /* الفاصل الذهبي الكامل — border-t border-amber-500/20 */
