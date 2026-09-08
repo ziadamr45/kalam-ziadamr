@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Header } from "@/components/header";
+import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
@@ -102,7 +102,7 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <Header />
+      <SiteHeader />
       <main className="flex-1">
         {/* ==================== بطاقة الهوية ==================== */}
         <section className="mx-auto max-w-3xl px-4 pt-32 sm:px-6">

@@ -12,11 +12,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { paths?: string[]; slug?: string };
+    const body = (await request.json()) as {
+      paths?: string[];
+      slug?: string;
+      layout?: boolean;
+    };
     const paths = body.paths?.length ? body.paths : ["/"];
 
     for (const path of paths) {
-      revalidatePath(path);
+      /* layout: إعادة تحقق على مستوى التخطيط المشترك — تُحدّث القائمة
+         الجانبية (الأقسام الحية) في كل الصفحات فورًا، تُستخدم عند
+         إضافة/تعديل/حذف قسم من لوحة التحكم */
+      revalidatePath(path, body.layout ? "layout" : undefined);
     }
 
     /* إعادة تحقق صريحة على مستوى صفحة المقال الديناميكي لحظة النشر */

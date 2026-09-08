@@ -7,7 +7,46 @@ import { useTheme } from "@/components/providers";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationBell, DrawerNotifications } from "@/components/notification-bell";
 import { BrandMark } from "@/components/brand-mark";
-import { SECTIONS } from "@/lib/sections";
+
+/* الأقسام الحية الواردة من الخادم (مجلوبة من Neon عبر مكوّن SiteHeader) */
+export type NavSection = {
+  slug: string;
+  name: string;
+  description: string;
+  count?: number;
+};
+
+/* زر الهمبرجر المتحوّل — ثلاثة شرائط تتحول إلى ✕ بتحويلات CSS نقية */
+function MorphBurger({ open }: { open: boolean }) {
+  const bar =
+    "absolute left-0 right-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full transition-all duration-300 ease-fluid";
+  return (
+    <span className="relative block h-[18px] w-[18px]" aria-hidden>
+      <span
+        className={bar}
+        style={{
+          background: "currentColor",
+          transform: open ? "rotate(45deg)" : "translateY(-5px)",
+        }}
+      />
+      <span
+        className={bar}
+        style={{
+          background: "currentColor",
+          opacity: open ? 0 : 1,
+          transform: open ? "scaleX(0.2)" : "scaleX(1)",
+        }}
+      />
+      <span
+        className={bar}
+        style={{
+          background: "currentColor",
+          transform: open ? "rotate(-45deg)" : "translateY(5px)",
+        }}
+      />
+    </span>
+  );
+}
 
 /* أيقونة قمر/شمس */
 function ThemeIcon({ dark }: { dark: boolean }) {
@@ -23,7 +62,7 @@ function ThemeIcon({ dark }: { dark: boolean }) {
   );
 }
 
-export function Header() {
+export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const [solid, setSolid] = useState(false);
@@ -32,6 +71,8 @@ export function Header() {
   const [sectionsOpen, setSectionsOpen] = useState(false);
   /* درج التنقل المتنقل — انسيابي بلا لاج مع قفل التمرير */
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /* الأقسام الحية من قاعدة البيانات — لا مصفوفات ثابتة هنا بعد اليوم */
+  const sections = navSections;
   /* إشعار «وضع القراءة المركزة» — كبسولة هادئة لثانيتين */
   const [readerToast, setReaderToast] = useState(false);
   const readerToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -189,19 +230,31 @@ export function Header() {
                   className="absolute right-0 top-full w-72 rounded-2xl border p-2 shadow-lift animate-fade-in"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >
-                  {SECTIONS.map((s) => (
+                  {sections.map((s) => (
                     <Link
                       key={s.slug}
-                      href={`/section/${s.slug}`}
+                      href={`/section/${encodeURIComponent(s.slug)}`}
                       className="block rounded-xl px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
                       onClick={() => setSectionsOpen(false)}
                     >
-                      <span className="block font-semibold" style={{ color: "var(--ink)" }}>
-                        {s.name}
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="font-semibold" style={{ color: "var(--ink)" }}>
+                          {s.name}
+                        </span>
+                        {typeof s.count === "number" && s.count > 0 && (
+                          <span
+                            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                          >
+                            {s.count}
+                          </span>
+                        )}
                       </span>
-                      <span className="block text-xs" style={{ color: "var(--ink-muted)" }}>
-                        {s.description}
-                      </span>
+                      {s.description && (
+                        <span className="mt-0.5 block text-xs" style={{ color: "var(--ink-muted)" }}>
+                          {s.description}
+                        </span>
+                      )}
                     </Link>
                   ))}
                 </div>
@@ -288,6 +341,27 @@ export function Header() {
           }`}
         />
 
+        {/* الهمبرجر المتحوّل — يقف فوق الدرّج والطبقة المعتمة في موضع زر الفتح نفسه:
+            نفس النقر يحوّله إلى ✕ ويعيد تكوينه عند الإغلاق (تحوّل ☰ ⇄ ✕ انسيابي) */}
+        <button
+          onClick={() => setDrawerOpen(false)}
+          aria-label={drawerOpen ? "إغلاق القائمة" : "فتح قائمة التنقل"}
+          aria-expanded={drawerOpen}
+          tabIndex={drawerOpen ? 0 : -1}
+          className={`fixed left-3 top-[10px] z-[60] flex h-11 w-11 items-center justify-center rounded-full border shadow-soft transition-all duration-300 ease-fluid md:hidden ${
+            drawerOpen
+              ? "pointer-events-auto scale-100 opacity-100"
+              : "pointer-events-none scale-75 opacity-0"
+          }`}
+          style={{
+            background: "var(--surface)",
+            borderColor: "var(--border)",
+            color: "var(--ink)",
+          }}
+        >
+          <MorphBurger open={drawerOpen} />
+        </button>
+
         {/* الدرجة الجانبية — مثبتة على اليسار (left-0) وتنزلق من نفس جهة الزر */}
         <aside
           className={`absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col shadow-lift transition-transform duration-300 ease-fluid ${
@@ -297,7 +371,10 @@ export function Header() {
           role="dialog"
           aria-label="قائمة التنقل"
         >
-          <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
+          <div className="flex items-center justify-end border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
+            {/* زر الإغلاق صار هو نفسه الهمبرجر المتحوّل — عائم فوق الدرّج في موضع
+                زر الفتح نفسه (الاتصال المكاني: فُتح من هناك فأُغلق من هناك)،
+                بمساحة لمس 44px وشكل يتحوّل ☰ ⇄ ✕ بحركة واحدة ناعمة */}
             <div>
               <p className="flex items-center gap-1.5 font-ui font-bold" style={{ color: "var(--ink)" }}>
                 <BrandMark size={16} />
@@ -307,16 +384,6 @@ export function Header() {
                 مش كل كلام لازم يتقال..
               </p>
             </div>
-            {/* زر الإغلاق — أعلى يسار الدرج (نفس جهة زر الهمبرجر) لاتصال مكاني
-                بديهي: فُتح من هناك فأُغلق من هناك، بمساحة لمس 44px مريحة ليد واحدة */}
-            <button
-              onClick={() => setDrawerOpen(false)}
-              aria-label="إغلاق القائمة"
-              className="flex h-11 w-11 items-center justify-center rounded-full border transition-colors hover:bg-[var(--accent-soft)] active:bg-[var(--accent-soft)]"
-              style={{ color: "var(--ink)", borderColor: "var(--border)", background: "var(--bg-soft)" }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-            </button>
           </div>
 
           {/* روابط التنقل — أهداف لمس مريحة للإبهام */}
@@ -339,19 +406,31 @@ export function Header() {
               الأقسام
             </p>
             <div className="space-y-1">
-              {SECTIONS.map((s) => (
+              {sections.map((s) => (
                 <Link
                   key={s.slug}
-                  href={`/section/${s.slug}`}
+                  href={`/section/${encodeURIComponent(s.slug)}`}
                   onClick={() => setDrawerOpen(false)}
-                  className="block rounded-2xl px-4 py-3 transition-colors active:bg-[var(--accent-soft)]"
+                  className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 transition-colors active:bg-[var(--accent-soft)]"
                 >
-                  <span className="block font-semibold" style={{ color: "var(--ink)" }}>
-                    {s.name}
+                  <span className="min-w-0">
+                    <span className="block font-semibold" style={{ color: "var(--ink)" }}>
+                      {s.name}
+                    </span>
+                    {s.description && (
+                      <span className="mt-0.5 block text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
+                        {s.description}
+                      </span>
+                    )}
                   </span>
-                  <span className="mt-0.5 block text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
-                    {s.description}
-                  </span>
+                  {typeof s.count === "number" && s.count > 0 && (
+                    <span
+                      className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                      style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                    >
+                      {s.count}
+                    </span>
+                  )}
                 </Link>
               ))}
             </div>

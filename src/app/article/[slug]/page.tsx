@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Header } from "@/components/header";
+import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { ReadingProgress } from "@/components/reading-progress";
 import { BackToTop } from "@/components/back-to-top";
@@ -107,7 +107,7 @@ export default async function ArticlePage({
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <ReadingProgress />
-      <Header />
+      <SiteHeader />
       <BackToTop offsetClass="bottom-24" />
 
       <main className="flex-1">

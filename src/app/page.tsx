@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Header } from "@/components/header";
+import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { ArticleCard } from "@/components/article-card";
 import { getLatestArticles, getActiveSections } from "@/lib/db-queries";
@@ -35,7 +35,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <Header />
+      <SiteHeader />
       <main className="flex-1">
         {/* البطل — الهوية والشعار المندمج */}
         <section className="relative overflow-hidden pt-32 pb-20 text-center">

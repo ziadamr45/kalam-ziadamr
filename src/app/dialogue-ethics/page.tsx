@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/header";
+import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { LegalPageView, legalMetadata } from "@/components/legal-page-view";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = legalMetadata("dialogue-ethics");
 export default function DialogueEthicsPage() {
   return (
     <>
-      <Header />
+      <SiteHeader />
       <main className="flex-1">
         <LegalPageView slug="dialogue-ethics" />
       </main>

@@ -109,12 +109,25 @@ export async function getPublishedSlugs(): Promise<{ slug: string }[]> {
   }
 }
 
-/** الأقسام النشطة من قاعدة البيانات مع fallback للثوابت */
+/**
+ * الأقسام النشطة من قاعدة البيانات — مصدر القائمة الجانبية الحي.
+ * ترتيب حسب sortOrder ثم createdAt، مع عدّاد المقالات المنشورة لكل قسم
+ * (شرط النشر الكسول نفسه حتى لا يُحسب المجدول المستقبلي).
+ */
 export async function getActiveSections() {
   try {
     const sections = await prisma.section.findMany({
       where: { active: true },
-      orderBy: { sortOrder: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      include: {
+        _count: {
+          select: {
+            articles: {
+              where: { status: "PUBLISHED" },
+            },
+          },
+        },
+      },
     });
     if (sections.length > 0) return sections;
   } catch {}

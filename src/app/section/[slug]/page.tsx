@@ -1,12 +1,21 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Header } from "@/components/header";
+import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { ArticleCard } from "@/components/article-card";
 import { getArticlesBySection, getActiveSections } from "@/lib/db-queries";
 import { SECTION_MAP, SECTIONS } from "@/lib/sections";
 
 export const revalidate = 300;
+
+/** فك تشفير آمن للـ slugs العربية — يفشل بهدوء لو كانت النسبة حرفية أصلًا */
+function safeDecodeSlug(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
 
 export async function generateStaticParams() {
   try {
@@ -21,7 +30,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = safeDecodeSlug(rawSlug);
   const def = SECTION_MAP[slug];
   const dbSections = await getActiveSections();
   const name = dbSections?.find((s) => s.slug === slug)?.name ?? def?.name ?? slug;
@@ -33,7 +43,8 @@ export default async function SectionPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = safeDecodeSlug(rawSlug);
   const def = SECTION_MAP[slug];
   const dbSections = await getActiveSections();
   const section = dbSections?.find((s) => s.slug === slug);
@@ -46,7 +57,7 @@ export default async function SectionPage({
 
   return (
     <>
-      <Header />
+      <SiteHeader />
       <main className="flex-1">
         <section className="mx-auto max-w-5xl px-4 pt-32 pb-10 text-center sm:px-6">
           <h1 className="font-body text-4xl font-bold leading-[1.6]" style={{ color: "var(--ink)" }}>

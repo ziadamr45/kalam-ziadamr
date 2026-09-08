@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/header";
+import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ const CHECKLIST = [
 export default function AboutPage() {
   return (
     <>
-      <Header />
+      <SiteHeader />
       <main className="flex-1">
         <section className="mx-auto max-w-3xl px-4 pt-32 pb-8 text-center sm:px-6">
           <h1 className="font-body text-4xl font-bold leading-[1.6]" style={{ color: "var(--ink)" }}>

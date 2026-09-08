@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/header";
+import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { ContactForm } from "@/components/contact-form";
 
@@ -19,7 +19,7 @@ const CHANNELS = [
 export default function ContactPage() {
   return (
     <>
-      <Header />
+      <SiteHeader />
       <main className="flex-1">
         <section className="mx-auto max-w-3xl px-4 pb-24 pt-28 sm:px-6">
           <header className="page-chrome text-center">
