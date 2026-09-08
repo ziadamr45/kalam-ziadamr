@@ -3,7 +3,8 @@ import { toArabicDigits } from "@/lib/content-blocks";
 /**
  * كتلة الآية القرآنية:
  * خط الرسم العثماني (Amiri Quran) + حاوية هادئة + أقواس قرآنية ﴿ ﴾
- * + توثيق السورة والآية في هامش فرعي أنيق بالأرقام العربية.
+ * + شارة توثيق السورة والآية في هامش فرعي أنيق بالأرقام العربية.
+ * (تتحمل غياب السورة أو رقم الآية — تُعرض الشارة بما توفر فقط)
  */
 export function QuranBlock({
   id,
@@ -16,7 +17,10 @@ export function QuranBlock({
   sura: string;
   ayah: string;
 }) {
-  const ayahNum = toArabicDigits(ayah.replace(/[^\d]/g, "") || ayah);
+  const hasSura = Boolean(sura?.trim());
+  const hasAyah = Boolean(ayah?.trim());
+  const ayahNum = toArabicDigits((ayah || "").replace(/[^\d]/g, "") || ayah || "");
+
   return (
     <figure id={id} className="quran-block" dir="rtl">
       <span aria-hidden className="quran-ornament">
@@ -31,29 +35,46 @@ export function QuranBlock({
           ﴾
         </span>
       </blockquote>
-      <figcaption className="quran-ref">
-        سورة {sura} <span className="quran-ref-dot">•</span> الآية {ayahNum}
-      </figcaption>
+      {(hasSura || hasAyah) && (
+        <figcaption className="quran-ref">
+          {hasSura && <span>سورة {sura}</span>}
+          {hasSura && hasAyah && <span className="quran-ref-dot">•</span>}
+          {hasAyah && <span>الآية {ayahNum}</span>}
+        </figcaption>
+      )}
     </figure>
   );
 }
 
 /**
  * كتلة الحديث النبوي الشريف:
- * خط نسخ كلاسيكي رصين (Noto Naskh Arabic / Amiri) + إطار ناعم
- * + أقواس اقتباس راقية + اسم الراوي والتخريج في سطر فرعي هادئ.
+ * خط نسخ كلاسيكي رصين (Amiri) + إطار ناعم + أقواس اقتباس راقية
+ * + بادئة «قال رسول الله ﷺ:» لنسخة الوسم التوجيهي :::hadith
+ * + اسم الراوي والتخريج في سطر فرعي هادئ في نهاية الكادر.
+ * (حماية من التكرار: لا تُضاف البادئة إن وردت بالفعل في أول النص)
  */
+const PREFIX_GUARD = /^\s*(قال\s*(رسول الله|نبي الله)|ﷺ)/;
+
 export function HadithBlock({
   id,
   text,
   narrator,
+  withPrefix = false,
 }: {
   id: string;
   text: string;
   narrator: string;
+  withPrefix?: boolean;
 }) {
+  const showPrefix = withPrefix && !PREFIX_GUARD.test(text);
+
   return (
     <figure id={id} className="hadith-block" dir="rtl">
+      {showPrefix && (
+        <span className="hadith-prefix">
+          قال رسول الله <span className="hadith-saw">ﷺ</span>:
+        </span>
+      )}
       <blockquote className="hadith-text">
         <span className="hadith-bracket" aria-hidden>
           «
@@ -63,7 +84,7 @@ export function HadithBlock({
           »
         </span>
       </blockquote>
-      <figcaption className="hadith-ref">{narrator}</figcaption>
+      {narrator?.trim() && <figcaption className="hadith-ref">{narrator}</figcaption>}
     </figure>
   );
 }

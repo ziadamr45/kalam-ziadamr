@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
-import { QuranBlock, HadithBlock } from "@/components/quran-hadith-blocks";
+import { ArticleBlocks } from "@/components/markdown-blocks";
 import { trackView, trackComplete, trackDwell } from "@/lib/analytics";
 import {
   saveOfflineArticle,
@@ -27,27 +27,6 @@ type ReaderArticle = {
   coverImage: string | null;
   readingTimeSec: number;
 };
-
-/* امتداد الكلمات — يبقي المسافات كما هي (بلا أي تغيير في التصميم) ويمنح كل كلمة فهرسها العام */
-function Words({ text, start }: { text: string; start: number }) {
-  const parts = text.split(/(\s+)/);
-  let wi = start;
-  return (
-    <>
-      {parts.map((p, i) => {
-        if (!p.trim()) return p;
-        const idx = wi++;
-        return (
-          <span key={i} data-wi={idx} className="audio-word">
-            {p}
-          </span>
-        );
-      })}
-    </>
-  );
-}
-
-/* المحلل الموحد: src/lib/content-blocks.ts (فقرات + آيات + أحاديث) */
 
 export function ArticleReader({
   article,
@@ -317,71 +296,13 @@ export function ArticleReader({
         </div>
       )}
 
-      {/* جسم المقال */}
+      {/* جسم المقال — العارض الموحد لمحرك التنسيق الموسع (كاريوكي آمن) */}
       <div
         id="article-body"
         className={`article-body mt-10 ${tashkeel ? "is-tashkeel" : ""}`}
         style={{ color: "var(--ink)" }}
       >
-        {blocks.map((block) => {
-          const start = wordOffsets.get(block.id) ?? 0;
-          if (block.kind === "h2") {
-            return (
-              <h2 key={block.id} id={block.id}>
-                <Words text={block.text} start={start} />
-              </h2>
-            );
-          }
-          if (block.kind === "quote") {
-            return (
-              <blockquote key={block.id} id={block.id}>
-                <Words text={block.text} start={start} />
-              </blockquote>
-            );
-          }
-          if (block.kind === "list") {
-            let acc = start;
-            return (
-              <ul key={block.id} id={block.id}>
-                {block.items.map((item, i) => {
-                  const itemStart = acc;
-                  acc += item.split(/\s+/).filter(Boolean).length;
-                  return (
-                    <li key={i}>
-                      <Words text={item} start={itemStart} />
-                    </li>
-                  );
-                })}
-              </ul>
-            );
-          }
-          if (block.kind === "quran") {
-            return (
-              <QuranBlock
-                key={block.id}
-                id={block.id}
-                text={block.text}
-                sura={block.sura}
-                ayah={block.ayah}
-              />
-            );
-          }
-          if (block.kind === "hadith") {
-            return (
-              <HadithBlock
-                key={block.id}
-                id={block.id}
-                text={block.text}
-                narrator={block.narrator}
-              />
-            );
-          }
-          return (
-            <p key={block.id} id={block.id}>
-              <Words text={block.text} start={start} />
-            </p>
-          );
-        })}
+        <ArticleBlocks blocks={blocks} offsets={wordOffsets} />
       </div>
 
       <div id="article-end-marker" className="h-1" aria-hidden />

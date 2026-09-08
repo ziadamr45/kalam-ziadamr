@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { parseBlocks } from "@/lib/content-blocks";
+import { ArticleBlocks } from "@/components/markdown-blocks";
 import {
   LEGAL_DEFAULTS,
   LEGAL_DEFAULTS_UPDATED_AT,
@@ -65,19 +66,7 @@ export async function LegalPageView({ slug }: { slug: LegalSlug }) {
       </header>
 
       <div className="article-body mt-12" style={{ color: "var(--ink)" }}>
-        {blocks.map((block) => {
-          if (block.kind === "h2") return <h2 key={block.id}>{block.text}</h2>;
-          if (block.kind === "quote") return <blockquote key={block.id}>{block.text}</blockquote>;
-          if (block.kind === "list")
-            return (
-              <ul key={block.id}>
-                {block.items.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            );
-          return <p key={block.id}>{block.text}</p>;
-        })}
+        <ArticleBlocks blocks={blocks} />
       </div>
 
       {/* التاريخ الفعلي لآخر تحديث — وعدٌ نصّي مُطبَّق برمجيًا: يتجدد تلقائيًا مع كل حفظ إداري */}
