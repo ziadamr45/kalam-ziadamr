@@ -175,31 +175,44 @@ function drawQuoteCard(
   corner(c, H - c, 1, -1);
   corner(W - c, H - c, -1, -1);
 
-  /* ============ ٤) هندسة التذييل قبل الاقتباس (لتحديد مساحة النص) ============ */
+  /* ============ ٤) هندسة التدفق الصريح — الفوتر يُحسب أولًا ثم مساحة الاقتباس ============
+     كل سطر يقف على مسار مقيس صراحةً (bottom-up flow) — لا إحداثيات عشوائية
+     ولا تمركز حول عناصر مجاورة، فلا التصاق أسطر مهما اختلف المقاس */
   const pad = Math.round(m * 0.9);
-  const qrSize = Math.round(minWH * 0.115);
-  const captionSize = Math.max(13, Math.round(minWH * 0.015));
-  const qrX = qr ? W - m - pad - qrSize : 0;
-  const qrY = qr ? H - m - pad - qrSize : 0;
-  /* التعليق يُرسم فوق البلاطة — بعيدًا تمامًا عن زخارف الأركان في كل المقاسات */
-  const captionY = qr ? qrY - Math.round(captionSize * 0.7) : 0;
-  const qrCenterY = qr ? qrY + qrSize / 2 : H - m - pad - minWH * 0.05;
-  /* مركز عمود النص: يزاح قليلًا يسارًا ليتنفس بجوار QR */
-  const textCx = qr ? ((m + pad) + (qrX - 26)) / 2 : W / 2;
+  const footerBottom = H - m - pad;
 
-  const brandSize = Math.round(minWH * 0.034);
-  const taglineSize = Math.round(minWH * 0.021);
-  const titleSize = Math.round(minWH * 0.027);
+  /* مقاسات الفوتر — نظيرات أحرف Tailwind المطلوبة */
+  const captionSize = Math.max(12, Math.round(minWH * 0.0145)); // «امسح للقراءة» — text-[9px]
+  const taglineSize = Math.round(minWH * 0.0245); // اللسان — text-[10px]
+  const brandSize = Math.round(minWH * 0.041); // الاسم — text-base font-bold
+  const titleSize = Math.round(minWH * 0.031); // العنوان — text-xs
 
-  const taglineY = qrCenterY + Math.round(taglineSize * 1.1);
-  const brandY = qrCenterY + Math.round(brandSize * 0.15);
-  const titleY = brandY - Math.round(brandSize * 1.5);
-  const dividerY = titleY - Math.round(titleSize * 1.7);
-  const quoteAreaBottom = dividerY - Math.round(minWH * 0.065);
-  const quoteAreaTop = m + Math.round(minWH * 0.10);
+  const captionBaseline = footerBottom - Math.round(captionSize * 0.3);
+
+  /* بلاطة QR — يسار الفوتر (الموضع المخصص)، وتعليقها تحتها بمسافة آمنة */
+  const qrSize = Math.round(minWH * 0.112);
+  const tile = qrSize + Math.round(qrSize * 0.26); // خلفية بيضاء بحواف ناعمة — p-1.5
+  const tileBottom = captionBaseline - Math.round(captionSize * 1.3); // mt-1.5 + فاصل آمن
+  const tileTop = tileBottom - tile;
+  const tileX = m + pad;
+  const captionCx = tileX + tile / 2;
+
+  /* كتلة النص الثلاثية — يمين الفوتر، قاعدتها مصفوفة مع قاعدة البلاطة (items-end) */
+  const textRight = W - m - pad;
+  const taglineBaseline = tileBottom + Math.round(taglineSize * 0.05);
+  const brandBaseline = taglineBaseline - Math.round(taglineSize * 1.0 + brandSize * 0.6);
+  const titleBaseline = brandBaseline - Math.round(brandSize * 0.85 + titleSize * 0.5);
+  const titleTop = titleBaseline - Math.round(titleSize);
+  const sepY = titleTop - Math.round(minWH * 0.032); // pt-6 ثم border-t فوق الكتلة
+
+  /* فاصل أفقي آمن بين كتلة النص وبلاطة QR */
+  const footerMaxW = textRight - (tileX + tile) - Math.round(minWH * 0.05);
+
+  const quoteAreaBottom = sepY - Math.round(minWH * 0.055);
+  const quoteAreaTop = m + Math.round(minWH * 0.075);
 
   /* ============ ٥) نص الاقتباس — أبيض ناصع بخط أميري عريض ============ */
-  const maxW = qr ? qrX - 26 - (m + pad) : W - m * 2 - Math.round(W * 0.09);
+  const maxW = W - m * 2 - Math.round(W * 0.075);
   const lineHFactor = variant === "quran" ? 2.15 : variant === "hadith" ? 2.0 : 1.95;
   let fontSize = Math.round(minWH * (variant === "quran" ? 0.056 : 0.06));
   const minFontSize = Math.round(minWH * 0.026);
@@ -228,35 +241,38 @@ function drawQuoteCard(
     return out;
   };
 
+  /* المساحة المطلوبة = السطور + القوسان وفراغاهما الجمالية — كتلة واحدة تُقاس وتتمركز */
   for (;;) {
     lines = wrap(fontSize);
-    const needed = lines.length * fontSize * lineHFactor + fontSize * 2.6;
+    const needed = (lines.length - 1) * fontSize * lineHFactor + fontSize * 4.6;
     if (needed <= quoteAreaBottom - quoteAreaTop || fontSize <= minFontSize) break;
     fontSize = Math.round(fontSize * 0.94);
   }
 
   const lineH = fontSize * lineHFactor;
-  const blockH = lines.length * lineH;
   const areaCenter = (quoteAreaTop + quoteAreaBottom) / 2;
-  const startY = areaCenter - blockH / 2 + fontSize * 0.4;
+  const groupH = (lines.length - 1) * lineH + fontSize * 4.45;
+  const groupTop = areaCenter - groupH / 2;
+  const startY = groupTop + fontSize * 2.55; // خط أساس السطر الأول
 
-  /* علامتا الاقتباس الذهبيتان اللامعتان — تُوّجان النص وتختمانه بوقار */
+  /* القوسان الذهبيان اللامعان — العلوي » قبل النص والسفلي « بعده بمسافة جمالية (my-4) */
   const goldGrad = ctx.createLinearGradient(0, quoteAreaTop, 0, quoteAreaBottom);
   goldGrad.addColorStop(0, "#F5D78E");
   goldGrad.addColorStop(0.5, "#D9A441");
   goldGrad.addColorStop(1, "#C08A16");
-  const openMark = variant === "quran" ? "﴿" : "«";
-  const closeMark = variant === "quran" ? "﴾" : "»";
+  const topMark = variant === "quran" ? "﴾" : "»";
+  const bottomMark = variant === "quran" ? "﴿" : "«";
   const markFont = (scale: number) => {
     ctx.font =
       variant === "quran"
         ? `400 ${Math.round(fontSize * scale)}px "Amiri Quran", "Amiri", serif`
         : `700 ${Math.round(fontSize * scale)}px "Amiri", serif`;
   };
+  ctx.textAlign = "center";
   ctx.fillStyle = goldGrad;
   ctx.globalAlpha = 0.95;
-  markFont(1.7);
-  ctx.fillText(openMark, textCx, startY - fontSize * 1.5);
+  markFont(1.55);
+  ctx.fillText(topMark, W / 2, groupTop + fontSize * 1.15);
   ctx.globalAlpha = 1;
 
   ctx.fillStyle = "#FFFFFF"; // أبيض ناصع
@@ -270,63 +286,62 @@ function drawQuoteCard(
   ctx.shadowBlur = Math.round(fontSize * 0.22);
   ctx.shadowOffsetY = 2;
   lines.forEach((line, i) => {
-    ctx.fillText(line, textCx, startY + i * lineH);
+    ctx.fillText(line, W / 2, startY + i * lineH);
   });
   ctx.shadowColor = "transparent";
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
   ctx.fillStyle = goldGrad;
-  markFont(1.7);
-  ctx.fillText(closeMark, textCx, startY + blockH + fontSize * 0.5);
+  markFont(1.55);
+  ctx.fillText(bottomMark, W / 2, startY + (lines.length - 1) * lineH + fontSize * 1.55);
 
-  /* ============ ٦) التذييل — عنوان المقال + هوية المنصة + QR ============ */
-  /* الخط الفاصل الذهبي المتلاشي */
-  const ruleW = Math.round(maxW * 0.14);
-  const grad = ctx.createLinearGradient(textCx - ruleW, 0, textCx + ruleW, 0);
-  grad.addColorStop(0, "rgba(217,164,65,0)");
-  grad.addColorStop(0.5, "rgba(217,164,65,0.85)");
-  grad.addColorStop(1, "rgba(217,164,65,0)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(textCx - ruleW, dividerY, ruleW * 2, 3);
+  /* ============ ٦) الفوتر — فاصل ذهبي كامل + كتلة نص يمين + بلاطة QR يسار ============ */
+  /* الفاصل الذهبي الكامل — border-t border-amber-500/20 */
+  ctx.fillStyle = "rgba(245,158,11,0.22)";
+  ctx.fillRect(m + pad, sepY, W - (m + pad) * 2, 2);
 
-  /* عنوان المقال — رمادي فاتح هادئ */
-  if (articleTitle.trim()) {
-    ctx.fillStyle = "rgba(214,210,202,0.92)";
-    ctx.font = `400 ${titleSize}px "Readex Pro", "Amiri", sans-serif`;
+  /* كتلة النص الثلاثية — محاذاة يمين كاملة بأسطر متباعدة بمقاسات صريحة */
+  ctx.textAlign = "right";
+
+  /* سطر ١: عنوان المقال — ذهبي هادئ (text-xs text-amber-200/80 font-medium) */
+  if (articleTitle.trim() && footerMaxW > 180) {
+    ctx.fillStyle = "rgba(253,230,138,0.82)";
+    ctx.font = `500 ${titleSize}px "Readex Pro", "Amiri", sans-serif`;
     let title = articleTitle.trim();
-    while (ctx.measureText(title).width > maxW && title.length > 6) {
+    while (ctx.measureText(title).width > footerMaxW && title.length > 6) {
       title = title.slice(0, -3);
     }
     if (title !== articleTitle.trim()) title += "…";
-    ctx.fillText(title, textCx, titleY);
+    ctx.fillText(title, textRight, titleBaseline);
   }
 
-  /* هوية المنصة — اسم ذهبي + اللسان المميز */
-  ctx.fillStyle = "#D9A441";
+  /* سطر ٢: اسم المنصة — أبيض بارز وواضح (text-base font-bold text-white) */
+  ctx.fillStyle = "#FFFFFF";
   ctx.font = `700 ${brandSize}px "Readex Pro", "Amiri", sans-serif`;
-  ctx.fillText("كلام له لازمة", textCx, brandY);
-  ctx.fillStyle = "rgba(196,192,184,0.8)";
-  ctx.font = `400 ${taglineSize}px "Readex Pro", "Amiri", sans-serif`;
-  ctx.fillText("مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.", textCx, taglineY);
+  ctx.fillText("كلام له لازمة", textRight, brandBaseline);
 
-  /* رمز QR — بلاطة بيضاء مستديرة ظلّها يرفعها عن الخلفية */
+  /* سطر ٣: اللسان المميز — رمادي مريح (text-[10px] text-zinc-400) بفاصل صريح يمنع الالتصاق */
+  ctx.fillStyle = "rgba(161,161,170,0.95)";
+  ctx.font = `400 ${taglineSize}px "Readex Pro", "Amiri", sans-serif`;
+  ctx.fillText("مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.", textRight, taglineBaseline);
+
+  /* بلاطة QR — يسار الفوتر، وتحتها مباشرة «امسح للقراءة» بمسافة آمنة (mt-1.5) */
   if (qr) {
-    const tile = qrSize + Math.round(qrSize * 0.14);
-    const tx = qrX - (tile - qrSize) / 2;
-    const ty = qrY - (tile - qrSize) / 2;
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.45)";
     ctx.shadowBlur = 16;
     ctx.shadowOffsetY = 5;
     ctx.fillStyle = "#FFFFFF";
-    roundRect(ctx, tx, ty, tile, tile, Math.round(tile * 0.12));
+    roundRect(ctx, tileX, tileTop, tile, tile, Math.round(tile * 0.12));
     ctx.fill();
     ctx.restore();
-    ctx.drawImage(qr, qrX, qrY, qrSize, qrSize);
-    ctx.fillStyle = "rgba(217,164,65,0.85)";
+    const inset = Math.round((tile - qrSize) / 2);
+    ctx.drawImage(qr, tileX + inset, tileTop + inset, qrSize, qrSize);
+    ctx.fillStyle = "rgba(161,161,170,0.9)"; // text-[9px] text-zinc-400
     ctx.font = `500 ${captionSize}px "Readex Pro", "Amiri", sans-serif`;
-    ctx.fillText("امسح الكود للمقال", qrX + qrSize / 2, captionY);
+    ctx.textAlign = "center";
+    ctx.fillText("امسح للقراءة", captionCx, captionBaseline);
   }
 }
 
