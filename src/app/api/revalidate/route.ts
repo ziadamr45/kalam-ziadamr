@@ -12,11 +12,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { paths?: string[] };
+    const body = (await request.json()) as { paths?: string[]; slug?: string };
     const paths = body.paths?.length ? body.paths : ["/"];
 
     for (const path of paths) {
       revalidatePath(path);
+    }
+
+    /* إعادة تحقق صريحة على مستوى صفحة المقال الديناميكي لحظة النشر */
+    if (body.slug) {
+      revalidatePath(`/article/${body.slug}`, "page");
     }
 
     return NextResponse.json({ ok: true, revalidated: paths });

@@ -14,7 +14,7 @@ import { displayName, displayAvatar } from "@/lib/identity";
 import { requiredReadSeconds } from "@/lib/impact";
 import {
   getArticleBySlug,
-  getPublishedSlugs,
+  safeDecodeSlug,
   getRelatedArticles,
   getApprovedComments,
   getInteractionCounts,
@@ -25,19 +25,23 @@ import { getSiteConfig } from "@/lib/site-config";
 import { formatArabicDate } from "@/lib/utils";
 import { formatReadingTime } from "@/lib/readingTime";
 
-export const revalidate = 300;
-
-export async function generateStaticParams() {
-  const slugs = await getPublishedSlugs();
-  return slugs.map((s) => ({ slug: s.slug }));
-}
+/**
+ * عرض ديناميكي كامل — لا توليد ثابت ولا كاش للمقالات:
+ * 1) لا تُخزَّن صفحة 404 زائفة أبدًا في الكاش لحظة استعلام مبكر أو فاشل.
+ * 2) المقال المنشور حديثًا يُقرأ فورًا دون انتظار إعادة التحقق.
+ * 3) استعلام حي من Neon في كل زيارة يعكس حالة النشر اللحظية.
+ */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  /* فك ترميز الـ slug العربي قبل الاستعلام — مع إبقاء الخام مطابقةً احتياطية */
+  const slug = safeDecodeSlug(rawSlug);
   const article = await getArticleBySlug(slug);
   if (!article) return { title: "مقال غير موجود" };
 
@@ -65,7 +69,9 @@ export default async function ArticlePage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  /* فك ترميز الـ slug العربي قبل الاستعلام — مع إبقاء الخام مطابقةً احتياطية */
+  const slug = safeDecodeSlug(rawSlug);
   const article = await getArticleBySlug(slug);
   if (!article) notFound();
 

@@ -4,6 +4,9 @@ import { SECTIONS } from "@/lib/sections";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kalam-ziadamr.vercel.app";
 
+/* إعادة تحقق ساعية — خريطة الموقع تعكس المقالات الجديدة دون انتظار نشر جديد */
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [articles, sectionSlugs] = await Promise.all([
     getLatestArticles(200),

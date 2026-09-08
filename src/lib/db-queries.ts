@@ -50,13 +50,45 @@ export async function getArticlesBySection(
   }
 }
 
-/** مقال واحد بالـ slug */
+/**
+ * فك ترميز الـ slug الوارد من المتصفح قبل أي استعلام.
+ * الروابط العربية تصل من App Router مشفرة (URL Encoded) على هيئة
+ * %D9%84%D9%85%D8%A7-... بينما المخزَّن في قاعدة البيانات عربي خالص،
+ * فلا يكتمل البحث دون فك التشفير — وهو جذر صفحات 404 الزائفة.
+ */
+export function safeDecodeSlug(raw: string): string {
+  if (!raw) return raw;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * مقال واحد بالـ slug — بمطابقة مزدوجة تحصينية:
+ * (المشفر كما وصل + المفكوك كما خُزّن) فتُغطى كل حالات المتصفحات والروابط.
+ * المنشور صراحةً بحالة PUBLISHED يُعرض بلا قيود زمنية إضافية،
+ * والمجدول يُعرض لحظة استحقاق موعده فقط.
+ */
 export async function getArticleBySlug(
   slug: string,
 ): Promise<ArticleWithSection | null> {
+  if (!slug) return null;
+  const decoded = safeDecodeSlug(slug);
   try {
     const article = await prisma.article.findFirst({
-      where: { slug, ...publishedWhere },
+      where: {
+        AND: [
+          { OR: [{ slug: decoded }, { slug }] },
+          {
+            OR: [
+              { status: "PUBLISHED" },
+              { status: "SCHEDULED", scheduledAt: { lte: new Date() } },
+            ],
+          },
+        ],
+      },
       include: { section: true },
     });
     return article;
