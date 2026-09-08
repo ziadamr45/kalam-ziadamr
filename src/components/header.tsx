@@ -32,7 +32,33 @@ export function Header() {
   const [sectionsOpen, setSectionsOpen] = useState(false);
   /* درج التنقل المتنقل — انسيابي بلا لاج مع قفل التمرير */
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /* إشعار «وضع القراءة المركزة» — كبسولة هادئة لثانيتين */
+  const [readerToast, setReaderToast] = useState(false);
+  const readerToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastY = useRef(0);
+
+  /* تفعيل وضع القراءة المركزة بسلاسة:
+     1) إغلاق الدرج إن كان مفتوحًا  2) تلاشٍ تدريجي للعناصر (CSS قائم)
+     3) تمرير انسيابي تلقائي إلى أول المقال فورًا  4) إشعار هادئ لثانيتين */
+  const enterImmersion = useCallback(() => {
+    setDrawerOpen(false);
+    setImmersed(true);
+    requestAnimationFrame(() => {
+      document
+        .getElementById("article-body")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    if (readerToastTimer.current) clearTimeout(readerToastTimer.current);
+    setReaderToast(true);
+    readerToastTimer.current = setTimeout(() => setReaderToast(false), 2000);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (readerToastTimer.current) clearTimeout(readerToastTimer.current);
+    },
+    [],
+  );
 
   /* إخفاء تلقائي سلس عند التمرير لأسفل وإعادته عند الصعود */
   const onScroll = useCallback(() => {
@@ -75,13 +101,37 @@ export function Header() {
 
   if (immersed) {
     return (
-      <button
-        onClick={() => setImmersed(false)}
-        className="fixed bottom-5 left-5 z-50 rounded-full px-4 py-2.5 text-sm shadow-lift transition-all hover:scale-105"
-        style={{ background: "var(--accent)", color: "#fff" }}
-      >
-        إنهاء وضع الغمر (Esc)
-      </button>
+      <>
+        {/* إشعار التفعيل — كبسولة عائمة هادئة أعلى الشاشة لثانيتين */}
+        {readerToast && (
+          <div className="fixed left-1/2 top-5 z-[60] -translate-x-1/2 animate-fade-in">
+            <p
+              className="whitespace-nowrap rounded-full border px-5 py-2.5 text-xs font-semibold shadow-lift sm:text-sm"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+                color: "var(--ink)",
+              }}
+              role="status"
+            >
+              تم تفعيل وضع القراءة المركزة.. قراءة هادئة ومثمرة
+            </p>
+          </div>
+        )}
+
+        {/* زر الخروج — كبسولة صغيرة أنيقة في الزاوية العليا */}
+        <button
+          onClick={() => setImmersed(false)}
+          className="fixed left-4 top-4 z-50 rounded-full border px-4 py-2 text-xs font-bold shadow-lift transition-all hover:scale-105 sm:text-sm"
+          style={{
+            background: "var(--surface)",
+            borderColor: "var(--border)",
+            color: "var(--ink)",
+          }}
+        >
+          خروج من وضع القراءة
+        </button>
+      </>
     );
   }
 
@@ -167,7 +217,7 @@ export function Header() {
             </Link>
 
             <button
-              onClick={() => setImmersed(true)}
+              onClick={enterImmersion}
               title="وضع الغمر الكامل"
               aria-label="وضع الغمر الكامل"
               className="rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)]"
@@ -332,10 +382,7 @@ export function Header() {
 
           <div className="border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
             <button
-              onClick={() => {
-                setImmersed(true);
-                setDrawerOpen(false);
-              }}
+              onClick={enterImmersion}
               className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition-transform active:scale-[0.98]"
               style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
             >

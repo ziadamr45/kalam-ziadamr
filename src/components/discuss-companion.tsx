@@ -362,12 +362,12 @@ export function DiscussCompanion({
 
             {exhausted && (
               <p
-                className="rounded-2xl border border-dashed p-4 text-center text-xs leading-6"
+                className="rounded-2xl border border-dashed p-4 text-center text-xs leading-7"
                 style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
               >
-                استُهلكت حصة النقاش لهذا المقال — شكرًا لحوارك الراقي.
+                لقد استوفيت الحد المخصص لنقاش هذا المقال ({arabicNum(limit - Math.max(remaining ?? 0, 0))}/{arabicNum(limit)}).
                 <br />
-                وستجد لكل مقالٍ حصة نقاشٍ منّا.
+                تفضل بزيارة مقال آخر لفتح نقاش جديد — شكرًا لحوارك الراقي.
               </p>
             )}
 

@@ -30,6 +30,7 @@ function drawQuoteCard(
   preset: SizePreset,
   theme: CardTheme,
   variant: CardVariant,
+  articleTitle: string,
 ) {
   const t = THEMES[theme];
   const W = preset.w;
@@ -152,6 +153,18 @@ function drawQuoteCard(
   ctx.fillStyle = grad;
   ctx.fillRect(W / 2 - ruleW, ruleY, ruleW * 2, 4);
 
+  // عنوان المقال — سطر واحد مقطوع بذكاء فوق الفاصل
+  if (articleTitle?.trim()) {
+    ctx.fillStyle = t.muted;
+    ctx.font = `400 ${Math.round(Math.min(W, H) * 0.026)}px "Readex Pro", "Amiri", sans-serif`;
+    let title = articleTitle.trim();
+    while (ctx.measureText(title).width > maxW && title.length > 6) {
+      title = title.slice(0, -3);
+    }
+    if (title !== articleTitle.trim()) title += "…";
+    ctx.fillText(title, W / 2, ruleY - Math.round(H * 0.026));
+  }
+
   // التذييل — الهوية
   ctx.fillStyle = t.ink;
   ctx.font = `700 ${Math.round(Math.min(W, H) * 0.032)}px "Readex Pro", "Amiri", sans-serif`;
@@ -183,22 +196,27 @@ export function QuoteGenerator({
   articleTitle,
   articleSlug,
   containerSelector,
+  suggestedQuotes = [],
 }: {
   articleId: string;
   articleTitle: string;
   articleSlug: string;
   containerSelector: string;
+  suggestedQuotes?: string[];
 }) {
   const { data: session } = useSession();
   const [selectedText, setSelectedText] = useState("");
   const [variant, setVariant] = useState<CardVariant>("normal");
   const [chipPos, setChipPos] = useState<{ x: number; y: number } | null>(null);
   const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [manualQuote, setManualQuote] = useState("");
   const [size, setSize] = useState<SizePreset>(SIZES[1]);
   const [theme, setTheme] = useState<CardTheme>("paper");
   const [mounted, setMounted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chipRef = useRef<HTMLDivElement | null>(null);
+  const chipGraceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -210,17 +228,22 @@ export function QuoteGenerator({
     const onSelectionChange = () => {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-        setChipPos(null);
+        /* على اللمس: لمس الزر يُسقط التحديد قبل اكتمال النقر —
+           مهلة قصيرة تُبقي الشريحة حية حتى يصل الحدث */
+        if (chipGraceRef.current) clearTimeout(chipGraceRef.current);
+        chipGraceRef.current = setTimeout(() => setChipPos(null), 450);
         return;
       }
       const range = sel.getRangeAt(0);
       if (!container.contains(range.commonAncestorContainer)) {
-        setChipPos(null);
+        if (chipGraceRef.current) clearTimeout(chipGraceRef.current);
+        chipGraceRef.current = setTimeout(() => setChipPos(null), 450);
         return;
       }
       const text = sel.toString().trim().replace(/\s+/g, " ");
       if (text.length < 12 || text.length > 400) {
-        setChipPos(null);
+        if (chipGraceRef.current) clearTimeout(chipGraceRef.current);
+        chipGraceRef.current = setTimeout(() => setChipPos(null), 450);
         return;
       }
       /* كشف السياق: هل التحديد داخل آية أو حديث؟ */
@@ -236,6 +259,7 @@ export function QuoteGenerator({
       );
       const rect = range.getBoundingClientRect();
       setSelectedText(text);
+      if (chipGraceRef.current) clearTimeout(chipGraceRef.current);
       setChipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
     };
 
@@ -249,7 +273,7 @@ export function QuoteGenerator({
     let cancelled = false;
     const render = () => {
       if (cancelled || !canvasRef.current) return;
-      drawQuoteCard(canvasRef.current, selectedText, size, theme, variant);
+      drawQuoteCard(canvasRef.current, selectedText, size, theme, variant, articleTitle);
     };
     if (document.fonts?.ready) {
       document.fonts.ready.then(render).catch(render);
@@ -259,7 +283,7 @@ export function QuoteGenerator({
     return () => {
       cancelled = true;
     };
-  }, [open, selectedText, size, theme, variant]);
+  }, [open, selectedText, size, theme, variant, articleTitle]);
 
   /**
    * خطاف «حفظ ومشاركة الاقتباس» (+3 أثر — مرتان يوميًا بسقف خادمي):
@@ -315,21 +339,43 @@ export function QuoteGenerator({
     } catch {}
   }, [articleSlug, articleTitle, selectedText, trackImpact]);
 
+  /**
+   * فتح المولد: بالتحديد المحفوظ إن وُجد — وإلا نافذة البديل الذكي.
+   * onMouseDown preventDefault يمنع الزر من سرق التحديد عند اللمس/النقر.
+   */
+  const requestOpen = useCallback(() => {
+    if (selectedText.trim().length >= 12) {
+      setOpen(true);
+    } else {
+      setManualQuote("");
+      setPickerOpen(true);
+    }
+  }, [selectedText]);
+
+  const adoptQuote = useCallback((text: string) => {
+    const clean = text.trim().replace(/\s+/g, " ");
+    if (clean.length < 12) return;
+    setSelectedText(clean);
+    setVariant("normal");
+    setPickerOpen(false);
+    setOpen(true);
+  }, []);
+
   return (
     <>
       <button
-        onClick={() => {
-          if (!selectedText) {
-            alert("ظلّل أولًا الجملة التي ألهمتك داخل المقال، ثم اضغط «اقتباسها».");
-            return;
-          }
-          setOpen(true);
+        onMouseDown={(e) => e.preventDefault()}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          requestOpen();
         }}
+        onClick={requestOpen}
         className="rounded-full px-3 py-1.5 transition-all hover:bg-[var(--accent-soft)]"
         style={{ color: "var(--ink-muted)" }}
         title="حوّل أي جملة إلى بطاقة اقتباس جاهزة للمشاركة"
       >
-        اقتباسها ✦
+        <span className="hidden sm:inline">اقتباسها ✦</span>
+        <span className="sm:hidden">اقتباسها</span>
       </button>
 
       {/* الشريحة العائمة عند التحديد */}
@@ -340,7 +386,12 @@ export function QuoteGenerator({
           style={{ left: chipPos.x, top: chipPos.y }}
         >
           <button
-            onClick={() => setOpen(true)}
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              requestOpen();
+            }}
+            onClick={requestOpen}
             className="rounded-full px-4 py-2 text-xs font-bold shadow-lift transition-transform hover:scale-105"
             style={{ background: "var(--accent)", color: "#fff" }}
           >
@@ -447,6 +498,83 @@ export function QuoteGenerator({
                   ✦ {impactNote}
                 </p>
               )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* نافذة البديل الذكي — تُفتح عند النقر بلا تحديد سابق */}
+      {pickerOpen &&
+        mounted &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4"
+            onClick={() => setPickerOpen(false)}
+          >
+            <div
+              className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl border p-5 shadow-lift sm:rounded-3xl"
+              style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-ui font-bold" style={{ color: "var(--ink)" }}>
+                  اختر جملة لبطاقة الاقتباس
+                </h3>
+                <button
+                  onClick={() => setPickerOpen(false)}
+                  aria-label="إغلاق"
+                  className="rounded-full p-2 transition-colors hover:bg-[var(--accent-soft)]"
+                  style={{ color: "var(--ink-muted)" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <p className="mb-4 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
+                ظلّل أي جملة في المقال لالتقاطها تلقائيًا — أو اختر من الاقتباسات الجوهرية أدناه، أو اكتبها بنفسك.
+              </p>
+
+              {/* الاقتباسات المنتقاة تلقائيًا من المقال */}
+              {suggestedQuotes.length > 0 && (
+                <div className="mb-4 space-y-2">
+                  {suggestedQuotes.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => adoptQuote(q)}
+                      className="block w-full rounded-2xl border px-4 py-3 text-right text-sm leading-7 transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                      style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+                    >
+                      <span style={{ color: "var(--accent-strong)" }}>«</span>
+                      {q.length > 140 ? `${q.slice(0, 140)}…` : q}
+                      <span style={{ color: "var(--accent-strong)" }}>»</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* الكتابة أو اللصق اليدوي */}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold" style={{ color: "var(--ink)" }}>
+                  أو اكتب الجملة التي تريد اقتباسها
+                </label>
+                <textarea
+                  value={manualQuote}
+                  onChange={(e) => setManualQuote(e.target.value)}
+                  rows={3}
+                  maxLength={400}
+                  placeholder="الصق هنا الجملة التي ألهمتك.."
+                  className="w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]"
+                  style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+                />
+                <button
+                  onClick={() => adoptQuote(manualQuote)}
+                  disabled={manualQuote.trim().length < 12}
+                  className="mt-3 w-full rounded-xl px-4 py-3 text-sm font-bold shadow-soft transition-all hover:scale-[1.01] disabled:opacity-40 disabled:hover:scale-100"
+                  style={{ background: "var(--accent)", color: "#fff" }}
+                >
+                  إنشاء البطاقة
+                </button>
+              </div>
             </div>
           </div>,
           document.body,

@@ -108,10 +108,10 @@ export default async function ArticlePage({
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <ReadingProgress />
       <Header />
-      <BackToTop />
+      <BackToTop offsetClass="bottom-24" />
 
       <main className="flex-1">
-        <article className="mx-auto max-w-3xl px-4 pt-28 pb-10 sm:px-6">
+        <article className="mx-auto max-w-3xl px-4 pt-28 pb-28 sm:px-6">
           {/* تصنيف القسم */}
           {article.section && (
             <div className="page-chrome mb-6 text-center">

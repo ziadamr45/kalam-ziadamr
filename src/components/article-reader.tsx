@@ -176,19 +176,37 @@ export function ArticleReader({
     [article.summary],
   );
 
+  /* اقتباسات مقترحة لمولد البطاقات: سطور الاقتباس (> ) في متن المقال
+     ثم نقاط المختصر — لتفتح للقارئ بديلًا ذكيًا عند غياب التحديد */
+  const suggestedQuotes = useMemo(() => {
+    const quotes: string[] = [];
+    for (const line of article.content.split("\n")) {
+      const t = line.trim();
+      if (t.startsWith("> ")) quotes.push(t.slice(2).trim());
+    }
+    if (quotes.length < 3) quotes.push(...summaryPoints);
+    return Array.from(new Set(quotes.filter((q) => q.length >= 20))).slice(0, 6);
+  }, [article.content, summaryPoints]);
+
   return (
     <div className="relative">
-      {/* شريط الأدوات: التشكيل + المختصر + الحفظ + الاقتباس — أهداف لمس مريحة على الموبايل */}
-      <div className="page-chrome sticky top-16 z-20 mx-auto -mx-2 mt-8 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 rounded-2xl border px-2 py-2 text-sm shadow-soft backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2.5"
-        style={{ background: "color-mix(in srgb, var(--surface) 90%, transparent)", borderColor: "var(--border)" }}
+      {/* شريط أدوات القراءة — مثبت أسفل الشاشة كشريط عائم مضغوط لا يحجب المحتوى
+          (كان يطفو sticky أعلى الصفحة فوق الغلاف والنص) */}
+      <div
+        className="page-chrome fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-md"
+        style={{
+          background: "color-mix(in srgb, var(--bg) 92%, transparent)",
+          borderColor: "var(--border)",
+        }}
       >
+        <div className="mx-auto flex max-w-3xl items-center justify-center gap-x-0.5 gap-y-1 px-2 py-2 text-sm sm:gap-2 sm:px-4">
         {/* مفتاح التشكيل — يختفي كليًا إذا عطّله الأدمن */}
         {tashkeelAllowed && (
           <button
             onClick={toggleTashkeel}
             role="switch"
             aria-checked={tashkeel}
-            className="flex min-h-11 items-center gap-2 rounded-full px-4 py-2 transition-all hover:bg-[var(--accent-soft)] sm:min-h-9 sm:px-3 sm:py-1.5"
+            className="flex min-h-11 items-center gap-2 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:py-1.5"
             style={{ color: tashkeel ? "var(--accent-strong)" : "var(--ink-muted)" }}
             title="تبديل النص المشكول بالحركات الكاملة"
           >
@@ -212,10 +230,11 @@ export function ArticleReader({
         {/* المختصر المفيد */}
         <button
           onClick={() => setShowSummary((v) => !v)}
-          className="min-h-11 rounded-full px-4 py-2 transition-all hover:bg-[var(--accent-soft)] sm:min-h-9 sm:px-3 sm:py-1.5"
+          className="min-h-11 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:py-1.5"
           style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
         >
-          المختصر المفيد
+          <span className="sm:hidden">المختصر</span>
+          <span className="hidden sm:inline">المختصر المفيد</span>
         </button>
 
         <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
@@ -224,11 +243,12 @@ export function ArticleReader({
         <button
           onClick={handleSave}
           disabled={saved || saveBusy}
-          className="min-h-11 rounded-full px-4 py-2 transition-all hover:bg-[var(--accent-soft)] disabled:opacity-60 sm:min-h-9 sm:px-3 sm:py-1.5"
+          className="min-h-11 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] disabled:opacity-60 sm:px-3 sm:py-1.5"
           style={{ color: saved ? "var(--accent-strong)" : "var(--ink-muted)" }}
           title={loggedIn ? "يُحفظ في حسابك (متزامن عبر أجهزتك) + لقطة داخل جهازك للقراءة دون إنترنت" : "حفظ داخل جهازك — سجّل الدخول لتتزامن محفوظاتك عبر أجهزتك"}
         >
-          {saved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}
+          <span className="sm:hidden">{saved ? "محفوظ ✓" : "حفظ"}</span>
+          <span className="hidden sm:inline">{saved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
         </button>
 
         <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
@@ -239,30 +259,37 @@ export function ArticleReader({
           articleTitle={article.title}
           articleSlug={article.slug}
           containerSelector="#article-body"
+          suggestedQuotes={suggestedQuotes}
         />
+        </div>
       </div>
 
-      {/* المختصر المفيد */}
+      {/* المختصر المفيد — لوحة عائمة تنبثق فوق شريط الأدوات السفلي */}
       <div
-        className={`page-chrome mt-5 overflow-hidden rounded-2xl border transition-all duration-500 ease-fluid ${
-          showSummary ? "max-h-[600px] opacity-100" : "max-h-0 border-transparent opacity-0"
+        className={`page-chrome fixed inset-x-0 bottom-[68px] z-40 px-3 transition-all duration-300 ease-fluid sm:px-6 ${
+          showSummary ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
         }`}
-        style={showSummary ? { background: "var(--bg-soft)", borderColor: "var(--border)" } : undefined}
+        aria-hidden={!showSummary}
       >
-        <div className="p-6">
-          <p className="font-ui mb-3 text-sm font-bold" style={{ color: "var(--accent-strong)" }}>
-            المختصر المفيد
-          </p>
-          <ul className="space-y-2.5">
-            {summaryPoints.map((point, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
-                <span className="font-body leading-9" style={{ color: "var(--ink)" }}>
-                  {point}
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div
+          className="mx-auto max-w-3xl rounded-2xl border shadow-lift"
+          style={showSummary ? { background: "var(--surface)", borderColor: "var(--border)" } : { borderColor: "transparent" }}
+        >
+          <div className="p-6">
+            <p className="font-ui mb-3 text-sm font-bold" style={{ color: "var(--accent-strong)" }}>
+              المختصر المفيد
+            </p>
+            <ul className="space-y-2.5">
+              {summaryPoints.map((point, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                  <span className="font-body leading-9" style={{ color: "var(--ink)" }}>
+                    {point}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 

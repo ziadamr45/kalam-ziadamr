@@ -31,6 +31,10 @@ const useSecureCookies =
 const cookiePrefix = useSecureCookies ? "__Secure-" : "";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  /* سرّ التوقيع صريحًا — يغطي التسميتين (Auth.js v5 يقرأ AUTH_SECRET أولًا،
+     ووجوده هنا يمنع خطأ MissingSecret الذي يولّد الشاشة الرمادية
+     «There is a problem with the server configuration» في الإنتاج */
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   adapter: PrismaAdapter(prisma) as Adapter,
   providers: googleConfigured
     ? [
@@ -98,6 +102,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
+    /*
+     * حارس إعادة التوجيه — قلب إصلاح الشاشة الرمادية بعد العودة من Google:
+     * أي رابط داخلي يُلحق بـ baseUrl كما هو، وأي رابط خارجي
+     * يطابق نطاق الإنتاج يُمرَّر، وما عدا ذلك يعود آمنًا إلى baseUrl —
+     * بلا أي استثناء غير معالج في دورة الـ Callback.
+     */
+    redirect({ url, baseUrl }) {
+      const base = baseUrl.replace(/\/+$/, "");
+      try {
+        if (url.startsWith("/")) return `${base}${url}`;
+        const parsed = new URL(url);
+        if (parsed.origin === base) return url;
+        /* نطاق غريب — يُقتطع إلى الرئيسية بدل رمي خطأ */
+        return base;
+      } catch {
+        /* رابط مشوّه — عودة آمنة بدل انهيار الدورة */
+        return base;
+      }
+    },
     async signIn({ user }) {
       if (!user?.email) return true;
       try {

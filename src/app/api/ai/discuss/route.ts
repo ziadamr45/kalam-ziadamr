@@ -3,6 +3,12 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { geminiChat, geminiConfigured, ChatTurn, GeminiError } from "@/lib/gemini-chat";
 import { aiQuotaForScore, AI_QUOTA_BASE } from "@/lib/ranks";
+import {
+  AI_QUOTA_COOKIE,
+  encodeGuestQuota,
+  decodeGuestQuota,
+  readCookieFromRequest,
+} from "@/lib/ai-quota";
 
 /**
  * ============================================================
@@ -11,9 +17,11 @@ import { aiQuotaForScore, AI_QUOTA_BASE } from "@/lib/ranks";
  * - النموذج المعتمد حصريًا: gemini-3.5-flash-lite (فائق السرعة، خفيف التكلفة).
  * - حقن السياق المزدوج: متن المقال كاملًا + التغذية الفكرية السرية (authorIntent)
  *   التي لا تُغادر الخادم أبدًا ولا تُعاد في أي استجابة.
- * - حماية الموارد: حصة صارمة لكل قارئ في كل مقال + مانع اندفاع لحظي.
- * - ميزة الرصيد المرتفع: حصة النقاش تتمدد مع ترقية رتبة «رصيد الأثر»
- *   (عقل رصين 9 رسائل — أهل الكلمة 12 رسالة لكل مقال).
+ * - حماية الموارد: حصة دائمة صارمة لكل قارئ في كل مقال + مانع اندفاع لحظي.
+ *   • المسجلون: جدول AiDiscussionUsage في Neon — لا يُصفَّر بالتحديث أبدًا.
+ *   • الزوار: كوكي HTTP-Only موقعة HMAC بصلاحية 24 ساعة.
+ * - الفحص يتم في الخادم قبل أي نداء لـ Gemini — الواجهة مرآة فقط.
+ * - ميزة الرصيد المرتفع: حصة النقاش تتمدد مع ترقية رتبة «رصيد الأثر».
  */
 
 export const maxDuration = 30;
@@ -23,8 +31,8 @@ const BASE_PER_READER_PER_ARTICLE = AI_QUOTA_BASE;
 /** مانع الاندفاع: 10 رسائل كحد أقصى في الدقيقة للقارئ نفسه */
 const BURST_PER_MINUTE = 10;
 
-/* التتبع بالجلسة (ذاكرة العملية — يُعاد ضبطها عند البرودة وهذا مقبول تصميميًا،
-   والعداد مرآته في الواجهة عبر sessionStorage) */
+/* ذاكرة احتياطية فقط — تُستعمل للمسجلين إذا لم يكن جدول AiDiscussionUsage
+   مُهيأً بعد في قاعدة البيانات (قبل prisma db push) حتى لا تنكسر الميزة */
 const quotaBuckets = new Map<string, { count: number; day: string }>();
 const burstBuckets = new Map<string, number[]>();
 
@@ -50,24 +58,75 @@ async function limitFor(readerKey: string): Promise<number> {
   return BASE_PER_READER_PER_ARTICLE;
 }
 
-async function remainingFor(articleId: string, readerKey: string): Promise<number> {
-  const limit = await limitFor(readerKey);
-  const q = quotaBuckets.get(quotaKey(articleId, readerKey));
-  if (!q || q.day !== todayKey()) return limit;
-  return Math.max(0, limit - q.count);
+/* ==================== الاستهلاك الدائم — المسجلون ==================== */
+
+/** قراءة الاستهلاك من Neon — null يعني فشل الاستعلام (تُستعمل الذاكرة الاحتياطية) */
+async function dbUsage(userId: string, articleId: string): Promise<number | null> {
+  try {
+    const row = await prisma.aiDiscussionUsage.findUnique({
+      where: { userId_articleId: { userId, articleId } },
+      select: { messageCount: true },
+    });
+    return row?.messageCount ?? 0;
+  } catch {
+    return null;
+  }
 }
 
-async function consumeQuota(articleId: string, readerKey: string): Promise<number> {
-  const limit = await limitFor(readerKey);
+/** ترصيد رسالة جديدة في قاعدة البيانات — يُرجع العدد الجديد أو null عند الفشل */
+async function dbConsume(userId: string, articleId: string): Promise<number | null> {
+  try {
+    const row = await prisma.aiDiscussionUsage.upsert({
+      where: { userId_articleId: { userId, articleId } },
+      create: { userId, articleId, messageCount: 1 },
+      update: {
+        messageCount: { increment: 1 },
+        lastMessageAt: new Date(),
+      },
+      select: { messageCount: true },
+    });
+    return row.messageCount;
+  } catch {
+    return null;
+  }
+}
+
+/* الاستهلاك الاحتياطي في الذاكرة (سلوك ما قبل الترحيل — تصفير يومي) */
+function memUsage(articleId: string, readerKey: string): number {
+  const q = quotaBuckets.get(quotaKey(articleId, readerKey));
+  if (!q || q.day !== todayKey()) return 0;
+  return q.count;
+}
+
+function memConsume(articleId: string, readerKey: string): number {
   const key = quotaKey(articleId, readerKey);
   const day = todayKey();
   const q = quotaBuckets.get(key);
   if (!q || q.day !== day) {
     quotaBuckets.set(key, { count: 1, day });
-  } else {
-    q.count += 1;
+    return 1;
   }
-  return Math.max(0, limit - quotaBuckets.get(key)!.count);
+  q.count += 1;
+  return q.count;
+}
+
+/* ==================== الاستهلاك الدائم — الزوار (كوكي موقعة) ==================== */
+
+function guestUsage(request: Request, articleId: string): number {
+  const counts = decodeGuestQuota(readCookieFromRequest(request, AI_QUOTA_COOKIE));
+  return counts[articleId] ?? 0;
+}
+
+function guestCookieOptions() {
+  const secure = (process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "").startsWith("https://") ||
+    process.env.VERCEL_ENV === "production";
+  return {
+    httpOnly: true as const,
+    sameSite: "lax" as const,
+    secure,
+    path: "/",
+    maxAge: 24 * 60 * 60,
+  };
 }
 
 function allowBurst(readerKey: string): boolean {
@@ -83,7 +142,7 @@ function allowBurst(readerKey: string): boolean {
   return true;
 }
 
-/** تنظيف دوري بسيط لمنع تضخم الخرائط */
+/** تنظيف دوري بسيط لمنع تضخم الخرائط الاحتياطية */
 function gcBuckets() {
   if (quotaBuckets.size > 5000) {
     const day = todayKey();
@@ -134,6 +193,20 @@ function cleanText(raw: string): string {
     .trim();
 }
 
+/** قراءة الاستهلاك الكلي للقارئ في مقالٍ ما — الدائم أولًا والاحتياطي عند الفشل */
+async function usedFor(
+  request: Request,
+  articleId: string,
+  readerKey: string,
+): Promise<number> {
+  if (readerKey.startsWith("u:")) {
+    const db = await dbUsage(readerKey.slice(2), articleId);
+    if (db !== null) return db;
+    return memUsage(articleId, readerKey);
+  }
+  return guestUsage(request, articleId);
+}
+
 /* ==================== الاستعلام عن الحصة المتبقية ==================== */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -146,9 +219,13 @@ export async function GET(request: Request) {
   const fp = url.searchParams.get("fp");
   const readerKey = getReaderKey(session, fp);
 
+  const limit = await limitFor(readerKey);
+  const used = await usedFor(request, articleId, readerKey);
+
   return NextResponse.json({
-    limit: await limitFor(readerKey),
-    remaining: await remainingFor(articleId, readerKey),
+    limit,
+    used,
+    remaining: Math.max(0, limit - used),
   });
 }
 
@@ -187,10 +264,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const remaining = await remainingFor(articleId, readerKey);
-    if (remaining <= 0) {
+    /* ===== الفحص الصارم الدائم — قبل أي نداء لـ Gemini ===== */
+    const limit = await limitFor(readerKey);
+    const used = await usedFor(request, articleId, readerKey);
+    if (used >= limit) {
       return NextResponse.json(
-        { error: "استُهلكت حصة النقاش لهذا المقال — شكرًا لحوارك الراقي", exhausted: true },
+        {
+          error: `لقد استوفيت الحد المخصص لنقاش هذا المقال (${used}/${limit}). تفضل بزيارة مقال آخر لفتح نقاش جديد`,
+          exhausted: true,
+          used,
+          limit,
+        },
         { status: 429 },
       );
     }
@@ -243,14 +327,34 @@ export async function POST(request: Request) {
       );
     }
 
-    gcBuckets();
-    const remainingAfter = await consumeQuota(articleId, readerKey);
+    /* ===== ترصيد الاستهلاك بعد نجاح الرد ===== */
+    let usedAfter = used + 1;
+    if (readerKey.startsWith("u:")) {
+      const dbCount = await dbConsume(readerKey.slice(2), articleId);
+      if (dbCount !== null) {
+        usedAfter = dbCount;
+      } else {
+        usedAfter = memConsume(articleId, readerKey);
+      }
+    }
 
-    return NextResponse.json({
+    gcBuckets();
+    const response = NextResponse.json({
       reply,
-      remaining: remainingAfter,
-      limit: await limitFor(readerKey),
+      remaining: Math.max(0, limit - usedAfter),
+      limit,
+      used: usedAfter,
     });
+
+    /* الزوار: إعادة إصدار الكوكي الموقعة بالعدّ الجديد (توقيع خادمي لا يُزوَّر) */
+    if (!readerKey.startsWith("u:")) {
+      const counts = decodeGuestQuota(readCookieFromRequest(request, AI_QUOTA_COOKIE));
+      counts[articleId] = usedAfter;
+      const { value, maxAge } = encodeGuestQuota(counts);
+      response.cookies.set(AI_QUOTA_COOKIE, value, guestCookieOptions());
+    }
+
+    return response;
   } catch (err) {
     if (err instanceof GeminiError) {
       return NextResponse.json({ error: err.message }, { status: err.status >= 500 ? 502 : err.status });
