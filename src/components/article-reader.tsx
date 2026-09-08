@@ -258,6 +258,7 @@ export function ArticleReader({
           articleId={article.id}
           articleTitle={article.title}
           articleSlug={article.slug}
+          articleCover={article.coverImage}
           containerSelector="#article-body"
           suggestedQuotes={suggestedQuotes}
         />

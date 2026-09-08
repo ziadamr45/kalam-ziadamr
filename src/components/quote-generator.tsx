@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
+import QRCode from "qrcode";
 
 type SizePreset = { key: string; label: string; w: number; h: number };
-type CardTheme = "paper" | "night";
 type CardVariant = "normal" | "quran" | "hadith";
 
 const SIZES: SizePreset[] = [
@@ -14,73 +14,202 @@ const SIZES: SizePreset[] = [
   { key: "wide", label: "إكس ١٦٠٠×٩٠٠", w: 1600, h: 900 },
 ];
 
-const THEMES: Record<CardTheme, { bg: string; ink: string; accent: string; muted: string }> = {
-  paper: { bg: "#FDFBF7", ink: "#1C1917", accent: "#A16A1F", muted: "#8A847B" },
-  night: { bg: "#0B1120", ink: "#E5E3DF", accent: "#D9A441", muted: "#94A3B8" },
-};
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kalam-ziadamr.vercel.app";
 
 /**
- * رسم بطاقة الاقتباس على Canvas بدعم RTL كامل:
- * لف كلمات، علامتا اقتباس، خط نحاسي، تذييل الهوية.
- * متمايز للآيات (﴿ ﴾ + خط الرسم العثماني) وللأحاديث (خط النسخ الكلاسيكي).
+ * تصدير فائق النقاء — pixelRatio 3 (كريستالي لشاشات Retina).
+ * حصانة iOS: حد ذاكرة كانفاس ≈ 16.7 مليون بكسل، لذا يُخفَّض النسبة
+ * تلقائيًا للمقاسات الطويلة (ستوري) بدل أن تفرغ البطاقة صمتًا.
+ */
+function pixelRatioFor(w: number, h: number): number {
+  const MAX_AREA = 16_400_000;
+  return Math.min(3, Math.sqrt(MAX_AREA / (w * h)));
+}
+
+/** تنظيف وسوم الماركداون — تُرسم كنص صافٍ لا كأخطاء ظاهرة */
+function stripMarkdown(raw: string): string {
+  return raw
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/(\*|_)(.*?)\1/g, "$2")
+    .replace(/~~(.*?)~~/g, "$2")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^[«»\s]+/, "")
+    .replace(/[«»\s]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** تحميل غلاف المقال — crossOrigin آمن، ويفشل بهدوء إلى خلفية متدرجة */
+function loadCover(src?: string | null): Promise<HTMLImageElement | null> {
+  if (!src) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img.naturalWidth > 0 ? img : null);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/** توليد رمز QR الموجه للمقال — بقع داكنة على أبيض لثبات المسح */
+async function loadQR(url: string): Promise<HTMLImageElement | null> {
+  try {
+    const dataUrl = await QRCode.toDataURL(url, {
+      margin: 0,
+      width: 512,
+      errorCorrectionLevel: "M",
+      color: { dark: "#14100B", light: "#FFFFFF" },
+    });
+    return await loadCover(dataUrl);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * محرك البطاقة السينمائية — يرسم في إحداثيات منطقية W×H ويضخّم ×3:
+ * غلاف المقال ممتد كاملًا + ضبابية عازلة + تراكب دافئ عميق + vignette شعاعي
+ * + إطار ذهبي داخلي بأركان مخطوطية هادئة + اقتباس أبيض ناصع بخط أميري
+ * + تذييل بهوية المنصة ورمز QR موجّه للمقال.
  */
 function drawQuoteCard(
   canvas: HTMLCanvasElement,
-  quote: string,
-  preset: SizePreset,
-  theme: CardTheme,
-  variant: CardVariant,
-  articleTitle: string,
+  opts: {
+    quote: string;
+    preset: SizePreset;
+    variant: CardVariant;
+    articleTitle: string;
+    cover: HTMLImageElement | null;
+    qr: HTMLImageElement | null;
+  },
 ) {
-  const t = THEMES[theme];
+  const { quote, preset, variant, articleTitle, cover, qr } = opts;
   const W = preset.w;
   const H = preset.h;
-  canvas.width = W;
-  canvas.height = H;
+  const ratio = pixelRatioFor(W, H);
+  canvas.width = Math.round(W * ratio);
+  canvas.height = Math.round(H * ratio);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-
-  ctx.scale(1, 1);
+  ctx.scale(ratio, ratio);
   ctx.direction = "rtl";
   ctx.textAlign = "center";
 
-  // الخلفية
-  ctx.fillStyle = t.bg;
-  ctx.fillRect(0, 0, W, H);
+  const minWH = Math.min(W, H);
+  const m = Math.round(minWH * 0.045); // هامش الإطار الداخلي (روح m-5)
+  const radius = Math.round(minWH * 0.026);
 
-  // نمط نقاط خفيف
-  ctx.fillStyle = theme === "paper" ? "rgba(161,106,31,0.05)" : "rgba(217,164,65,0.05)";
-  const gap = 46;
-  for (let y = gap / 2; y < H; y += gap) {
-    for (let x = gap / 2; x < W; x += gap) {
-      ctx.beginPath();
-      ctx.arc(x, y, 2.2, 0, Math.PI * 2);
-      ctx.fill();
+  /* ============ ١) الخلفية السينمائية — الغلاف ممتد كاملًا ============ */
+  const supportsFilter = typeof ctx.filter === "string";
+  let drewCover = false;
+  if (cover) {
+    try {
+      ctx.save();
+      const scale =
+        Math.max(W / cover.naturalWidth, H / cover.naturalHeight) *
+        (supportsFilter ? 1.14 : 1.03); // أوفرسكان يخفي تفتت حواف الضبابية
+      const dw = cover.naturalWidth * scale;
+      const dh = cover.naturalHeight * scale;
+      if (supportsFilter) {
+        ctx.filter = "blur(14px) saturate(1.1) brightness(0.88)";
+      }
+      ctx.drawImage(cover, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.filter = "none";
+      ctx.restore();
+      drewCover = true;
+    } catch {
+      drewCover = false;
     }
   }
+  if (!drewCover) {
+    /* خلفية احتياطية فخمة — بني عتيق متوهج من القلب */
+    const g = ctx.createRadialGradient(W / 2, H * 0.44, 0, W / 2, H * 0.44, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "#2E2113");
+    g.addColorStop(0.55, "#1B1309");
+    g.addColorStop(1, "#0C0906");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
 
-  // إطار داخلي رفيع
-  ctx.strokeStyle = t.accent;
-  ctx.globalAlpha = 0.35;
-  ctx.lineWidth = 3;
-  const m = Math.round(Math.min(W, H) * 0.045);
-  const r = 28;
-  roundRect(ctx, m, m, W - m * 2, H - m * 2, r);
+  /* ============ ٢) التراكب الدافئ العميق + تركيز الضوء ============ */
+  ctx.fillStyle = "rgba(12,10,8,0.70)"; // bg-black/70 بلمسة دفء
+  ctx.fillRect(0, 0, W, H);
+
+  const vg = ctx.createRadialGradient(W / 2, H * 0.46, minWH * 0.16, W / 2, H * 0.5, Math.max(W, H) * 0.78);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(0.6, "rgba(0,0,0,0.10)");
+  vg.addColorStop(1, "rgba(0,0,0,0.58)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  /* تعتيم سفلي ناعم — يهيئ الأرضية للتذييل وQR */
+  const floor = ctx.createLinearGradient(0, H * 0.6, 0, H);
+  floor.addColorStop(0, "rgba(0,0,0,0)");
+  floor.addColorStop(1, "rgba(0,0,0,0.45)");
+  ctx.fillStyle = floor;
+  ctx.fillRect(0, H * 0.6, W, H * 0.4);
+
+  /* ============ ٣) الإطار الذهبي الداخلي + الأركان المخطوطية ============ */
+  ctx.strokeStyle = "rgba(245,158,11,0.25)"; // amber-500/25
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, m, m, W - m * 2, H - m * 2, radius);
   ctx.stroke();
-  ctx.globalAlpha = 1;
 
-  // نص الاقتباس — لف الكلمات بمقاس متكيّف
-  const maxW = W - m * 2 - Math.round(W * 0.09);
-  const lineHFactor = variant === "quran" ? 2.15 : 1.85;
-  let fontSize = Math.round(Math.min(W, H) * (variant === "quran" ? 0.058 : 0.062));
-  const minFontSize = Math.round(Math.min(W, H) * 0.026);
+  const c = m + Math.round(minWH * 0.016);
+  const L = Math.round(minWH * 0.05);
+  ctx.strokeStyle = "rgba(217,164,65,0.8)";
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = "round";
+  const corner = (x: number, y: number, sx: number, sy: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + sx * L, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + sy * L);
+    ctx.stroke();
+  };
+  corner(c, c, 1, 1);
+  corner(W - c, c, -1, 1);
+  corner(c, H - c, 1, -1);
+  corner(W - c, H - c, -1, -1);
+
+  /* ============ ٤) هندسة التذييل قبل الاقتباس (لتحديد مساحة النص) ============ */
+  const pad = Math.round(m * 0.9);
+  const qrSize = Math.round(minWH * 0.115);
+  const captionSize = Math.max(13, Math.round(minWH * 0.015));
+  const qrX = qr ? W - m - pad - qrSize : 0;
+  const qrY = qr ? H - m - pad - qrSize - captionSize - 6 : 0;
+  const qrCenterY = qr ? qrY + qrSize / 2 : H - m - pad - minWH * 0.05;
+  /* مركز عمود النص: يزاح قليلًا يسارًا ليتنفس بجوار QR */
+  const textCx = qr ? ((m + pad) + (qrX - 26)) / 2 : W / 2;
+
+  const brandSize = Math.round(minWH * 0.034);
+  const taglineSize = Math.round(minWH * 0.021);
+  const titleSize = Math.round(minWH * 0.027);
+
+  const taglineY = qrCenterY + Math.round(taglineSize * 1.1);
+  const brandY = qrCenterY + Math.round(brandSize * 0.15);
+  const titleY = brandY - Math.round(brandSize * 1.5);
+  const dividerY = titleY - Math.round(titleSize * 1.7);
+  const quoteAreaBottom = dividerY - Math.round(minWH * 0.065);
+  const quoteAreaTop = m + Math.round(minWH * 0.10);
+
+  /* ============ ٥) نص الاقتباس — أبيض ناصع بخط أميري عريض ============ */
+  const maxW = qr ? qrX - 26 - (m + pad) : W - m * 2 - Math.round(W * 0.09);
+  const lineHFactor = variant === "quran" ? 2.15 : variant === "hadith" ? 2.0 : 1.95;
+  let fontSize = Math.round(minWH * (variant === "quran" ? 0.056 : 0.06));
+  const minFontSize = Math.round(minWH * 0.026);
   let lines: string[] = [];
 
   const wrap = (fs: number): string[] => {
     ctx.font =
       variant === "quran"
         ? `400 ${fs}px "Amiri Quran", "Amiri", serif`
-        : `700 ${fs}px "Amiri", serif`;
+        : variant === "hadith"
+          ? `700 ${fs}px "Noto Naskh Arabic", "Amiri", serif`
+          : `700 ${fs}px "Amiri", serif`;
     const words = quote.split(/\s+/);
     const out: string[] = [];
     let line = "";
@@ -99,79 +228,104 @@ function drawQuoteCard(
 
   for (;;) {
     lines = wrap(fontSize);
-    const lineH = fontSize * lineHFactor;
-    const needed = lines.length * lineH + fontSize;
-    if (needed <= H - m * 2 - Math.round(H * 0.16) || fontSize <= minFontSize) break;
+    const needed = lines.length * fontSize * lineHFactor + fontSize * 2.6;
+    if (needed <= quoteAreaBottom - quoteAreaTop || fontSize <= minFontSize) break;
     fontSize = Math.round(fontSize * 0.94);
   }
 
   const lineH = fontSize * lineHFactor;
   const blockH = lines.length * lineH;
-  const startY = H / 2 - blockH / 2 + fontSize * 0.4;
+  const areaCenter = (quoteAreaTop + quoteAreaBottom) / 2;
+  const startY = areaCenter - blockH / 2 + fontSize * 0.4;
 
-  // علامتا الاقتباس — قرآنية ﴿ أو راقية «
+  /* علامتا الاقتباس الذهبيتان اللامعتان — تُوّجان النص وتختمانه بوقار */
+  const goldGrad = ctx.createLinearGradient(0, quoteAreaTop, 0, quoteAreaBottom);
+  goldGrad.addColorStop(0, "#F5D78E");
+  goldGrad.addColorStop(0.5, "#D9A441");
+  goldGrad.addColorStop(1, "#C08A16");
   const openMark = variant === "quran" ? "﴿" : "«";
   const closeMark = variant === "quran" ? "﴾" : "»";
-  ctx.fillStyle = t.accent;
-  ctx.globalAlpha = 0.9;
-  ctx.font =
-    variant === "quran"
-      ? `400 ${Math.round(fontSize * 1.5)}px "Amiri Quran", "Amiri", serif`
-      : `700 ${Math.round(fontSize * 1.6)}px Amiri, serif`;
-  ctx.fillText(openMark, W / 2, startY - fontSize * 1.5);
+  const markFont = (scale: number) => {
+    ctx.font =
+      variant === "quran"
+        ? `400 ${Math.round(fontSize * scale)}px "Amiri Quran", "Amiri", serif`
+        : `700 ${Math.round(fontSize * scale)}px "Amiri", serif`;
+  };
+  ctx.fillStyle = goldGrad;
+  ctx.globalAlpha = 0.95;
+  markFont(1.7);
+  ctx.fillText(openMark, textCx, startY - fontSize * 1.5);
   ctx.globalAlpha = 1;
 
-  // السطور
-  ctx.fillStyle = t.ink;
+  ctx.fillStyle = "#FFFFFF"; // أبيض ناصع
   ctx.font =
     variant === "quran"
       ? `400 ${fontSize}px "Amiri Quran", "Amiri", serif`
       : variant === "hadith"
-        ? `700 ${fontSize * 0.92}px "Noto Naskh Arabic", "Amiri", serif`
-        : `700 ${fontSize}px Amiri, serif`;
-  ctx.shadowColor = theme === "night" ? "rgba(0,0,0,0.4)" : "rgba(28,25,23,0.06)";
-  ctx.shadowBlur = 0;
+        ? `700 ${Math.round(fontSize * 0.92)}px "Noto Naskh Arabic", "Amiri", serif`
+        : `700 ${fontSize}px "Amiri", serif`;
+  ctx.shadowColor = "rgba(0,0,0,0.6)"; // ظل رقيق يرفع النص فوق الصورة
+  ctx.shadowBlur = Math.round(fontSize * 0.22);
+  ctx.shadowOffsetY = 2;
   lines.forEach((line, i) => {
-    ctx.fillText(line, W / 2, startY + i * lineH);
+    ctx.fillText(line, textCx, startY + i * lineH);
   });
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
 
-  // علامة الإغلاق
-  ctx.fillStyle = t.accent;
-  ctx.font =
-    variant === "quran"
-      ? `400 ${Math.round(fontSize * 1.5)}px "Amiri Quran", "Amiri", serif`
-      : `700 ${Math.round(fontSize * 1.6)}px Amiri, serif`;
-  ctx.fillText(closeMark, W / 2, startY + blockH + fontSize * 0.5);
+  ctx.fillStyle = goldGrad;
+  markFont(1.7);
+  ctx.fillText(closeMark, textCx, startY + blockH + fontSize * 0.5);
 
-  // الخط الفاصل النحاسي
-  const ruleY = H - Math.round(H * 0.11);
-  const ruleW = Math.round(W * 0.12);
-  const grad = ctx.createLinearGradient(W / 2 - ruleW, 0, W / 2 + ruleW, 0);
-  grad.addColorStop(0, "rgba(0,0,0,0)");
-  grad.addColorStop(0.5, t.accent);
-  grad.addColorStop(1, "rgba(0,0,0,0)");
+  /* ============ ٦) التذييل — عنوان المقال + هوية المنصة + QR ============ */
+  /* الخط الفاصل الذهبي المتلاشي */
+  const ruleW = Math.round(maxW * 0.14);
+  const grad = ctx.createLinearGradient(textCx - ruleW, 0, textCx + ruleW, 0);
+  grad.addColorStop(0, "rgba(217,164,65,0)");
+  grad.addColorStop(0.5, "rgba(217,164,65,0.85)");
+  grad.addColorStop(1, "rgba(217,164,65,0)");
   ctx.fillStyle = grad;
-  ctx.fillRect(W / 2 - ruleW, ruleY, ruleW * 2, 4);
+  ctx.fillRect(textCx - ruleW, dividerY, ruleW * 2, 3);
 
-  // عنوان المقال — سطر واحد مقطوع بذكاء فوق الفاصل
-  if (articleTitle?.trim()) {
-    ctx.fillStyle = t.muted;
-    ctx.font = `400 ${Math.round(Math.min(W, H) * 0.026)}px "Readex Pro", "Amiri", sans-serif`;
+  /* عنوان المقال — رمادي فاتح هادئ */
+  if (articleTitle.trim()) {
+    ctx.fillStyle = "rgba(214,210,202,0.92)";
+    ctx.font = `400 ${titleSize}px "Readex Pro", "Amiri", sans-serif`;
     let title = articleTitle.trim();
     while (ctx.measureText(title).width > maxW && title.length > 6) {
       title = title.slice(0, -3);
     }
     if (title !== articleTitle.trim()) title += "…";
-    ctx.fillText(title, W / 2, ruleY - Math.round(H * 0.026));
+    ctx.fillText(title, textCx, titleY);
   }
 
-  // التذييل — الهوية
-  ctx.fillStyle = t.ink;
-  ctx.font = `700 ${Math.round(Math.min(W, H) * 0.032)}px "Readex Pro", "Amiri", sans-serif`;
-  ctx.fillText("كلام له لازمة", W / 2, ruleY + Math.round(H * 0.055));
-  ctx.fillStyle = t.muted;
-  ctx.font = `400 ${Math.round(Math.min(W, H) * 0.02)}px "Readex Pro", "Amiri", sans-serif`;
-  ctx.fillText("مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.", W / 2, ruleY + Math.round(H * 0.088));
+  /* هوية المنصة — اسم ذهبي + اللسان المميز */
+  ctx.fillStyle = "#D9A441";
+  ctx.font = `700 ${brandSize}px "Readex Pro", "Amiri", sans-serif`;
+  ctx.fillText("كلام له لازمة", textCx, brandY);
+  ctx.fillStyle = "rgba(196,192,184,0.8)";
+  ctx.font = `400 ${taglineSize}px "Readex Pro", "Amiri", sans-serif`;
+  ctx.fillText("مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.", textCx, taglineY);
+
+  /* رمز QR — بلاطة بيضاء مستديرة ظلّها يرفعها عن الخلفية */
+  if (qr) {
+    const tile = qrSize + Math.round(qrSize * 0.14);
+    const tx = qrX - (tile - qrSize) / 2;
+    const ty = qrY - (tile - qrSize) / 2;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 5;
+    ctx.fillStyle = "#FFFFFF";
+    roundRect(ctx, tx, ty, tile, tile, Math.round(tile * 0.12));
+    ctx.fill();
+    ctx.restore();
+    ctx.drawImage(qr, qrX, qrY, qrSize, qrSize);
+    ctx.fillStyle = "rgba(217,164,65,0.85)";
+    ctx.font = `500 ${captionSize}px "Readex Pro", "Amiri", sans-serif`;
+    ctx.fillText("امسح الكود لقراءة المقال", qrX + qrSize / 2, H - m - pad - 4);
+  }
 }
 
 function roundRect(
@@ -195,12 +349,14 @@ export function QuoteGenerator({
   articleId,
   articleTitle,
   articleSlug,
+  articleCover = null,
   containerSelector,
   suggestedQuotes = [],
 }: {
   articleId: string;
   articleTitle: string;
   articleSlug: string;
+  articleCover?: string | null;
   containerSelector: string;
   suggestedQuotes?: string[];
 }) {
@@ -212,7 +368,7 @@ export function QuoteGenerator({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [manualQuote, setManualQuote] = useState("");
   const [size, setSize] = useState<SizePreset>(SIZES[1]);
-  const [theme, setTheme] = useState<CardTheme>("paper");
+  const [rendering, setRendering] = useState(false);
   const [mounted, setMounted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chipRef = useRef<HTMLDivElement | null>(null);
@@ -267,23 +423,37 @@ export function QuoteGenerator({
     return () => document.removeEventListener("selectionchange", onSelectionChange);
   }, [containerSelector]);
 
-  /* الرسم عند فتح المودال أو تغيير الخيارات */
+  /* الرسم السينمائي — ينتظر الخطوط ثم الغلاف وQR ثم يرسم دفعة واحدة */
   useEffect(() => {
     if (!open || !canvasRef.current) return;
     let cancelled = false;
-    const render = () => {
+    setRendering(true);
+    const render = async () => {
+      const cleanQuote = stripMarkdown(selectedText);
+      const [cover, qrImg] = await Promise.all([
+        loadCover(articleCover),
+        loadQR(`${SITE_URL}/article/${articleSlug}`),
+      ]);
       if (cancelled || !canvasRef.current) return;
-      drawQuoteCard(canvasRef.current, selectedText, size, theme, variant, articleTitle);
+      drawQuoteCard(canvasRef.current, {
+        quote: cleanQuote,
+        preset: size,
+        variant,
+        articleTitle: stripMarkdown(articleTitle),
+        cover,
+        qr: qrImg,
+      });
+      setRendering(false);
     };
     if (document.fonts?.ready) {
       document.fonts.ready.then(render).catch(render);
     } else {
-      render();
+      void render();
     }
     return () => {
       cancelled = true;
     };
-  }, [open, selectedText, size, theme, variant, articleTitle]);
+  }, [open, selectedText, size, variant, articleTitle, articleCover, articleSlug]);
 
   /**
    * خطاف «حفظ ومشاركة الاقتباس» (+3 أثر — مرتان يوميًا بسقف خادمي):
@@ -431,17 +601,29 @@ export function QuoteGenerator({
                 </button>
               </div>
 
-              {/* المعاينة */}
-              <div className="mb-4 flex justify-center">
+              {/* المعاينة السينمائية */}
+              <div className="relative mb-4 flex justify-center">
                 <canvas
                   ref={canvasRef}
-                  className="max-h-[46vh] w-auto max-w-full rounded-xl shadow-soft"
+                  className="max-h-[46vh] w-auto max-w-full rounded-xl shadow-lift"
                   style={{ aspectRatio: `${size.w} / ${size.h}` }}
                 />
+                {rendering && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center rounded-xl text-xs font-bold"
+                    style={{ background: "rgba(0,0,0,0.35)", color: "#F5D78E" }}
+                  >
+                    جارٍ إعداد البطاقة..
+                  </div>
+                )}
               </div>
 
+              <p className="mb-3 text-center text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                بطاقة سينمائية من غلاف المقال — بتصدير فائق النقاء ×٣ مع رمز QR يوجه القارئ إلى المقال
+              </p>
+
               {/* المقاسات */}
-              <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className="mb-4 grid grid-cols-3 gap-2">
                 {SIZES.map((s) => (
                   <button
                     key={s.key}
@@ -458,35 +640,19 @@ export function QuoteGenerator({
                 ))}
               </div>
 
-              {/* الثيمات */}
-              <div className="mb-4 grid grid-cols-2 gap-2">
-                {(["paper", "night"] as CardTheme[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTheme(t)}
-                    className="rounded-xl border px-2 py-2 text-xs font-semibold transition-all"
-                    style={
-                      theme === t
-                        ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
-                        : { color: "var(--ink-muted)", borderColor: "var(--border)" }
-                    }
-                  >
-                    {t === "paper" ? "ثيم ورقي" : "ثيم ليلي"}
-                  </button>
-                ))}
-              </div>
-
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={download}
-                  className="rounded-xl px-4 py-3 text-sm font-bold shadow-soft transition-all hover:scale-[1.02]"
+                  disabled={rendering}
+                  className="rounded-xl px-4 py-3 text-sm font-bold shadow-soft transition-all hover:scale-[1.02] disabled:opacity-50"
                   style={{ background: "var(--accent)", color: "#fff" }}
                 >
                   تحميل الصورة
                 </button>
                 <button
                   onClick={shareNative}
-                  className="rounded-xl border px-4 py-3 text-sm font-bold transition-all hover:scale-[1.02]"
+                  disabled={rendering}
+                  className="rounded-xl border px-4 py-3 text-sm font-bold transition-all hover:scale-[1.02] disabled:opacity-50"
                   style={{ color: "var(--accent-strong)", borderColor: "var(--accent)" }}
                 >
                   مشاركة
