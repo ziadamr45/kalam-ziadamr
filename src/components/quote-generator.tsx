@@ -180,7 +180,9 @@ function drawQuoteCard(
   const qrSize = Math.round(minWH * 0.115);
   const captionSize = Math.max(13, Math.round(minWH * 0.015));
   const qrX = qr ? W - m - pad - qrSize : 0;
-  const qrY = qr ? H - m - pad - qrSize - captionSize - 6 : 0;
+  const qrY = qr ? H - m - pad - qrSize : 0;
+  /* التعليق يُرسم فوق البلاطة — بعيدًا تمامًا عن زخارف الأركان في كل المقاسات */
+  const captionY = qr ? qrY - Math.round(captionSize * 0.7) : 0;
   const qrCenterY = qr ? qrY + qrSize / 2 : H - m - pad - minWH * 0.05;
   /* مركز عمود النص: يزاح قليلًا يسارًا ليتنفس بجوار QR */
   const textCx = qr ? ((m + pad) + (qrX - 26)) / 2 : W / 2;
@@ -324,7 +326,7 @@ function drawQuoteCard(
     ctx.drawImage(qr, qrX, qrY, qrSize, qrSize);
     ctx.fillStyle = "rgba(217,164,65,0.85)";
     ctx.font = `500 ${captionSize}px "Readex Pro", "Amiri", sans-serif`;
-    ctx.fillText("امسح الكود لقراءة المقال", qrX + qrSize / 2, H - m - pad - 4);
+    ctx.fillText("امسح الكود لقراءة المقال", qrX + qrSize / 2, captionY);
   }
 }
 
