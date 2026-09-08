@@ -326,7 +326,7 @@ function drawQuoteCard(
     ctx.drawImage(qr, qrX, qrY, qrSize, qrSize);
     ctx.fillStyle = "rgba(217,164,65,0.85)";
     ctx.font = `500 ${captionSize}px "Readex Pro", "Amiri", sans-serif`;
-    ctx.fillText("امسح الكود لقراءة المقال", qrX + qrSize / 2, captionY);
+    ctx.fillText("امسح الكود للمقال", qrX + qrSize / 2, captionY);
   }
 }
 
