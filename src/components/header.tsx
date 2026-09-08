@@ -371,10 +371,13 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           role="dialog"
           aria-label="قائمة التنقل"
         >
-          <div className="flex items-center justify-end border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
-            {/* زر الإغلاق صار هو نفسه الهمبرجر المتحوّل — عائم فوق الدرّج في موضع
-                زر الفتح نفسه (الاتصال المكاني: فُتح من هناك فأُغلق من هناك)،
-                بمساحة لمس 44px وشكل يتحوّل ☰ ⇄ ✕ بحركة واحدة ناعمة */}
+          {/* في RTL يجب أن يستقر اللوجو عند «بداية» السطر (يمين الشاشة) —
+              بعيدًا تمامًا عن زر ✕ العائم المثبّت في أقصى اليسار (left-3)
+              حيث كان justify-end يدفعه إلى اليسار فيسقط تحت الزر */}
+          <div className="flex items-center justify-start border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
+            {/* زر الإغلاق صار هو نفسه الهمبرجر المتحوّل — عائم فوق الدرّج في أقصى
+                اليسار (موضع زر الفتح نفسه)، واللوجو والشعار في المقابل الآمن
+                من الرأس: مسافة فاصلة كاملة بلا أي تراكب */}
             <div>
               <p className="flex items-center gap-1.5 font-ui font-bold" style={{ color: "var(--ink)" }}>
                 <BrandMark size={16} />
