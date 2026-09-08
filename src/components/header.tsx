@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTheme } from "@/components/providers";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationBell, DrawerNotifications } from "@/components/notification-bell";
 import { BrandMark } from "@/components/brand-mark";
@@ -48,23 +48,11 @@ function MorphBurger({ open }: { open: boolean }) {
   );
 }
 
-/* أيقونة قمر/شمس */
-function ThemeIcon({ dark }: { dark: boolean }) {
-  return dark ? (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4" />
-    </svg>
-  ) : (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
-    </svg>
-  );
-}
+/* زر تبديل الثيم انتقل إلى مكوّن ThemeToggle المستقل (theme-toggle.tsx)
+   مع نمط الجهوزية الذي يمنع وميض الأيقونة عند إعادة التحميل */
 
 export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   const pathname = usePathname();
-  const { theme, toggleTheme } = useTheme();
   const [solid, setSolid] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [immersed, setImmersed] = useState(false);
@@ -77,6 +65,11 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   const [readerToast, setReaderToast] = useState(false);
   const readerToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastY = useRef(0);
+
+  /* حصر «وضع القراءة المركزة» بصفحات المقالات الفردي حصريًا —
+     ظهوره في الرئيسية والتصنيفات والصفحات العامة يسبب ارتباكًا وإخفاءً
+     عشوائيًا للعناصر دون متن مقال يُقرأ */
+  const isArticlePage = pathname?.startsWith("/article/") ?? false;
 
   /* تفعيل وضع القراءة المركزة بسلاسة:
      1) إغلاق الدرج إن كان مفتوحًا  2) تلاشٍ تدريجي للعناصر (CSS قائم)
@@ -140,6 +133,11 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
     };
   }, [drawerOpen]);
 
+  /* صمام أمان: لو انتقل القارئ من مقال لمسار آخر وهو في الغمر يُطفأ فورًا */
+  useEffect(() => {
+    if (immersed && !isArticlePage) setImmersed(false);
+  }, [immersed, isArticlePage]);
+
   if (immersed) {
     return (
       <>
@@ -160,10 +158,11 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           </div>
         )}
 
-        {/* زر الخروج — كبسولة صغيرة أنيقة في الزاوية العليا */}
+        {/* زر الخروج — كبسولة واضحة مثبتة أعلى الشاشة (فصل هندسي كامل عن
+            كبسولة التحكم الصوتي المثبتة أسفلها)، بمساحة لمس مريحة ≥ 48px */}
         <button
           onClick={() => setImmersed(false)}
-          className="fixed left-4 top-4 z-50 rounded-full border px-4 py-2 text-xs font-bold shadow-lift transition-all hover:scale-105 sm:text-sm"
+          className="fixed left-5 top-5 z-50 min-h-[48px] rounded-full border px-5 py-2.5 text-xs font-bold shadow-lift transition-all hover:scale-105 active:scale-95 sm:text-sm"
           style={{
             background: "var(--surface)",
             borderColor: "var(--border)",
@@ -269,28 +268,23 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
               عن المنصة
             </Link>
 
-            <button
-              onClick={enterImmersion}
-              title="وضع الغمر الكامل"
-              aria-label="وضع الغمر الكامل"
-              className="rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)]"
-              style={{ color: "var(--accent)" }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-            </button>
+            {/* وضع القراءة المركزة — داخل صفحات المقالات حصريًا */}
+            {isArticlePage && (
+              <button
+                onClick={enterImmersion}
+                title="وضع الغمر الكامل"
+                aria-label="وضع الغمر الكامل"
+                className="rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)]"
+                style={{ color: "var(--accent)" }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            )}
 
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "الوضع الفاتح" : "الوضع الليلي"}
-              aria-label="تبديل الثيم"
-              className="rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)]"
-              style={{ color: "var(--ink)" }}
-            >
-              <ThemeIcon dark={theme === "dark"} />
-            </button>
+            <ThemeToggle className="p-2" />
 
             {/* جرس الإشعارات — بجانب صورة الحساب (للحاسوب والتابلت) */}
             <NotificationBell />
@@ -300,14 +294,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
 
           {/* أدوات الهاتف: ثيم + حساب + قائمة */}
           <div className="flex items-center gap-1 md:hidden">
-            <button
-              onClick={toggleTheme}
-              aria-label="تبديل الثيم"
-              className="rounded-full p-2.5 transition-colors active:bg-[var(--accent-soft)]"
-              style={{ color: "var(--ink)" }}
-            >
-              <ThemeIcon dark={theme === "dark"} />
-            </button>
+            <ThemeToggle className="p-2.5" />
             <div className="account-menu-mobile">
               <AccountMenu />
             </div>
@@ -462,19 +449,22 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             </div>
           </nav>
 
-          <div className="border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
-            <button
-              onClick={enterImmersion}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition-transform active:scale-[0.98]"
-              style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              وضع القراءة المركزة
-            </button>
-          </div>
+          {/* وضع القراءة المركزة — داخل الدرج في صفحات المقالات حصريًا */}
+          {isArticlePage && (
+            <div className="border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
+              <button
+                onClick={enterImmersion}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition-transform active:scale-[0.98]"
+                style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                وضع القراءة المركزة
+              </button>
+            </div>
+          )}
         </aside>
       </div>
     </>

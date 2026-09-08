@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { get, set } from "idb-keyval";
 import { easternDigits } from "@/lib/utils";
 
@@ -53,6 +54,8 @@ export function AudioPlayer({
   const [duration, setDuration] = useState(durationSec ?? 0);
   const [rate, setRate] = useState(1);
   const [follow, setFollow] = useState(true);
+  /* جلسة صوتية نشطة (بدأ التشغيل ولم ينتهِ) — تحكم ظهور الكبسولة العائمة */
+  const [sessionActive, setSessionActive] = useState(false);
 
   const wordElsRef = useRef<Map<number, Element> | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -360,11 +363,12 @@ export function AudioPlayer({
   }, []);
 
   return (
-    <div
-      className="rounded-2xl border p-4 shadow-soft"
-      style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-      dir="rtl"
-    >
+    <>
+      <div
+        className="rounded-2xl border p-4 shadow-soft"
+        style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        dir="rtl"
+      >
       <audio
         ref={audioRef}
         preload="metadata"
@@ -373,10 +377,14 @@ export function AudioPlayer({
           if (isFinite(d) && d > 0) setDuration(d);
         }}
         onTimeUpdate={onTimeUpdate}
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true);
+          setSessionActive(true);
+        }}
         onPause={() => setPlaying(false)}
         onEnded={() => {
           setPlaying(false);
+          setSessionActive(false);
           setActiveWord(-1);
           document.querySelectorAll("#article-body .audio-active").forEach((el) => el.classList.remove("audio-active"));
           void cacheAudio(); /* تخزين محلي للزائر المتكرر — بلا استهلاك شبكة إضافي */
@@ -456,6 +464,65 @@ export function AudioPlayer({
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
         </button>
       </div>
-    </div>
+      </div>
+
+      {/* ==================== كبسولة التحكم الصوتي العائمة ====================
+          تُرسَم عبر Portal إلى جسم الصفحة مباشرة حتى لا يخفيها وضع الغمر
+          (body.immersion يُعتم عناصر page-chrome التي يقع داخلها المشغل)،
+          وتبقى ثابتة مهما تحركت الصفحة تلقائيًا أو يدويًا — إيقاف الصوت
+          بلمسة واحدة دون البحث عن المشغل.
+
+          الهندسة والمسافات:
+          - أسفل الشاشة فوق شريط أدوات القراءة المثبت (bottom-0 بحوالي 68px):
+            هامش سفلي 5rem + safe-area لأجهزة Android/iOS ذات الشاشات الكاملة.
+          - أفقياً: قرب الحافة (left) على الهواتف، ومحاذاة إطار المحتوى
+            max-w-5xl على الشاشات العريضة (حافة المحتوى اليسرى + padding).
+          - هدف لمس زر التشغيل/الإيقاف 48×48px + حالة hover ناعمة للحاسوب. */}
+      {sessionActive &&
+        createPortal(
+          <div dir="ltr" className="pointer-events-none fixed inset-x-0 bottom-0 z-40">
+            <div className="flex justify-start pb-[calc(5rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
+              <div
+                className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-zinc-900 py-2 pl-2 pr-3.5 text-white shadow-2xl transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] dark:bg-white dark:text-zinc-900 sm:py-2.5"
+                role="group"
+                aria-label="التحكم العائم في الصوت"
+              >
+                <button
+                  onClick={toggle}
+                  aria-label={playing ? "إيقاف الصوت مؤقتًا" : "متابعة التشغيل"}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+                >
+                  {playing ? (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+                  ) : (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72c0 .8.87 1.3 1.55.87l10.4-6.86a1 1 0 0 0 0-1.72L9.55 4.27A1 1 0 0 0 8 5.14Z" /></svg>
+                  )}
+                </button>
+
+                {/* المؤشر المصغر للوقت + شريط تقدم مصغر */}
+                <div className="flex select-none flex-col items-start gap-1.5">
+                  <span className="font-ui flex items-center gap-1.5 text-xs font-bold tabular-nums leading-none">
+                    <span
+                      aria-hidden
+                      className={`h-1.5 w-1.5 rounded-full bg-amber-400 ${playing ? "animate-pulse" : "opacity-30"}`}
+                    />
+                    {fmtTime(current)} / {fmtTime(duration)}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="relative block h-1 w-16 overflow-hidden rounded-full bg-white/25 dark:bg-zinc-900/20 sm:w-20"
+                  >
+                    <span
+                      className="absolute inset-y-0 left-0 rounded-full bg-amber-400 transition-[width] duration-200"
+                      style={{ width: duration ? `${Math.min(100, (current / duration) * 100)}%` : "0%" }}
+                    />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

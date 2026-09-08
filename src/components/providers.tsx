@@ -10,7 +10,9 @@ type Theme = "light" | "dark";
 const ThemeContext = createContext<{
   theme: Theme;
   toggleTheme: () => void;
-}>({ theme: "light", toggleTheme: () => {} });
+  /** هل قُرئ الثيم المحفوظ واكتمل الترطيب؟ يُمنع به رسم أيقونة الثيم قبل الجهوزية لمنع الوميض */
+  ready: boolean;
+}>({ theme: "light", toggleTheme: () => {}, ready: false });
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -18,11 +20,15 @@ export function useTheme() {
 
 function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
+  /* الجهوزية: يُرفع في نفس التأثير الذي يقرأ التخزين المحلي — الاثنان يُجمَعان
+     في تصيير واحد، فأول رسم للأيقونة بعد الجهوزية يكون صحيحًا من أول مرة */
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const stored =
       (typeof window !== "undefined" && window.localStorage.getItem("kalam_theme")) as Theme | null;
     if (stored === "dark" || stored === "light") setTheme(stored);
+    setReady(true);
   }, []);
 
   const applyTheme = useCallback((next: Theme) => {
@@ -49,7 +55,7 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [applyTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, ready }}>
       {children}
     </ThemeContext.Provider>
   );

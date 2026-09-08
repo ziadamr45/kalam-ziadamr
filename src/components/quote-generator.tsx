@@ -11,6 +11,7 @@ type CardVariant = "normal" | "quran" | "hadith";
 const SIZES: SizePreset[] = [
   { key: "story", label: "ستوري ١٠٨٠×١٩٢٠", w: 1080, h: 1920 },
   { key: "square", label: "إنستجرام ١٠٨٠×١٣٥٠", w: 1080, h: 1350 },
+  { key: "post", label: "مربع ١٠٨٠×١٠٨٠", w: 1080, h: 1080 },
   { key: "wide", label: "إكس ١٦٠٠×٩٠٠", w: 1600, h: 900 },
 ];
 
@@ -647,8 +648,8 @@ export function QuoteGenerator({
                 بطاقة سينمائية من غلاف المقال — بتصدير فائق النقاء ×٣ مع رمز QR يوجه القارئ إلى المقال
               </p>
 
-              {/* المقاسات */}
-              <div className="mb-4 grid grid-cols-3 gap-2">
+              {/* المقاسات — أبعاد تصدير ثابتة برمجيًا بجودة متطابقة من أي جهاز */}
+              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {SIZES.map((s) => (
                   <button
                     key={s.key}
