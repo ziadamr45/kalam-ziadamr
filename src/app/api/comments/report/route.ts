@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
+import { rateLimit, rateLimitDurable, requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
 
 /**
@@ -28,17 +28,19 @@ const REPORT_REASONS = new Set([
 export async function POST(request: Request) {
   const ip = requestIp(request);
   try {
-    /* حد المعدل: 3 بلاغات / 5 دقائق لكل IP — سد سطح الإغراق المكشوف */
-    const rl = rateLimit(`report:${ip}`, 3, 5 * 60_000);
-    if (!rl.ok) {
+    /* حد المعدل: 3 بلاغات / 5 دقائق لكل IP — درع مزدوج:
+       ذاكرة النسخة الفوري + العداد الدائم العابر للنسخ عبر RequestLog */
+    const mem = rateLimit(`report:${ip}`, 3, 5 * 60_000);
+    const durable = await rateLimitDurable({ path: "/api/comments/report", ip, limit: 3, windowMs: 5 * 60_000 });
+    if (!mem.ok || !durable.ok) {
       logSecurityEvent({
         type: "RATE_LIMIT",
-        message: `تجاوز حد البلاغات من ${ip} — تعثر ${rl.retryAfterSec}ث`,
+        message: `تجاوز حد البلاغات من ${ip} — تعثر ${Math.max(mem.retryAfterSec, durable.retryAfterSec)}ث`,
         meta: { ip, path: "/api/comments/report" },
       });
       return NextResponse.json(
         { error: "وصلنا عدد من البلاغات — حاول لاحقًا" },
-        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+        { status: 429, headers: { "Retry-After": String(Math.max(mem.retryAfterSec, durable.retryAfterSec)) } },
       );
     }
 

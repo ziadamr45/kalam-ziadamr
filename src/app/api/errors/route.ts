@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logErrorReport } from "@/lib/audit";
 import { pushAdmins } from "@/lib/push";
-import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
+import { rateLimit, rateLimitDurable, requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
 import { createHash } from "crypto";
 
@@ -24,9 +24,10 @@ const errorSchema = z.object({
 export async function POST(request: Request) {
   const ip = requestIp(request);
   try {
-    /* سد سطح الإغراق: مسار عام يكتب في القاعدة — حصة صارمة لكل IP */
-    const rl = rateLimit(`errreport:${ip}`, 10, 5 * 60_000);
-    if (!rl.ok) {
+    /* سد سطح الإغراق: درع مزدوج — ذاكرة النسخة + العداد الدائم عبر RequestLog */
+    const mem = rateLimit(`errreport:${ip}`, 10, 5 * 60_000);
+    const durable = await rateLimitDurable({ path: "/api/errors", ip, limit: 10, windowMs: 5 * 60_000 });
+    if (!mem.ok || !durable.ok) {
       logSecurityEvent({
         type: "RATE_LIMIT",
         message: `إغراق محتمل على /api/errors من ${ip}`,

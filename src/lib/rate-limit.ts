@@ -98,6 +98,40 @@ export function logSecurityEvent(alert: {
   }
 }
 
+/**
+ * ============================================================
+ * الحد الدائم العابر للنسخ — عبر RequestLog المشترك
+ * ============================================================
+ * الذاكرة لكل نسخة lambda على Vercel؛ الموجات المتوازية توزع
+ * على نسخ متعددة فيفلت بعضها. الحد الدائم يعدّ الطلبات الفعلية
+ * نفسها من سجل المرصد (كل طلب موثق بالوسيط بإب + مسار + فهرس
+ * مركب) — دقة مطلقة بلا أي بنية إضافية، وفشله منفتح (fail-open)
+ * فلا يعطل المنصة إن شحبت النبض لحظة.
+ */
+
+export async function rateLimitDurable(opts: {
+  path: string;
+  ip: string;
+  /** الحد المسموح للطلبات السابقة داخل النافذة */
+  limit: number;
+  windowMs: number;
+}): Promise<RateLimitResult> {
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const since = new Date(Date.now() - opts.windowMs);
+    const previous = await prisma.requestLog.count({
+      where: { path: opts.path, ip: opts.ip, createdAt: { gte: since } },
+    });
+    if (previous >= opts.limit) {
+      return { ok: false, retryAfterSec: Math.ceil(opts.windowMs / 1000), remaining: 0 };
+    }
+    return { ok: true, retryAfterSec: 0, remaining: opts.limit - previous };
+  } catch {
+    /* فشل النبض لا يعطل المسار أبدًا */
+    return { ok: true, retryAfterSec: 0, remaining: opts.limit };
+  }
+}
+
 /** استخراج IP الطلب من ترويسات Vercel/الوكيل */
 export function requestIp(request: Request): string {
   return (
