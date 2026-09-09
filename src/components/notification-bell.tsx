@@ -319,6 +319,7 @@ export function NotificationBell() {
         aria-label="الإشعارات"
         aria-expanded={open}
         title="الإشعارات"
+        data-tour="notif-bell"
         className="relative rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)]"
         style={{ color: "var(--ink)" }}
       >

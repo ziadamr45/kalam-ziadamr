@@ -140,6 +140,7 @@ export default function SearchPalette() {
       {/* زر البحث — سطح المكتب */}
       <button
         onClick={() => setOpen(true)}
+        data-tour="search-btn"
         title="البحث الفكري الفوري (Ctrl+K)"
         aria-label="البحث الفكري الفوري"
         className="hidden items-center gap-2 rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)] md:flex"
@@ -154,6 +155,7 @@ export default function SearchPalette() {
       {/* زر البحث — الهاتف */}
       <button
         onClick={() => setOpen(true)}
+        data-tour="search-btn"
         aria-label="البحث الفكري الفوري"
         className="rounded-full p-2.5 transition-colors active:bg-[var(--accent-soft)] md:hidden"
         style={{ color: "var(--ink)" }}

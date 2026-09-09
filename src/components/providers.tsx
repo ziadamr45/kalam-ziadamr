@@ -2,6 +2,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { OnboardingExperience } from "@/components/onboarding-experience";
 
 /* ============================ الثيم ============================ */
 
@@ -77,6 +78,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <ThemeProvider>
         {children}
+        {/* تجربة التهيئة الموحدة — لا ترسم شيئًا إلا للأعضاء الجدد بعد حسم الجلسة */}
+        <OnboardingExperience />
         <ServiceWorkerRegistrar />
       </ThemeProvider>
     </SessionProvider>

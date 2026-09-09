@@ -115,6 +115,7 @@ model User {
   /* ============ محرك رصيد الأثر الفكري (Reader Impact Engine) ============ */
   impactScore     Int     @default(0) // إجمالي رصيد الأثر المكتسب
   intellectualRank String @default("قارئ متأمل") // الرتبة الفكرية المحسوبة آليًا من الرصيد
+  hasCompletedOnboarding Boolean @default(false) // ختم تجربة التهيئة والجولة التفاعلية — تُعرض مرة واحدة للأعضاء الجدد
 
   accounts     Account[]
   sessions     Session[]
@@ -266,9 +267,12 @@ model PageView {
 // ============ محرك رصيد الأثر الفكري (Gamification & Reader Impact Engine) ============
 
 /* سجل الأثر — توثيق نقطة بنقطة لمنع التلاعب وتكرار الاحتساب.
-   أنواع الأفعال: READ_COMPLETE (قراءة متأنية +10) | AI_DISCUSS (نقاش عميق +5)
-   | COMMENT_APPROVED (تعليق هادف +15) | COMMENT_INSPIRING (تمييز إداري +30)
-   | QUOTE_SHARE (حفظ/مشاركة اقتباس +3) | ADMIN_ADJUST (منح/خصم إداري يدوي) */
+   الاقتصاد المعاير (أوزان رصينة):
+   READ_COMPLETE (قراءة متأنية +1 بسقف مرتين يوميًا) | AI_DISCUSS (نقاش عميق +1)
+   | COMMENT_APPROVED (تعليق هادف +2) | COMMENT_LIKED (إعجاب قارئ مسجل بتعليقك +1)
+   | COMMENT_INSPIRING (تمييز إداري +10) | COMMENT_UNFEATURED (إلغاء التمييز -10 عكسي موثق)
+   | QUOTE_SHARE (اقتباس +1) | CHANNEL_UNLOCKED (افتتاح قناة أهل الكلمة — توثيق احتفالي)
+   | CALIBRATION (معايرة) | ADMIN_ADJUST (منح/خصم إداري يدوي) */
 model ImpactLog {
   id         String   @id @default(cuid())
   userId     String

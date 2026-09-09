@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     let result: AwardResult;
 
-    /* ==================== القراءة المتأنية +10 ==================== */
+    /* ==================== القراءة المتأنية +1 (مرتان يوميًا كحد أقصى) ==================== */
     if (actionType === "READ_COMPLETE") {
       const required = requiredReadSeconds(article.content);
       const dwell = Math.max(0, Math.floor(Number(body.dwellSeconds) || 0));
@@ -81,9 +81,10 @@ export async function POST(request: Request) {
         points: IMPACT_POINTS.READ_COMPLETE,
         articleId,
         dedupKey: `READ:${userId}:${articleId}`,
+        dailyCap: 2, // مرة لكل مقال، ومرتان يوميًا كحد أقصى — اقتصاد رصين
       });
     } else if (actionType === "AI_DISCUSS") {
-      /* ==================== النقاش الفكري العميق +5 ==================== */
+      /* ==================== النقاش الفكري العميق +1 ==================== */
       const turns = Math.max(0, Math.floor(Number(body.userTurns) || 0));
       if (turns < 3) {
         return NextResponse.json(
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
         dedupKey: `AIDISC:${userId}:${articleId}`,
       });
     } else if (actionType === "QUOTE_SHARE") {
-      /* ==================== حفظ ومشاركة الاقتباس +3 (مرتان يوميًا) ==================== */
+      /* ==================== حفظ ومشاركة الاقتباس +1 (مرتان يوميًا) ==================== */
       result = await awardImpact({
         userId,
         actionType: "QUOTE_SHARE",

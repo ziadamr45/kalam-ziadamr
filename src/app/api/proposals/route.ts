@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canSendProposals } from "@/lib/ranks";
+import { rankForScore, canSendProposals } from "@/lib/ranks";
+import { ELDERS_THRESHOLD } from "@/lib/impact";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { pushAdmins } from "@/lib/push";
 
@@ -23,16 +24,19 @@ export async function POST(request: Request) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { banned: true, intellectualRank: true, customName: true, name: true },
+      select: { banned: true, impactScore: true, customName: true, name: true },
     });
     if (!user || user.banned) {
       return NextResponse.json({ error: "المشاركة موقوفة لهذا الحساب" }, { status: 403 });
     }
 
-    /* بوابة الرتبة — حصرية لأهل الكلمة */
-    if (!canSendProposals(user.intellectualRank)) {
+    /* بوابة الرصيد الحي — تُحتسب من الرصيد الفعلي المحدث لحظيًا (350 فأكثر)
+       لا من نص رتبة مخزّن قد يتأخر — لا تجاوز برمجي ممكن */
+    if (!canSendProposals(rankForScore(user.impactScore)) || user.impactScore < ELDERS_THRESHOLD) {
       return NextResponse.json(
-        { error: "قناة المقترحات الخاصة مفعّلة لرتبة «أهل الكلمة» — تابع بناء رصيد أثرك" },
+        {
+          error: `قناة المقترحات الخاصة حصرية لـ«أهل الكلمة» (عتبة ${ELDERS_THRESHOLD} نقطة) — رصيدك الحالي ${user.impactScore}، تابع بناء أثرك`,
+        },
         { status: 403 },
       );
     }

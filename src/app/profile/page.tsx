@@ -12,6 +12,7 @@ import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 import { displayName } from "@/lib/identity";
+import { IMPACT_ACTION_LABEL, ImpactLogButton } from "@/components/impact-log-modal";
 import { RANKS, rankMeta, canSendProposals } from "@/lib/ranks";
 import { formatArabicDate } from "@/lib/utils";
 
@@ -21,16 +22,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-/* أسماء أفعال الأثر بالعربية */
-const ACTION_LABEL: Record<string, string> = {
-  READ_COMPLETE: "قراءة متأنية أتممتها",
-  AI_DISCUSS: "نقاش فكري عميق مع المساعد",
-  COMMENT_APPROVED: "تعليق هادف اجتاز الفلترة",
-  COMMENT_INSPIRING: "تمييز التحرير لتعليقك كـ«ملهم»",
-  QUOTE_SHARE: "حفظ ومشاركة اقتباس",
-  ADMIN_ADJUST: "تعديل إداري من صاحب المنصة",
-};
 
 const STATUS_LABEL: Record<string, { text: string; color: string }> = {
   PENDING: { text: "بانتظار المراجعة", color: "#b58a2c" },
@@ -216,12 +207,15 @@ export default async function ProfilePage() {
           />
         </section>
 
-        {/* ==================== سجل الأثر ==================== */}
+        {/* ==================== سجل الأثر — شفافية كاملة نقطة بنقطة ==================== */}
         {logs.length > 0 && (
           <section className="mx-auto mt-10 max-w-3xl px-4 sm:px-6">
-            <h2 className="mb-4 font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
-              سجل أثرك الأخير
-            </h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
+                سجل أثرك الأخير
+              </h2>
+              <ImpactLogButton />
+            </div>
             <ul className="space-y-2.5">
               {logs.map((l) => (
                 <li
@@ -231,7 +225,7 @@ export default async function ProfilePage() {
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
-                      {ACTION_LABEL[l.actionType] ?? l.actionType}
+                      {IMPACT_ACTION_LABEL[l.actionType] ?? l.actionType}
                       {l.reason ? ` — ${l.reason}` : ""}
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--ink-muted)" }}>

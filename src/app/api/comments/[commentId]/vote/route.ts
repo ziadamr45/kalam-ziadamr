@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { pushUsers } from "@/lib/push";
 import { logEvent } from "@/lib/audit";
+import { awardImpact, IMPACT_POINTS } from "@/lib/impact";
 
 /**
  * تصويت التعليقات — إعجاب أو عدم إعجاب.
@@ -47,6 +48,7 @@ export async function POST(
       select: {
         id: true,
         userId: true,
+        articleId: true,
         status: true,
         article: { select: { slug: true, title: true } },
       },
@@ -77,12 +79,26 @@ export async function POST(
     } else if (existing) {
       /* بدّل الصوت إلى المعاكس */
       await prisma.commentVote.update({ where: { id: existing.id }, data: { value } });
-      notifyOwner = true;
+      notifyOwner = value === "LIKE"; // التحويل إلى إعجاب = أول إعجاب من هذا القارئ
     } else {
       await prisma.commentVote.create({
         data: { commentId, userId: session.user.id, value },
       });
-      notifyOwner = true;
+      notifyOwner = value === "LIKE";
+    }
+
+    /* ============ «إعجاب قارئ مسجل» +1 نقطة لصاحب التعليق ============
+       تُمنح مرة واحدة لكل قارئ لكل تعليق (قيد dedupKey فريد يحصّن
+       إعادة الإعجاب بعد الإلغاء من التربح)، وبصمت داخل سجل الأثر. */
+    if (value === "LIKE" && comment.userId) {
+      void awardImpact({
+        userId: comment.userId,
+        actionType: "COMMENT_LIKED",
+        points: IMPACT_POINTS.COMMENT_LIKED,
+        articleId: comment.articleId,
+        dedupKey: `LIKE:${commentId}:${session.user.id}`,
+        reason: "إعجاب قارئ مسجل بتعليقك",
+      }).catch(() => {});
     }
 
     /* العدادات الحالية بعد التغيير */

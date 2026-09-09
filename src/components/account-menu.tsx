@@ -66,6 +66,7 @@ export function AccountMenu() {
         aria-haspopup="true"
         aria-expanded={open}
         title={u.name || "حسابي"}
+        data-tour="account-avatar"
         /* محاذاة رأسية صريحة: flex + items-center + justify-center + self-center
            تقتل فجوة سطر الأساس (baseline descender) التي كانت ترفع الصورة ~2px،
            وh-9 w-9 توحّد القياس مع جرس الإشعارات (36px) على نفس المحور */
