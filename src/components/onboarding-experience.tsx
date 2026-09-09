@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { useSession } from "next-auth/react";
 
 /**
@@ -98,6 +99,7 @@ export function OnboardingExperience() {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [dimmed, setDimmed] = useState(true);
   const finishingRef = useRef(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   /* ================= فحص أهلية التهيئة (حقل قاعدة البيانات الحي) ================= */
   useEffect(() => {
@@ -145,8 +147,9 @@ export function OnboardingExperience() {
     }
     setRect(found);
     if (found) {
-      /* أدخل الهدف إلى مجال الرؤية إن كان بعيدًا */
-      if (found.top < 70 || found.bottom > window.innerHeight - 24) {
+      /* أدخل الهدف إلى مجال الرؤية فقط إن كان خارج الشاشة كليًا —
+         لا نلمس عناصر الهيدر المثبتة (fixed) إطلاقًا فلا حلقات تمرير */
+      if (found.bottom <= 0 || found.top >= window.innerHeight) {
         (document.querySelector(found_to_selector(defs)) as HTMLElement | null)?.scrollIntoView({
           behavior: "smooth",
           block: "center",
@@ -170,28 +173,43 @@ export function OnboardingExperience() {
     };
   }, [stage, step, measure]);
 
-  /* ================= بوابة اللمس: إثبات تنفيذ الخطوة بيده ================= */
+  /* ================= حارس النقر الشفاف — جوهر إصلاح علوق الجولة =================
+     الحاوية الجذرية pointer-events-none فتصل النقرات للعناصر الحقيقية تحتها،
+     وهذا الحارس (طور الالتقاط) ينظم ما يُسمح به:
+     • نقرات بطاقة التوجيه نفسها: حرة دائمًا (أزرار التالي/تخطي).
+     • النقر على الهدف المضيء: يمر للعنصر الحقيقي (يفتح القائمة/الجرس فعليًا)،
+       وإن كانت الخطوة مروّضة (gate) سُجّل الإنجاز وخفّ التعتيم.
+     • بقية الصفحة أثناء الترويد فقط: تُمنع مؤقتًا حفاظًا على تركيز الجولة،
+       وتُحرَّر كليًا بعد تنفيذ الخطوة وفي الخطوات غير المروّضة. */
   useEffect(() => {
     if (stage !== "tour") return;
     const defs = TOUR_STEPS[step];
-    if (!defs.gateOnClick) return;
+    const gating = defs.gateOnClick && !satisfied;
     const onCaptureClick = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (!target || !rect) return;
-      /* هل نقر العضو داخل مستطيل الهدف؟ */
-      const probe = target as Element;
+      const probe = e.target as Element | null;
+      if (!probe || !probe.closest) return;
+      /* بطاقة التوجيه وأزرارها حرة دائمًا */
+      if (cardRef.current && cardRef.current.contains(probe)) return;
+      /* هل نقر العضو على الهدف المضيء نفسه؟ */
       for (const sel of defs.selectors) {
         const el = document.querySelector(sel);
         if (el && (el === probe || el.contains(probe))) {
-          setSatisfied(true);
-          setDimmed(false); /* عند النجاح يخفّ التعتيم لتظهر القوائم المفتوحة بوضوح */
-          return;
+          if (defs.gateOnClick) {
+            setSatisfied(true);
+            setDimmed(false); /* عند النجاح يخفّ التعتيم لتظهر القوائم المفتوحة بوضوح */
+          }
+          return; /* يمرّ النقر إلى العنصر الحقيقي دون أي اعتراض */
         }
+      }
+      if (gating) {
+        /* أثناء انتظار تنفيذ الخطوة تُجمَّد بقية الصفحة مؤقتًا */
+        e.preventDefault();
+        e.stopPropagation();
       }
     };
     document.addEventListener("click", onCaptureClick, true);
     return () => document.removeEventListener("click", onCaptureClick, true);
-  }, [stage, step, rect]);
+  }, [stage, step, satisfied]);
 
   const nextStep = useCallback(() => {
     /* أغلق أي قائمة فتحها العضو أثناء الخطوة (الجرس/الحساب/البحث يستجيبون لـ Escape) */
@@ -312,7 +330,12 @@ export function OnboardingExperience() {
   }
 
   return (
-    <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label="جولة إرشادية تفاعلية">
+    <div
+      className="pointer-events-none fixed inset-0 z-[90]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="جولة إرشادية تفاعلية"
+    >
       {/* تركيض الضوء — القصّة الإضاءة عبر ظل هائل حول مستطيل الهدف */}
       {rect && (
         <div
@@ -332,9 +355,10 @@ export function OnboardingExperience() {
       {/* تعتيم كامل حين يغيب الهدف (بطاقة مركزية) */}
       {!rect && <div className="absolute inset-0 bg-zinc-950/74" />}
 
-      {/* بطاقة التوجيه */}
+      {/* بطاقة التوجيه — الوحيدة القابلة للنقر في الطبقة العائمة */}
       <div
-        className="absolute rounded-2xl border p-5 shadow-lift animate-fade-in"
+        ref={cardRef}
+        className="pointer-events-auto absolute rounded-2xl border p-5 shadow-lift animate-fade-in"
         style={{ ...tipStyle, background: "var(--surface)", borderColor: "var(--border)" }}
       >
         <p className="mb-1 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
@@ -372,7 +396,13 @@ export function OnboardingExperience() {
             className="rounded-full px-5 py-2.5 text-xs font-bold text-white transition-all active:scale-[0.98] disabled:opacity-45"
             style={{ background: "var(--accent)" }}
           >
-            {step === TOUR_STEPS.length - 1 ? defs.cta : defs.gateOnClick && !satisfied && rect ? "نفّذ الخطوة أولًا" : defs.cta}
+            {step === TOUR_STEPS.length - 1
+              ? defs.cta
+              : defs.gateOnClick && !satisfied && rect
+                ? satisfied
+                  ? "التالي"
+                  : "نفّذ الخطوة أولًا"
+                : defs.cta}
           </button>
         </div>
       </div>

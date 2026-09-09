@@ -81,28 +81,65 @@ export function ArticleReader({
   /* مفتاح إعادة مسح عناصر الكلمات في المشغل عند أي تغيير في العرض */
   const syncKey = `${article.id}:${tashkeel ? "t" : "p"}:${blocks.length}:${source.length}`;
 
-  /* الحفظ: في مكتبة الحساب المتزامنة + لقطة الجهاز للقراءة دون اتصال */
+  /* الحفظ: منظومة مزدوجة مستقلة — مزامنة سحابية في الحساب + لقطة محلية على الجهاز،
+     ولكلٍّ منفذُه الخاص وقائمته المفهومة (لا دمج عشوائي بين القناتين) */
   const { status } = useSession();
   const loggedIn = status === "authenticated";
-  const [saved, setSaved] = useState(false);
+  const [cloudSaved, setCloudSaved] = useState(false);
+  const [localSaved, setLocalSaved] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
+  const saveMenuRef = useRef<HTMLDivElement | null>(null);
+  const anySaved = cloudSaved || localSaved;
 
   useEffect(() => {
     let alive = true;
-    isArticleSaved(article.id).then((v) => { if (alive) setSaved(v); }).catch(() => {});
+    isArticleSaved(article.id).then((v) => { if (alive) setLocalSaved(v); }).catch(() => {});
     if (status === "authenticated") {
       fetch("/api/saves")
         .then((r) => (r.ok ? r.json() : { saves: [] }))
         .then((d) => {
-          if (alive && (d.saves ?? []).some((s: { id: string }) => s.id === article.id)) setSaved(true);
+          if (alive && (d.saves ?? []).some((s: { id: string }) => s.id === article.id)) setCloudSaved(true);
         })
         .catch(() => {});
+    } else {
+      setCloudSaved(false);
     }
     return () => { alive = false; };
   }, [article.id, status]);
 
-  const handleSave = useCallback(async () => {
-    if (saveBusy || saved) return;
+  /* إغلاق قائمة الحفظ عند النقر خارجها */
+  useEffect(() => {
+    if (!saveMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) setSaveMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [saveMenuOpen]);
+
+  /* حفظ سحابي في مكتبة الحساب — يتطلب جلسة حية */
+  const handleSaveCloud = useCallback(async () => {
+    if (saveBusy || cloudSaved) return;
+    if (!loggedIn) {
+      window.location.href = `/auth/login?callback=/article/${encodeURIComponent(article.slug)}`;
+      return;
+    }
+    setSaveBusy(true);
+    try {
+      await fetch("/api/saves", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ articleId: article.id }),
+      });
+      setCloudSaved(true);
+    } catch {}
+    setSaveBusy(false);
+  }, [article.id, article.slug, cloudSaved, saveBusy, loggedIn]);
+
+  /* حفظ لقطة محلية على هذا الجهاز — للقراءة دون اتصال */
+  const handleSaveLocal = useCallback(async () => {
+    if (saveBusy || localSaved) return;
     setSaveBusy(true);
     const snapshot: OfflineArticle = {
       id: article.id,
@@ -117,20 +154,11 @@ export function ArticleReader({
       sectionSlug: null,
     };
     try {
-      /* الحفظ المحلي (لقطة دون اتصال) في كل الأحوال */
       await saveOfflineArticle(snapshot);
-      /* الحفظ في مكتبة الحساب المتزامنة للمسجلين */
-      if (loggedIn) {
-        await fetch("/api/saves", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ articleId: article.id }),
-        }).catch(() => {});
-      }
-      setSaved(true);
+      setLocalSaved(true);
     } catch {}
     setSaveBusy(false);
-  }, [article, saved, saveBusy, loggedIn]);
+  }, [article, localSaved, saveBusy]);
 
   /* تتبع القراءة: زيارة، إكمال، بقاء */
   const viewIdRef = useRef<string | null>(null);
@@ -190,89 +218,149 @@ export function ArticleReader({
 
   return (
     <div className="relative">
-      {/* شريط أدوات القراءة — مثبت أسفل الشاشة كشريط عائم مضغوط لا يحجب المحتوى
-          (كان يطفو sticky أعلى الصفحة فوق الغلاف والنص) */}
+      {/* شريط أدوات القراءة — مثبت أسفل الشاشة: مفتاح التشكيل مثبّت في المقدمة
+          دون انقطاع، والأزرار التنفيذية مجموعة مرنة لا تخرج عن إطار الشاشة */}
       <div
-        className="page-chrome no-print fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-md"
+        className="page-chrome no-print fixed bottom-0 left-0 right-0 z-40 border-t px-3 py-2 backdrop-blur-md"
         style={{
-          background: "color-mix(in srgb, var(--bg) 92%, transparent)",
+          background: "color-mix(in srgb, var(--bg) 90%, transparent)",
           borderColor: "var(--border)",
         }}
       >
-        <div className="mx-auto flex max-w-3xl items-center justify-center gap-x-0.5 gap-y-1 px-2 py-2 text-sm sm:gap-2 sm:px-4">
-        {/* مفتاح التشكيل — يختفي كليًا إذا عطّله الأدمن */}
-        {tashkeelAllowed && (
-          <button
-            onClick={toggleTashkeel}
-            role="switch"
-            aria-checked={tashkeel}
-            className="flex min-h-11 items-center gap-2 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:py-1.5"
-            style={{ color: tashkeel ? "var(--accent-strong)" : "var(--ink-muted)" }}
-            title="تبديل النص المشكول بالحركات الكاملة"
-          >
-            <span
-              className="relative inline-block h-5 w-9 rounded-full transition-colors duration-300"
-              style={{ background: tashkeel ? "var(--accent)" : "var(--border)" }}
+        <div className="mx-auto flex max-w-screen-md items-center justify-between gap-1 sm:gap-3">
+          {/* مفتاح التشكيل ثابت في المقدمة (يمين الشاشة) دون زحزحة إطلاقًا */}
+          {tashkeelAllowed && (
+            <button
+              onClick={toggleTashkeel}
+              role="switch"
+              aria-checked={tashkeel}
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-2"
+              title="تبديل النص المشكول بالحركات الكاملة"
             >
+              <span className="text-xs font-medium" style={{ color: tashkeel ? "var(--accent-strong)" : "var(--ink-muted)" }}>
+                تشكيل
+              </span>
               <span
-                className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ease-fluid"
-                style={{ right: tashkeel ? "2px" : "18px" }}
+                className="relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors duration-300"
+                style={{ background: tashkeel ? "var(--accent)" : "var(--border)" }}
+              >
+                <span
+                  className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ease-fluid"
+                  style={{ right: tashkeel ? "2px" : "18px" }}
+                />
+              </span>
+            </button>
+          )}
+
+          {/* الأزرار التنفيذية — متناسقة الحجم بمسافات مرنة */}
+          <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
+            {/* المختصر المفيد */}
+            <button
+              onClick={() => setShowSummary((v) => !v)}
+              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
+              style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
+            >
+              <span className="sm:hidden">المختصر</span>
+              <span className="hidden sm:inline">المختصر المفيد</span>
+            </button>
+
+            {/* حفظ — قائمة مزدوجة واضحة: سحابي في الحساب + محلي على الجهاز */}
+            <div ref={saveMenuRef} className="relative shrink-0">
+              <button
+                onClick={() => setSaveMenuOpen((v) => !v)}
+                aria-expanded={saveMenuOpen}
+                aria-haspopup="menu"
+                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-[var(--accent-soft)]" : ""}`}
+                style={{ color: anySaved ? "var(--accent-strong)" : "var(--ink-muted)" }}
+                title="خيارات الحفظ: في حسابك متزامنًا، أو على هذا الجهاز دون إنترنت"
+              >
+                <span className="sm:hidden">{anySaved ? "محفوظ ✓" : "حفظ"}</span>
+                <span className="hidden sm:inline">{anySaved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
+              </button>
+
+              {saveMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-full right-0 mb-2 w-[19rem] max-w-[calc(100vw-2rem)] rounded-2xl border p-2 shadow-lift animate-fade-in"
+                  style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+                >
+                  {/* الخيار السحابي — مزامنة الحساب */}
+                  <button
+                    role="menuitem"
+                    onClick={() => void handleSaveCloud()}
+                    disabled={cloudSaved || saveBusy}
+                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-65"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: "var(--accent-strong)" }}>
+                          <path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6.5 6.5 0 0 0-12.7 1.74A4 4 0 0 0 6 19.5h11.5z" />
+                        </svg>
+                        حفظ في حسابي (مزامنة سحابية)
+                      </span>
+                      {cloudSaved && (
+                        <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
+                      )}
+                    </span>
+                    <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                      {loggedIn
+                        ? "للوصول إليه من أي جهاز عند تسجيل الدخول"
+                        : "يتطلب تسجيل الدخول — سيُفتح باب الدخول"}
+                    </span>
+                  </button>
+
+                  <div className="mx-2 my-1 h-px" style={{ background: "var(--border)" }} aria-hidden />
+
+                  {/* الخيار المحلي — لقطة هذا الجهاز دون اتصال */}
+                  <button
+                    role="menuitem"
+                    onClick={() => void handleSaveLocal()}
+                    disabled={localSaved || saveBusy}
+                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-65"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: "var(--accent-strong)" }}>
+                          <rect x="7" y="2" width="10" height="20" rx="2" />
+                          <path d="M11 18.5h2" />
+                        </svg>
+                        حفظ على هذا الجهاز (قراءة بدون إنترنت)
+                      </span>
+                      {localSaved && (
+                        <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
+                      )}
+                    </span>
+                    <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                      للقراءة في أي وقت بدون اتصال على هذا المتصفح
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* تحميل المقال كـ PDF — ورقة طباعة قارئة بهوامش متزنة يولّدها المتصفح */}
+            <button
+              onClick={() => window.print()}
+              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
+              style={{ color: "var(--ink-muted)" }}
+              title="نسخة منسقة بعناية للطباعة أو الحفظ PDF"
+            >
+              <span className="sm:hidden">PDF</span>
+              <span className="hidden sm:inline">تحميل كـ PDF</span>
+            </button>
+
+            {/* مولد الاقتباسات */}
+            <div className="flex min-h-11 items-center">
+              <QuoteGenerator
+                articleId={article.id}
+                articleTitle={article.title}
+                articleSlug={article.slug}
+                articleCover={article.coverImage}
+                containerSelector="#article-body"
+                suggestedQuotes={suggestedQuotes}
               />
-            </span>
-            التشكيل
-          </button>
-        )}
-
-        {tashkeelAllowed && (
-          <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
-        )}
-
-        {/* المختصر المفيد */}
-        <button
-          onClick={() => setShowSummary((v) => !v)}
-          className="min-h-11 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:py-1.5"
-          style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
-        >
-          <span className="sm:hidden">المختصر</span>
-          <span className="hidden sm:inline">المختصر المفيد</span>
-        </button>
-
-        <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
-
-        {/* حفظ في مكتبتي */}
-        <button
-          onClick={handleSave}
-          disabled={saved || saveBusy}
-          className="min-h-11 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] disabled:opacity-60 sm:px-3 sm:py-1.5"
-          style={{ color: saved ? "var(--accent-strong)" : "var(--ink-muted)" }}
-          title={loggedIn ? "يُحفظ في حسابك (متزامن عبر أجهزتك) + لقطة داخل جهازك للقراءة دون إنترنت" : "حفظ داخل جهازك — سجّل الدخول لتتزامن محفوظاتك عبر أجهزتك"}
-        >
-          <span className="sm:hidden">{saved ? "محفوظ ✓" : "حفظ"}</span>
-          <span className="hidden sm:inline">{saved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
-        </button>
-
-        <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
-
-        {/* تحميل المقال كـ PDF — ورقة طباعة قارئة بهوامش متزنة يولّدها المتصفح */}
-        <button
-          onClick={() => window.print()}
-          className="min-h-11 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:py-1.5"
-          style={{ color: "var(--ink-muted)" }}
-          title="نسخة منسقة بعناية للطباعة أو الحفظ PDF"
-        >
-          <span className="sm:hidden">PDF</span>
-          <span className="hidden sm:inline">تحميل كـ PDF</span>
-        </button>
-
-        {/* مولد الاقتباسات */}
-        <QuoteGenerator
-          articleId={article.id}
-          articleTitle={article.title}
-          articleSlug={article.slug}
-          articleCover={article.coverImage}
-          containerSelector="#article-body"
-          suggestedQuotes={suggestedQuotes}
-        />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -335,10 +423,11 @@ export function ArticleReader({
         </div>
       )}
 
-      {/* جسم المقال — العارض الموحد لمحرك التنسيق الموسع (كاريوكي آمن) */}
+      {/* جسم المقال — العارض الموحد لمحرك التنسيق الموسع (كاريوكي آمن)
+          مسافة سفلية واسعة (pb-32) حتى لا تحجب الكبسولة العائمة السطور الأخيرة أبدًا */}
       <div
         id="article-body"
-        className={`article-body mt-10 ${tashkeel ? "is-tashkeel" : ""}`}
+        className={`article-body mt-10 pb-32 ${tashkeel ? "is-tashkeel" : ""}`}
         style={{ color: "var(--ink)" }}
       >
         <ArticleBlocks blocks={blocks} offsets={wordOffsets} />

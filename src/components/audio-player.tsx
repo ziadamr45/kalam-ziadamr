@@ -483,17 +483,22 @@ export function AudioPlayer({
           بلمسة واحدة دون البحث عن المشغل.
 
           الهندسة والمسافات:
-          - أسفل الشاشة فوق شريط أدوات القراءة المثبت (bottom-0 بحوالي 68px):
-            هامش سفلي 5rem + safe-area لأجهزة Android/iOS ذات الشاشات الكاملة.
+          - أسفل الشاشة فوق شريط أدوات القراءة المثبت (bottom-0 بحوالي 64px):
+            هامش سفلي 4rem + safe-area لأجهزة Android/iOS ذات الشاشات الكاملة.
+          - عند الإيقاف المؤقت يخفت المشغل (opacity-35) ليكشف نصوص المقال
+            خلفه، ويعود مصمتًا عند التحويم أو استئناف التشغيل.
           - أفقياً: قرب الحافة (left) على الهواتف، ومحاذاة إطار المحتوى
             max-w-5xl على الشاشات العريضة (حافة المحتوى اليسرى + padding).
           - هدف لمس زر التشغيل/الإيقاف 48×48px + حالة hover ناعمة للحاسوب. */}
       {sessionActive &&
         createPortal(
           <div dir="ltr" className="no-print pointer-events-none fixed inset-x-0 bottom-0 z-40">
-            <div className="flex justify-start pb-[calc(5rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
+            <div className="flex justify-start pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
-                className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-zinc-900 py-2 pl-2 pr-3.5 text-white shadow-2xl transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] dark:bg-white dark:text-zinc-900 sm:py-2.5"
+                className={`pointer-events-auto flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-zinc-900 py-2 pl-2 pr-3.5 text-white shadow-2xl transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] dark:bg-white dark:text-zinc-900 sm:py-2.5 ${
+                  /* عند الإيقاف المؤقت يخفت المشغل ليكشف نص المقال خلفه — ويتوهج عند التحويم أو التشغيل */
+                  playing ? "opacity-100" : "opacity-35 hover:opacity-100"
+                }`}
                 role="group"
                 aria-label="التحكم العائم في الصوت"
               >

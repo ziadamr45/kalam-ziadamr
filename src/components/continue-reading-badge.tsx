@@ -21,6 +21,8 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
   const { status } = useSession();
   const [resume, setResume] = useState<SavedProgress | null>(null);
   const [progress, setProgress] = useState(0);
+  /* إغلاق يدوي للكبسولة لهذه الجلسة — لا يمحو موضع القراءة المحفوظ */
+  const [dismissed, setDismissed] = useState(false);
 
   const latest = useRef({ pct: 0, scrollY: 0 });
   const lastSaved = useRef(0);
@@ -145,27 +147,36 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
         </div>
       )}
 
-      {/* شارة الاستئناف */}
-      {resume && (
-        <button
-          onClick={continueReading}
-          className="no-print fixed bottom-[4.75rem] left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full border py-2 pe-2 ps-4 shadow-lift transition-transform hover:scale-[1.03] animate-fade-up"
-          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+      {/* كبسولة الاستئناف المنقّاة — بيان النسبة + زر إجرائي واحد دون تكرار */}
+      {resume && !dismissed && (
+        <div
+          className="no-print fixed bottom-16 right-4 z-30 flex items-center gap-2 rounded-full border border-amber-500/30 px-3 py-1.5 shadow-lg backdrop-blur-md animate-fade-up"
+          style={{ background: "color-mix(in srgb, var(--surface) 95%, transparent)" }}
+          role="group"
           aria-label={`استئناف القراءة من ${resume.pct} بالمئة`}
         >
-          <span className="text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
-            توقفت عند {resume.pct}%
-          </span>
           <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
-            متابعة القراءة
+            توقفت عند{" "}
+            <strong className="font-bold" style={{ color: "var(--ink)" }}>
+              {resume.pct}%
+            </strong>
           </span>
-          <span
-            className="flex h-7 items-center rounded-full px-3 text-xs font-bold"
-            style={{ background: "var(--accent)", color: "#fff" }}
+          <button
+            onClick={continueReading}
+            className="rounded-full bg-amber-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-700"
           >
-            متابعة
-          </span>
-        </button>
+            متابعة القراءة
+          </button>
+          <button
+            onClick={() => setDismissed(true)}
+            className="px-1 text-xs transition-colors"
+            style={{ color: "var(--ink-muted)" }}
+            aria-label="إغلاق"
+            title="إغلاق — يبقى موضع القراءة محفوظًا"
+          >
+            ✕
+          </button>
+        </div>
       )}
     </>
   );

@@ -269,15 +269,32 @@ export function DiscussCompanion({
           }`}
           style={{ background: "var(--surface)" }}
         >
-          {/* الترويسة */}
+          {/* الترويسة — عنوان + شارة هوية الذكاء الاصطناعي (شفافية كاملة) */}
           <header
             className="flex items-start justify-between gap-3 border-b p-4"
             style={{ borderColor: "var(--border)" }}
           >
             <div className="min-w-0">
-              <p className="font-ui text-sm font-bold" style={{ color: "var(--ink)" }}>
-                نقاش فكري
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-ui text-sm font-bold" style={{ color: "var(--ink)" }}>
+                  محاورة المقال فكريًا
+                </p>
+                <span
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
+                  style={{
+                    background: "var(--accent-soft)",
+                    color: "var(--accent-strong)",
+                    borderColor: "var(--accent)",
+                  }}
+                  title="تحاور نموذج ذكاء اصطناعي تحليلي مبنيًا على متن هذا المقال"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+                    <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+                  </svg>
+                  مساعد ذكاء اصطناعي
+                </span>
+              </div>
               <p className="mt-0.5 truncate text-xs" style={{ color: "var(--ink-muted)" }}>
                 {articleTitle}
               </p>
@@ -320,9 +337,19 @@ export function DiscussCompanion({
 
           {/* سجل الحوار */}
           <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
+            {/* الرسالة الافتتاحية الهادئة — هوية المحاور واضحة منذ أول لحظة */}
+            <div className="flex justify-start">
+              <div
+                className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-7"
+                style={{ background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }}
+              >
+                أنا هنا لأحاورك حول الأفكار الواردة في هذا المقال ومساعدتك في تحليلها واستخراج أبعادها.
+              </div>
+            </div>
+
             {messages.length === 0 && (
               <div
-                className="mt-6 rounded-2xl border border-dashed p-5 text-center text-sm leading-8"
+                className="mt-2 rounded-2xl border border-dashed p-5 text-center text-sm leading-8"
                 style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
               >
                 اسأل عن أي فكرة في المقال — سأحاورك بفكر الكاتب نفسه.
@@ -419,8 +446,9 @@ export function DiscussCompanion({
                 )}
               </button>
             </div>
-            <p className="mt-2 px-1 text-[10px]" style={{ color: "var(--ink-muted)" }}>
-              النقاش محصور بأفكار هذا المقال — Enter للإرسال، Shift+Enter لسطر جديد
+            {/* شريط التنويه السفلي الثابت — هوية المحاور وأمانة الإحالة */}
+            <p className="select-none py-1.5 text-center text-xs text-zinc-500 dark:text-zinc-400">
+              المحاور هو نموذج ذكاء اصطناعي تحليلي، وقد تقع منه أخطاء أو تأويلات؛ يُرجى الرجوع لمتن المقال والمصادر الأصلية دائمًا.
             </p>
           </div>
         </aside>
