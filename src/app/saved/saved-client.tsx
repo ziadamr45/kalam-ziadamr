@@ -66,7 +66,18 @@ function SaveCard({
 
 export default function SavedClient() {
   const { status } = useSession();
-  const loggedIn = status === "authenticated";
+
+  /* شبكة الترطيب (Hydration Guard): أول رسم على السيرفر وأول رسم على
+     الكلاينت متطابقان حرفيًا — لا تُعرض أي واجهة تعتمد حالة الجلسة قبل
+     اكتمال الترطيب، فمهما تصرف مزوّد الجلسة (loading/unauthenticated)
+     يبقى ناتج SSR مطابقًا لأول رسم كلاينتي بلا خطأ توافق */
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const loggedIn = isMounted && status === "authenticated";
+  const authPending = !isMounted || status === "loading";
 
   const [saves, setSaves] = useState<AccountSave[] | null>(null);
   const [device, setDevice] = useState<OfflineArticle[] | null>(null);
@@ -118,9 +129,11 @@ export default function SavedClient() {
             قراءاتي المحفوظة
           </h1>
           <p className="mt-3 text-sm" style={{ color: "var(--ink-muted)" }}>
-            {loggedIn
-              ? "محفوظات حسابك تتزامن عبر كل أجهزتك — ولقطة كل مقال محفوظة داخل جهازك للقراءة دون اتصال"
-              : "محفوظة داخل جهازك — سجّل الدخول لتتزامن عبر كل أجهزتك"}
+            {authPending
+              ? "جارٍ التحميل.."
+              : loggedIn
+                ? "محفوظات حسابك تتزامن عبر كل أجهزتك — ولقطة كل مقال محفوظة داخل جهازك للقراءة دون اتصال"
+                : "محفوظة داخل جهازك — سجّل الدخول لتتزامن عبر كل أجهزتك"}
           </p>
         </section>
 
@@ -193,7 +206,7 @@ export default function SavedClient() {
             )}
           </div>
 
-          {!loggedIn && (
+          {!authPending && !loggedIn && (
             <p className="text-center text-xs" style={{ color: "var(--ink-muted)" }}>
               <Link href="/auth/login?callback=/saved" className="underline" style={{ color: "var(--accent-strong)" }}>
                 سجّل الدخول بحساب Google
