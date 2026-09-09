@@ -1,5 +1,20 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import {
+  VERIFICATION_TYPES,
+  VERIFICATION_TYPE_META,
+  verificationMeta,
+  verificationSealLabel,
+  type VerificationType,
+} from "@/lib/verification-meta";
+
+export {
+  VERIFICATION_TYPES,
+  VERIFICATION_TYPE_META,
+  verificationMeta,
+  verificationSealLabel,
+} from "@/lib/verification-meta";
+export type { VerificationType } from "@/lib/verification-meta";
 
 /**
  * ============================================================
@@ -97,25 +112,10 @@ export async function userHasPrivilege(userId: string, key: keyof VipPrivileges)
   }
 }
 
-/* ==================== تصنيفات التوثيق وألوانها ==================== */
-
-export type VerifiedType =
-  | "SOVEREIGN" // الحساب السيادي — المؤسس الذهبي
-  | "ADMIN_STAFF" // طاقم الإدارة والإشراف — أزرق ملكي
-  | "IMPACT_ELITE" // نخبة أهل الكلمة (350 نقطة) — كحلي
-  | "VIP_GRANT" // منح يدوي مخصص من الاستوديو — لون يختاره الأدمن
-  | "GUEST_AUTHOR" // كتّاب ومفكرون ضيوف — زيتي
-  | "COMMUNITY"; // استحقاق مجتمعي تلقائي — فيروزي
-
-/** الألوان المعتمدة لكل مسار توثيق — تُستخدم تلقائيًا حين لا يحدد الأدمن لونًا */
-export const VERIFIED_TYPE_META: Record<VerifiedType, { color: string; label: string }> = {
-  SOVEREIGN: { color: SOVEREIGN_COLOR, label: "توثيق سيادي" },
-  ADMIN_STAFF: { color: "#2563EB", label: "طاقم الإدارة" },
-  IMPACT_ELITE: { color: "#1E3A8A", label: "عضو أهل الكلمة" },
-  VIP_GRANT: { color: "#7C3AED", label: "حساب مميز" },
-  GUEST_AUTHOR: { color: "#6B8E23", label: "كاتب ضيف" },
-  COMMUNITY: { color: "#0D9488", label: "موثّق مجتمعيًا" },
-};
+/* ==================== تصنيفات التوثيق الرسمي وألوانها ====================
+ * الفصل المعماري: التوثيق (إثبات هوية) ≠ العضوية المميزة (امتيازات).
+ * التصنيفات الأربعة وألوان الأختام في verification-meta.ts — تُعاد
+ * تصديرها هنا لتوحيد مصدر الحقيقة لكل الواجهات. */
 
 /** لوحة الألوان الجاهزة في الاستوديو — ألوان فاخرة معتمدة */
 export const BADGE_COLOR_PRESETS = [
@@ -156,7 +156,8 @@ export async function ensureOwnerSovereign(email?: string | null): Promise<Sover
     const fullySovereign =
       user.role === "OWNER" &&
       user.isVerified &&
-      user.verifiedType === "SOVEREIGN" &&
+      user.verificationType === "OWNER" &&
+      user.isVip === true &&
       user.vipBadgeTitle === "مؤسس المنصة" &&
       user.vipBadgeColor === SOVEREIGN_COLOR &&
       user.impactScore >= SOVEREIGN_IMPACT &&
@@ -169,8 +170,13 @@ export async function ensureOwnerSovereign(email?: string | null): Promise<Sover
       role: "OWNER" as const,
       banned: false,
       banReason: null,
+      /* التوثيق الرسمي: مؤسس — إثبات هوية ذهبي */
       isVerified: true,
-      verifiedType: "SOVEREIGN" as const,
+      verificationType: "OWNER" as const,
+      verifiedAt: user.verifiedAt ?? new Date(),
+      verificationLabel: user.verificationLabel ?? "مؤسس المنصة",
+      /* العضوية المميزة المستقلة: شارة المؤسس الذهبية + كل الصلاحيات */
+      isVip: true,
       vipBadgeTitle: "مؤسس المنصة",
       vipBadgeColor: SOVEREIGN_COLOR,
       vipReason: user.vipReason ?? "صاحب المنصة السيادي — الحساب الأسمى",
@@ -212,8 +218,8 @@ export async function ensureOwnerSovereign(email?: string | null): Promise<Sover
         actorType: "SYSTEM",
         actorId: user.id,
         actorLabel: user.email ?? undefined,
-        message: "البذر السيادي: تُوّثق حساب صاحب المنصة تلقائيًا بشارة المؤسس الذهبية",
-        meta: { verifiedType: "SOVEREIGN", badge: "مؤسس المنصة" },
+        message: "البذر السيادي: تُوّثق حساب صاحب المنصة تلقائيًا (توثيق مؤسس ذهبي + عضوية مميزة)",
+        meta: { verificationType: "OWNER", isVip: true, badge: "مؤسس المنصة" },
       });
     }
 
@@ -226,7 +232,13 @@ export async function ensureOwnerSovereign(email?: string | null): Promise<Sover
 
 /* ==================== مذيّع إشعارات التوثيق ==================== */
 
-export type VipDispatchEvent = "GRANTED" | "MODIFIED" | "REVOKED" | "ELITE";
+export type VipDispatchEvent =
+  | "GRANTED"
+  | "MODIFIED"
+  | "REVOKED"
+  | "ELITE"
+  | "VERIFIED"
+  | "UNVERIFIED";
 
 export type VipDispatchInput = {
   event: VipDispatchEvent;
@@ -264,6 +276,18 @@ function notificationCopy(input: VipDispatchInput): { title: string; body: strin
       return {
         title: "تم تحديث حالة توثيق حسابك",
         body: `سُحبت الشارة «${badge}». السبب: ${input.reason ?? "قرار إداري"}. شكرًا لمشاركتك، ويمكنك استعادة التمييز بالتفاعل الرصين.`,
+      };
+    case "VERIFIED": {
+      const sealLabel = input.badgeTitle || "حساب موثّق";
+      return {
+        title: `علامة التوثيق الرسمية صارت لك ✓`,
+        body: `وُثّق حسابك رسميًا كـ«${sealLabel}»${input.reason ? ` — السبب: ${input.reason}` : ""}. علامة التوثيق تظهر الآن بجانب اسمك في كل النقاشات، وتعليقاتك في مقدمة الحوار، وبلا فترات تهدئة.`,
+      };
+    }
+    case "UNVERIFIED":
+      return {
+        title: "تم تحديث حالة التوثيق لحسابك",
+        body: `سُحبت علامة التوثيق الرسمية${input.badgeTitle ? ` («${input.badgeTitle}»)` : ""}. السبب: ${input.reason ?? "قرار إداري"}. عضويتك المميزة إن وُجدت لا تُمس بهذا الإجراء.`,
       };
   }
 }

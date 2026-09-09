@@ -15,6 +15,7 @@ import { InteractionSlot } from "@/components/interaction-buttons";
 import { displayName, displayAvatar } from "@/lib/identity";
 import { requiredReadSeconds } from "@/lib/impact";
 import { hasPrivilege } from "@/lib/vip";
+import { verificationSealColor, verificationSealLabel, parsePersonalLinks } from "@/lib/verification-meta";
 import {
   getArticleBySlug,
   safeDecodeSlug,
@@ -220,13 +221,30 @@ export default async function ArticlePage({
                 authorImage: displayAvatar(c.user),
                 authorRank: c.user?.intellectualRank ?? null,
                 isInspiring: c.isInspiring,
+                /* التوثيق الرسمي المستقل — ختم بلون التصنيف (ذهبي/كحلي/زيتي/فيروزي) */
                 authorVerified: c.user?.isVerified ?? false,
+                authorSealColor: c.user?.isVerified
+                  ? verificationSealColor(c.user.verificationType)
+                  : null,
+                authorSealLabel: c.user?.isVerified
+                  ? verificationSealLabel(c.user.verificationType, c.user.verificationLabel)
+                  : null,
+                /* العضوية المميزة المستقلة — كبسولة بلون شارتها الخاص */
+                authorIsVip: c.user?.isVip ?? false,
                 authorBadgeTitle: c.user?.vipBadgeTitle ?? null,
                 authorBadgeColor: c.user?.vipBadgeColor ?? null,
                 /* إطار التعليق الفخم — بلون شارة الكاتب فقط عند امتلاكه الصلاحية */
                 authorAccent:
                   c.user && hasPrivilege(c.user.vipPrivileges, "vipCommentBorder")
                     ? c.user.vipBadgeColor
+                    : null,
+                /* البطاقة الفكرية الموسعة — لحاملي التوثيق */
+                authorCard:
+                  c.user?.isVerified && c.user
+                    ? {
+                        extendedBio: c.user.extendedBio ?? null,
+                        links: parsePersonalLinks(c.user.personalLinks),
+                      }
                     : null,
                 selfPinned: Boolean(c.selfPinnedAt),
                 likes: voteStats[c.id]?.likes ?? 0,

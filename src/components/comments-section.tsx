@@ -7,6 +7,7 @@ import { analyzeComment } from "@/lib/moderation";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
 import { formatArabicDate } from "@/lib/utils";
 import { RankBadge } from "@/components/rank-badge";
+import { PERSONAL_LINK_LABELS, type PersonalLinks } from "@/lib/verification-meta";
 
 type PublicComment = {
   id: string;
@@ -17,19 +18,25 @@ type PublicComment = {
   authorImage: string | null;
   authorRank: string | null;
   isInspiring: boolean;
-  /* منظومة التوثيق السيادي — شارة الحسابات المميزة */
+  /* التوثيق الرسمي المستقل — ختم بلون التصنيف (إثبات هوية فقط) */
   authorVerified?: boolean;
+  authorSealColor?: string | null;
+  authorSealLabel?: string | null;
+  /* العضوية المميزة المستقلة — كبسولة بلونها الخاص */
+  authorIsVip?: boolean;
   authorBadgeTitle?: string | null;
   authorBadgeColor?: string | null;
   /* إطار التعليق الفخم — لون شارة الكاتب عند امتلاكه الصلاحية */
   authorAccent?: string | null;
+  /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
+  authorCard?: { extendedBio: string | null; links: PersonalLinks } | null;
   /* تثبيت ذاتي من كاتبه */
   selfPinned?: boolean;
   likes: number;
   dislikes: number;
 };
 
-/** ختم التوثيق الرسمي — يظهر بجانب أسماء الحسابات الموثقة في كل النقاشات */
+/** ختم التوثيق الرسمي — بلون تصنيف الحساب (ذهبي للمؤسس، كحلي للنخبة، زيتي للكتاب، فيروزي للعائلة) */
 function VerifiedSeal({ color, title }: { color: string; title: string }) {
   return (
     <span title={`${title} — حساب موثّق رسميًا`} aria-label={`حساب موثق: ${title}`}>
@@ -40,6 +47,9 @@ function VerifiedSeal({ color, title }: { color: string; title: string }) {
     </span>
   );
 }
+
+/* روابط البطاقة الغنية بأيقونات نصية رصينة — المفاتيح المعتمدة فقط */
+const CARD_LINK_ORDER = ["portfolio", "github", "devto", "linkedin", "x"] as const;
 
 const REPORT_REASONS = ["إساءة أو لغة غير لائقة", "إعلان أو سبام", "مخالفة القيم", "سبب آخر"];
 const CUSTOM_REASON = "سبب آخر";
@@ -68,6 +78,8 @@ export function CommentsSection({
   const [reportSent, setReportSent] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [impactNote, setImpactNote] = useState<string>("");
+  /* البطاقة الفكرية الموسعة — تُفتح بالضغط على اسم الكاتب الموثق */
+  const [cardFor, setCardFor] = useState<string | null>(null);
   /* فخ الروبوتات — حقل مخفي عن البشر تمامًا، البوتات الملئة لكل الحقول ستملؤه */
   const [honey, setHoney] = useState("");
 
@@ -412,19 +424,36 @@ export function CommentsSection({
                   )}
                   <div>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
-                        {c.authorName}
-                      </p>
-                      {/* ختم التوثيق الرسمي + مسمى الشارة — بلون تصنيف الحساب */}
-                      {c.authorVerified && (
-                        <VerifiedSeal color={c.authorBadgeColor || "#2563EB"} title={c.authorBadgeTitle || "حساب موثّق"} />
+                      {c.authorVerified && c.authorCard ? (
+                        <button
+                          type="button"
+                          onClick={() => setCardFor(cardFor === c.id ? null : c.id)}
+                          className="cursor-pointer text-sm font-bold underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-[var(--accent-strong)]"
+                          style={{ color: "var(--ink)" }}
+                          title="اضغط لعرض البطاقة الفكرية الموسعة"
+                          aria-expanded={cardFor === c.id}
+                        >
+                          {c.authorName}
+                        </button>
+                      ) : (
+                        <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
+                          {c.authorName}
+                        </p>
                       )}
-                      {c.authorVerified && c.authorBadgeTitle && (
+                      {/* ختم التوثيق الرسمي المستقل — بلون تصنيف الحساب (ذهبي/كحلي/زيتي/فيروزي) */}
+                      {c.authorVerified && (
+                        <VerifiedSeal
+                          color={c.authorSealColor || "#2563EB"}
+                          title={c.authorSealLabel || "حساب موثّق"}
+                        />
+                      )}
+                      {/* كبسولة العضوية المميزة المستقلة — بلون شارتها الخاص */}
+                      {c.authorIsVip && c.authorBadgeTitle && (
                         <span
                           className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                           style={{
-                            background: `${c.authorBadgeColor || "#2563EB"}1f`,
-                            color: c.authorBadgeColor || "#2563EB",
+                            background: `${c.authorBadgeColor || "#7C3AED"}1f`,
+                            color: c.authorBadgeColor || "#7C3AED",
                           }}
                         >
                           {c.authorBadgeTitle}
@@ -461,6 +490,52 @@ export function CommentsSection({
                   </button>
                 )}
               </div>
+
+              {/* البطاقة الفكرية الموسعة — نبذة وروابط صاحب الحساب الموثق */}
+              {cardFor === c.id && c.authorCard && (
+                <div
+                  className="mb-3 rounded-2xl border p-4"
+                  style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
+                >
+                  <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold" style={{ color: c.authorSealColor || "#2563EB" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+                      <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                    </svg>
+                    بطاقة {c.authorSealLabel || "حساب موثّق"}
+                  </p>
+                  {c.authorCard.extendedBio && (
+                    <p className="whitespace-pre-line text-[13px] leading-7" style={{ color: "var(--ink)" }}>
+                      {c.authorCard.extendedBio}
+                    </p>
+                  )}
+                  {!c.authorCard.extendedBio && (
+                    <p className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                      لم يكتب صاحب هذه البطاقة نبذته الفكرية الموسعة بعد.
+                    </p>
+                  )}
+                  {CARD_LINK_ORDER.some((k) => c.authorCard?.links?.[k]) && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {CARD_LINK_ORDER.map((k) => {
+                        const href = c.authorCard?.links?.[k];
+                        if (!href) return null;
+                        return (
+                          <a
+                            key={k}
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer nofollow"
+                            className="rounded-full border px-3 py-1 text-[11px] font-bold transition-all hover:-translate-y-0.5"
+                            style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
+                          >
+                            {PERSONAL_LINK_LABELS[k]}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <p className="font-body leading-9" style={{ color: "var(--ink)" }}>
                 {c.content}

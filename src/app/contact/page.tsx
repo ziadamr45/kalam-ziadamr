@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { ContactForm } from "@/components/contact-form";
+import { getSocialLinks } from "@/lib/site-config";
+import type { SocialLinkEntry } from "@/lib/site-config";
 
 export const metadata: Metadata = {
   title: "اتصل بنا",
@@ -9,14 +11,23 @@ export const metadata: Metadata = {
     "راسل إدارة منصة كلام له لازمة مباشرة — اقتراحات، ملاحظات، أو كلمة طيبة. رسالتك تصل للإدارة مباشرة.",
 };
 
-const CHANNELS = [
-  { label: "البريد الإلكتروني", value: "ziad90216@gmail.com", href: "mailto:ziad90216@gmail.com" },
-  { label: "تليجرام", value: "t.me/ziadamr", href: "https://t.me/ziadamr" },
-  { label: "فيسبوك", value: "facebook.com/ziad7mr", href: "https://www.facebook.com/ziad7mr" },
-  { label: "إكس (تويتر)", value: "x.com/ziad90216", href: "https://x.com/ziad90216" },
+/* قنوات المراسلة السريعة المعتمدة — واتساب وتليجرام والبريد أزرار مباشرة */
+const QUICK_CHANNELS: Array<"whatsapp" | "telegram" | "email"> = ["whatsapp", "telegram", "email"];
+const SECONDARY_CHANNELS: Array<"facebook" | "x" | "instagram" | "youtube"> = [
+  "facebook",
+  "x",
+  "instagram",
+  "youtube",
 ];
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const socials = await getSocialLinks();
+  const byKey = (k: string) => socials.find((s) => s.key === k);
+  const quick: SocialLinkEntry[] = QUICK_CHANNELS.map(byKey).filter(Boolean) as SocialLinkEntry[];
+  const secondary: SocialLinkEntry[] = SECONDARY_CHANNELS.map(byKey).filter(
+    Boolean,
+  ) as SocialLinkEntry[];
+
   return (
     <>
       <SiteHeader />
@@ -37,30 +48,42 @@ export default function ContactPage() {
             <ContactForm />
           </div>
 
-          {/* قنوات التواصل المباشر */}
+          {/* المراسلة السريعة — أزرار مباشرة لأسرع قنوات الوصول */}
           <div className="page-chrome mt-10 rounded-3xl border p-6" style={{ background: "var(--bg-soft)", borderColor: "var(--border)" }}>
             <h2 className="font-ui mb-4 text-base font-bold" style={{ color: "var(--ink)" }}>
               أو تواصل مباشرة عبر
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {CHANNELS.map((c) => (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {quick.map((c) => (
                 <a
-                  key={c.label}
-                  href={c.href}
+                  key={c.key}
+                  href={c.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded-2xl border px-4 py-3.5 text-sm transition-all hover:-translate-y-0.5 hover:border-[var(--accent)]"
-                  style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                  className="flex items-center justify-between rounded-2xl border px-4 py-3.5 text-sm font-bold transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  style={{ borderColor: "var(--border)", background: "var(--surface)", color: "var(--ink)" }}
                 >
-                  <span className="font-semibold" style={{ color: "var(--ink)" }}>
-                    {c.label}
-                  </span>
-                  <span dir="ltr" className="text-xs" style={{ color: "var(--accent-strong)" }}>
-                    {c.value}
-                  </span>
+                  <span>{c.label}</span>
+                  <span aria-hidden>↗</span>
                 </a>
               ))}
             </div>
+            {secondary.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {secondary.map((c) => (
+                  <a
+                    key={c.key}
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border px-4 py-1.5 text-xs font-semibold transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+                  >
+                    {c.label}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </main>

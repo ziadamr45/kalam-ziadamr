@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
+import { SOCIAL_KEYS, SOCIAL_LABELS, SOCIAL_LINKS, type SocialKey } from "@/lib/constants/socials";
 
 /**
  * ============================================================
@@ -137,11 +138,13 @@ export async function getPublicBundle() {
   /* الأقسام الحية من قاعدة البيانات للتذييل الديناميكي — كاش موسوم بـ «sections» */
   const { getActiveSections } = await import("@/lib/sections-data");
   const liveSections = await getActiveSections();
+  /* الروابط الرسمية الموحدة — social.* من التكوين فوق الافتراضيات المعتمدة */
+  const socialLinks = await getSocialLinks();
   return {
     SITE_NAME: cfg.SITE_NAME,
     FOOTER_TEXT: cfg.FOOTER_TEXT,
     COPYRIGHT_TEXT: cfg.COPYRIGHT_TEXT,
-    SOCIAL_LINKS: cfg.SOCIAL_LINKS,
+    SOCIAL_LINKS: socialLinks,
     WELCOME_MESSAGE: cfg.WELCOME_MESSAGE,
     ONBOARDING_ENABLED: cfg.ONBOARDING_ENABLED,
     ONBOARDING_SLIDES: cfg.ONBOARDING_SLIDES,
@@ -160,6 +163,35 @@ export async function getPublicBundle() {
 }
 
 export type PublicBundle = Awaited<ReturnType<typeof getPublicBundle>>;
+
+/* ==================== الروابط الرسمية الموحدة ==================== */
+
+export type SocialLinkEntry = { key: SocialKey; label: string; url: string };
+
+/**
+ * روابط التواصل الرسمية — أولوية القارئ:
+ * 1) مفاتيح social.<key> من جدول التكوين السيادي (تجاوز الأدمن اللحظي)
+ * 2) مصفوفة SOCIAL_LINKS القديمة (توافق تاريخي بالتسمية)
+ * 3) الافتراضيات المعتمدة في lib/constants/socials.ts
+ */
+export async function getSocialLinks(): Promise<SocialLinkEntry[]> {
+  const stored = (await getCachedConfig().catch(() => ({}))) as Record<string, unknown>;
+  const legacy = Array.isArray(stored.SOCIAL_LINKS)
+    ? (stored.SOCIAL_LINKS as { label?: unknown; url?: unknown }[])
+    : [];
+  return SOCIAL_KEYS.map((key) => {
+    const label = SOCIAL_LABELS[key];
+    const keyOverride = stored[`social.${key}`];
+    if (typeof keyOverride === "string" && keyOverride.trim()) {
+      return { key, label, url: keyOverride.trim() };
+    }
+    const legacyHit = legacy.find(
+      (l) => l.label === label && typeof l.url === "string" && l.url.trim(),
+    );
+    if (legacyHit) return { key, label, url: (legacyHit.url as string).trim() };
+    return { key, label, url: SOCIAL_LINKS[key] };
+  });
+}
 
 /** أوزان اقتصاد الأثر الحية — يتحكم بها الأدمن ديناميكيًا */
 export async function getImpactParams() {

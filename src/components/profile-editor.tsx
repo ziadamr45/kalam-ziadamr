@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayName, validateCustomName, validateBio } from "@/lib/identity";
+import { PERSONAL_LINK_KEYS, PERSONAL_LINK_LABELS, type PersonalLinks } from "@/lib/verification-meta";
 
 /**
  * ============================================================
@@ -11,20 +12,29 @@ import { displayName, validateCustomName, validateBio } from "@/lib/identity";
  * - تعديل الاسم المعروض مع فحص فوري لمنع الأسماء المسيئة أو الفارغة.
  * - رفع صورة شخصية مباشر ومتكامل مع Cloudinary (من الهاتف أو الكمبيوتر).
  * - استرجاع صورة Google الأصلية بنقرة زر واحدة.
+ * - البطاقة الفكرية الموسعة (نبذة + روابط شخصية) — لحاملي التوثيق الرسمي.
  * - زر حفظ موحّد بتنبيه فوري بالنجاح أو الخطأ.
  * بيانات التوثيق الأصلية (email/googleId) لا تُمس إطلاقًا.
  */
 
-type Initial = { customName: string | null; customImage: string | null; bio: string | null };
+type Initial = {
+  customName: string | null;
+  customImage: string | null;
+  bio: string | null;
+  extendedBio?: string | null;
+  personalLinks?: PersonalLinks;
+};
 
 export function ProfileEditor({
   googleName,
   googleImage,
   initial,
+  isVerified = false,
 }: {
   googleName: string | null;
   googleImage: string | null;
   initial: Initial;
+  isVerified?: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -36,6 +46,9 @@ export function ProfileEditor({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
+  /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
+  const [extendedBio, setExtendedBio] = useState(initial.extendedBio ?? "");
+  const [links, setLinks] = useState<PersonalLinks>(initial.personalLinks ?? {});
 
   const currentAvatar = imageUrl || googleImage;
   const nameError = name.trim() ? validateCustomName(name) : null;
@@ -43,7 +56,10 @@ export function ProfileEditor({
   const dirty =
     name.trim() !== (initial.customName ?? "") ||
     bio.trim() !== (initial.bio ?? "") ||
-    (imageUrl ?? "") !== (initial.customImage ?? "");
+    (imageUrl ?? "") !== (initial.customImage ?? "") ||
+    (isVerified && extendedBio.trim() !== (initial.extendedBio ?? "")) ||
+    (isVerified &&
+      PERSONAL_LINK_KEYS.some((k) => (links[k] ?? "") !== (initial.personalLinks?.[k] ?? "")));
 
   const uploadAvatar = async (file: File) => {
     setMessage(null);
@@ -88,6 +104,16 @@ export function ProfileEditor({
           customName: name.trim() || null,
           customImage: imageUrl,
           bio: bio.trim() || null,
+          ...(isVerified
+            ? {
+                extendedBio: extendedBio.trim() || null,
+                personalLinks: PERSONAL_LINK_KEYS.some((k) => links[k]?.trim())
+                  ? Object.fromEntries(
+                      PERSONAL_LINK_KEYS.filter((k) => links[k]?.trim()).map((k) => [k, links[k]?.trim()]),
+                    )
+                  : null,
+              }
+            : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -244,6 +270,75 @@ export function ProfileEditor({
               <span>{bio.length}/200</span>
             </p>
           </div>
+
+          {/* ==================== البطاقة الفكرية الموسعة — لحاملي التوثيق الرسمي ==================== */}
+          {isVerified && (
+            <div
+              className="rounded-2xl border p-4"
+              style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
+            >
+              <p className="mb-1 flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+                  <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                </svg>
+                بطاقتك الفكرية الموسعة
+              </p>
+              <p className="mb-3 text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                امتياز توثيقك الرسمي: من يضغط على اسمك في النقاشات يرى نبذتك الموسعة وروابطك الشخصية.
+              </p>
+
+              <label htmlFor="extended-bio" className="mb-1.5 block text-xs font-bold" style={{ color: "var(--ink)" }}>
+                نبذة فكرية موسعة <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(حتى 1200 حرف)</span>
+              </label>
+              <textarea
+                id="extended-bio"
+                value={extendedBio}
+                onChange={(e) => {
+                  setExtendedBio(e.target.value);
+                  setMessage(null);
+                }}
+                rows={5}
+                maxLength={1200}
+                placeholder="اهتماماتك الفكرية، مشاريعك، اتجاهاتك القرائية، وخلاصة تجربتك — هذه بطاقتك أمام القراء"
+                className="w-full resize-y rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]"
+                style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+              />
+              <p className="mt-1 text-right text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                {extendedBio.length}/1200
+              </p>
+
+              <p className="mb-2 mt-4 block text-xs font-bold" style={{ color: "var(--ink)" }}>
+                روابطك الشخصية
+              </p>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {PERSONAL_LINK_KEYS.map((k) => (
+                  <div key={k}>
+                    <label htmlFor={`link-${k}`} className="mb-1 block text-[11px] font-bold" style={{ color: "var(--ink-muted)" }}>
+                      {PERSONAL_LINK_LABELS[k]}
+                    </label>
+                    <input
+                      id={`link-${k}`}
+                      type="url"
+                      dir="ltr"
+                      value={links[k] ?? ""}
+                      onChange={(e) => {
+                        setLinks((prev) => ({ ...prev, [k]: e.target.value }));
+                        setMessage(null);
+                      }}
+                      placeholder="https://..."
+                      maxLength={300}
+                      className="w-full rounded-xl border bg-transparent px-3 py-2.5 text-left text-xs outline-none transition-colors focus:border-[var(--accent)]"
+                      style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                يُقبل رابط https كامل لكل حقل — الروابط الفارغة تُهمل.
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-3">
             <button

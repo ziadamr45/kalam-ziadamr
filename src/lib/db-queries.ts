@@ -180,11 +180,19 @@ export async function getApprovedComments(articleId: string) {
             customImage: true,
             impactScore: true,
             intellectualRank: true,
-            /* منظومة التوثيق السيادي: الشارة واللون وإطار التعليق الفخم */
+            /* التوثيق الرسمي المستقل — ختم ملون حسب التصنيف */
             isVerified: true,
+            verificationType: true,
+            verificationLabel: true,
+            verifiedAt: true,
+            /* العضوية المميزة المستقلة — كبسولة ملونة وصلاحيات */
+            isVip: true,
             vipBadgeTitle: true,
             vipBadgeColor: true,
             vipPrivileges: true,
+            /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
+            extendedBio: true,
+            personalLinks: true,
           },
         },
       },

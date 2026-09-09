@@ -6,6 +6,7 @@ import { analyzeComment } from "@/lib/moderation";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { recordServerError } from "@/lib/error-alert";
 import { parsePrivileges } from "@/lib/vip";
+import { PERSONAL_LINK_KEYS, type PersonalLinks } from "@/lib/verification-meta";
 
 /**
  * ============================================================
@@ -29,9 +30,17 @@ export async function PUT(request: Request) {
       customName?: string | null;
       customImage?: string | null;
       bio?: string | null;
+      extendedBio?: string | null;
+      personalLinks?: PersonalLinks | null;
     };
 
-    const data: { customName?: string | null; customImage?: string | null; bio?: string | null } = {};
+    const data: {
+      customName?: string | null;
+      customImage?: string | null;
+      bio?: string | null;
+      extendedBio?: string | null;
+      personalLinks?: PersonalLinks | null;
+    } = {};
 
     /* ==================== الاسم المعروض ==================== */
     if (body.customName !== undefined) {
@@ -77,6 +86,49 @@ export async function PUT(request: Request) {
       }
     }
 
+    /* ==================== النبذة الموسعة (البطاقة الغنية لحاملي التوثيق) ==================== */
+    if (body.extendedBio !== undefined) {
+      if (body.extendedBio === null || body.extendedBio.trim() === "") {
+        data.extendedBio = null;
+      } else {
+        const text = body.extendedBio.trim();
+        if (text.length < 10) {
+          return NextResponse.json({ error: "النبذة الموسعة 10 أحرف فأكثر — اكتب عن اهتماماتك الفكرية" }, { status: 400 });
+        }
+        if (text.length > 1200) {
+          return NextResponse.json({ error: "النبذة الموسعة حتى 1200 حرف" }, { status: 400 });
+        }
+        /* الفلترة الأخلاقية نفسها — البطاقة العامة لا تحتمل لغة مسيئة */
+        const verdict = analyzeComment(text);
+        if (verdict.status === "REJECT") {
+          return NextResponse.json({ error: "النبذة تخالف أدب المنصة — راجع صياغتها" }, { status: 400 });
+        }
+        data.extendedBio = text;
+      }
+    }
+
+    /* ==================== الروابط الشخصية (المفاتيح المعتمدة فقط) ==================== */
+    if (body.personalLinks !== undefined) {
+      if (body.personalLinks === null) {
+        data.personalLinks = null;
+      } else {
+        const clean: PersonalLinks = {};
+        for (const key of PERSONAL_LINK_KEYS) {
+          const v = (body.personalLinks as Record<string, unknown>)[key];
+          if (typeof v !== "string" || !v.trim()) continue;
+          const url = v.trim();
+          if (!/^https:\/\/[^\s]{4,300}$/i.test(url)) {
+            return NextResponse.json(
+              { error: `رابط غير صالح في «${key}» — يُقبل رابط https كامل فقط` },
+              { status: 400 },
+            );
+          }
+          clean[key] = url;
+        }
+        data.personalLinks = Object.keys(clean).length > 0 ? clean : null;
+      }
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "لا تغييرات للحفظ" }, { status: 400 });
     }
@@ -84,7 +136,7 @@ export async function PUT(request: Request) {
     const updated = await prisma.user.update({
       where: { id: userId },
       data: data as never,
-      select: { customName: true, customImage: true, bio: true },
+      select: { customName: true, customImage: true, bio: true, extendedBio: true, personalLinks: true },
     });
 
     logEvent({
@@ -126,8 +178,11 @@ export async function GET() {
       bio: true,
       impactScore: true,
       intellectualRank: true,
-      /* منظومة التوثيق السيادي — يقرؤها قسم النقاشات وكل المكونات */
+      /* منظومة التوثيق الرسمي المستقل + العضوية المميزة — يقرؤها قسم النقاشات وكل المكونات */
       isVerified: true,
+      verificationType: true,
+      verificationLabel: true,
+      isVip: true,
       vipBadgeTitle: true,
       vipBadgeColor: true,
       vipPrivileges: true,
@@ -141,6 +196,9 @@ export async function GET() {
     loggedIn: true,
     profile: user,
     isVerified: user.isVerified,
+    verificationType: user.verificationType,
+    verificationLabel: user.verificationLabel,
+    isVip: user.isVip,
     badgeTitle: user.vipBadgeTitle,
     badgeColor: user.vipBadgeColor,
     role: user.role,

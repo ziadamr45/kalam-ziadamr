@@ -83,23 +83,21 @@ async function celebrateEldersThreshold(userId: string): Promise<void> {
     });
 
     /* المسار التلقائي للتوثيق (Impact Elite Track): أول من يبلغ 350
-       يُوثَّق فورًا بشارة «عضو أهل الكلمة» الكحلية — من موثق مسبقًا
-       برتبة أعلى لا يُمس شيء */
+       يُوثَّق فورًا توثيقًا رسميًا بنخبة «أهل الكلمة» — ختم كحلي بلا
+       أي عضوية مميزة (فصل معماري: التوثيق إثبات هوية فقط) */
     try {
       const u = await prisma.user.findUnique({
         where: { id: userId },
-        select: { isVerified: true, verifiedType: true, vipBadgeTitle: true },
+        select: { isVerified: true, verificationType: true },
       });
       if (u && !u.isVerified) {
         await prisma.user.update({
           where: { id: userId },
           data: {
             isVerified: true,
-            verifiedType: "IMPACT_ELITE",
-            vipBadgeTitle: "عضو أهل الكلمة",
-            vipBadgeColor: "#1E3A8A",
-            vipReason: "الاستحقاق التلقائي: بلوغ عتبة الـ350 نقطة أثر",
-            vipGrantedAt: new Date(),
+            verifiedAt: new Date(),
+            verificationType: "NOTABLE",
+            verificationLabel: "عضو أهل الكلمة",
           },
         });
       }
@@ -136,7 +134,7 @@ async function celebrateEldersThreshold(userId: string): Promise<void> {
       actorType: "SYSTEM",
       actorId: userId,
       message: "توثيق تلقائي: بلوغ عتبة «أهل الكلمة» — شارة عضو أهل الكلمة",
-      meta: { verifiedType: "IMPACT_ELITE", badge: "عضو أهل الكلمة" },
+      meta: { verificationType: "NOTABLE", label: "عضو أهل الكلمة" },
     });
   } catch {
     /* ازدواج الاحتفال مستحيل بقيد فريد، وأي خطأ هنا زينة لا تُعطل */

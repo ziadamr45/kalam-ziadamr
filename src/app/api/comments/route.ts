@@ -9,7 +9,7 @@ import { awardImpact } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
 import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
-import { hasPrivilege, userHasPrivilege } from "@/lib/vip";
+import { hasPrivilege } from "@/lib/vip";
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -75,25 +75,30 @@ export async function POST(request: Request) {
       );
     }
 
+    /* التحقق من حظر المستخدم + صلاحياته — يسبق مهلة التعليقات
+       لأن المعفاون بنيويًا يُحدَّدون من هنا */
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { banned: true, name: true, vipPrivileges: true, isVerified: true },
+    });
+    if (!user || user.banned) {
+      return NextResponse.json({ error: "تم إيقاف المشاركة لهذا الحساب" }, { status: 403 });
+    }
+
     const rateKey = session.user.id;
-    /* حاملو صلاحية bypassRateLimits/bypassCooldowns معفون من مهلة التعليقات
-       — لكن الفلترة الأخلاقية ومراجعة التحرير تبقى عليهم كالجميع */
-    const vipBypass = await userHasPrivilege(session.user.id, "bypassRateLimits")
-      .catch(() => false);
-    if (!vipBypass && !allow(rateKey)) {
+    /* معفوّو مهلة التعليقات بنيويًا:
+       1) الحسابات الموثقة رسميًا (علامة التوثيق تحمل إعفاءً ثابتًا)
+       2) حاملو صلاحية bypassRateLimits/bypassCooldowns من العضوية المميزة
+       — لكن الفلترة الأخلاقية ومراجعة التحرير تبقى على الجميع بلا استثناء */
+    const cooldownExempt =
+      user.isVerified ||
+      hasPrivilege(user.vipPrivileges, "bypassRateLimits") ||
+      hasPrivilege(user.vipPrivileges, "bypassCooldowns");
+    if (!cooldownExempt && !allow(rateKey)) {
       return NextResponse.json(
         { error: "أرسلت عدة تعليقات خلال دقائق.. خذ نفسًا وعد لاحقًا" },
         { status: 429 },
       );
-    }
-
-    /* التحقق من حظر المستخدم + صلاحياته */
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { banned: true, name: true, vipPrivileges: true },
-    });
-    if (!user || user.banned) {
-      return NextResponse.json({ error: "تم إيقاف المشاركة لهذا الحساب" }, { status: 403 });
     }
 
     /* الفلترة الأخلاقية متعددة المستويات (قواعد محلية لحظية) */
