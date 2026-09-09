@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { pushUsers } from "@/lib/push";
 import { logEvent } from "@/lib/audit";
-import { awardImpact, IMPACT_POINTS } from "@/lib/impact";
+import { awardImpact } from "@/lib/impact";
 
 /**
  * تصويت التعليقات — إعجاب أو عدم إعجاب.
@@ -94,7 +94,7 @@ export async function POST(
       void awardImpact({
         userId: comment.userId,
         actionType: "COMMENT_LIKED",
-        points: IMPACT_POINTS.COMMENT_LIKED,
+        /* الوزن الحي من التكوين السيادي — الافتراضي +1 */
         articleId: comment.articleId,
         dedupKey: `LIKE:${commentId}:${session.user.id}`,
         reason: "إعجاب قارئ مسجل بتعليقك",

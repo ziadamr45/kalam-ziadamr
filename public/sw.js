@@ -4,7 +4,7 @@
    الأصول الثابتة كاش أولًا. القراءة دون اتصال عبر IndexedDB.
    ============================================================ */
 
-const CACHE_VERSION = "kalam-v5";
+const CACHE_VERSION = "kalam-v6";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

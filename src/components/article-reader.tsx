@@ -31,9 +31,12 @@ type ReaderArticle = {
 export function ArticleReader({
   article,
   tashkeelAllowed = true,
+  audioEnabled = true,
 }: {
   article: ReaderArticle;
   tashkeelAllowed?: boolean;
+  /** مفتاح السيادة: إظهار/إخفاء المشغل الصوتي من التكوين السيادي */
+  audioEnabled?: boolean;
 }) {
   /* تبديل التشكيل الفوري — مرهون بإذن الأدمن (عامًا + لهذا المقال) */
   const [tashkeel, setTashkeel] = useState(false);
@@ -406,8 +409,8 @@ export function ArticleReader({
         </div>
       )}
 
-      {/* المشغل الصوتي */}
-      {article.audioUrl && (
+      {/* المشغل الصوتي — يخضع لمفتاح التكوين السيادي AUDIO_PLAYER_ENABLED */}
+      {audioEnabled && article.audioUrl && (
         <div className="page-chrome mt-8">
           <AudioPlayer
             src={article.audioUrl}

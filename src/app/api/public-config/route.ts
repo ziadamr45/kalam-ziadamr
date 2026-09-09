@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
-import { getSiteConfig } from "@/lib/site-config";
+import { getPublicBundle } from "@/lib/site-config";
 
-/*
- * إعدادات عامة قابلة للنشر للعميل — نص التذييل فقط.
- * لا تُرجع أي مفاتيح أو إعدادات حساسة؛ إعدادات النشر تُدار من لوحة التحكم.
+/**
+ * حزمة التكوين القابلة للنشر للعميل — كل ما تحتاجه الواجهات التفاعلية
+ * من نصوص الهوية ومفاتيح الميزات، بلا أسرار ولا إعدادات حساسة.
+ * تُدار قيمها كاملة من استوديو التكوين السيادي بلوحة الأدمن.
  */
 
 export const dynamic = "force-dynamic";
 
-const FALLBACK = "نُشر بعناية.. لكلام له لازمة.";
-
 export async function GET() {
   try {
-    const cfg = await getSiteConfig();
-    return NextResponse.json(
-      { FOOTER_TEXT: cfg.FOOTER_TEXT || FALLBACK },
-      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
-    );
+    const bundle = await getPublicBundle();
+    return NextResponse.json(bundle, {
+      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+    });
   } catch {
-    return NextResponse.json({ FOOTER_TEXT: FALLBACK });
+    return NextResponse.json({ error: "تعذر جلب التكوين" }, { status: 500 });
   }
 }

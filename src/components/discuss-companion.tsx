@@ -23,6 +23,14 @@ export function DiscussCompanion({
   articleTitle: string;
 }) {
   const [open, setOpen] = useState(false);
+  /* التكوين السيادي: شارة المحاور ورسالته الافتتاحية وتنويهه الثابت */
+  const [cfgBadge, setCfgBadge] = useState("مساعد ذكاء اصطناعي");
+  const [cfgOpening, setCfgOpening] = useState(
+    "أنا هنا لأحاورك حول الأفكار الواردة في هذا المقال ومساعدتك في تحليلها واستخراج أبعادها.",
+  );
+  const [cfgDisclaimer, setCfgDisclaimer] = useState(
+    "المحاور هو نموذج ذكاء اصطناعي تحليلي، وقد تقع منه أخطاء أو تأويلات؛ يُرجى الرجوع لمتن المقال والمصادر الأصلية دائمًا.",
+  );
   const [mounted, setMounted] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -94,6 +102,18 @@ export function DiscussCompanion({
   }, []);
 
   /* تهيئة الهجوم على أعلى القائمة عند رسالة جديدة */
+  useEffect(() => {
+    /* جلب حزمة التكوين السيادي — نصوص المحاور يحكمها الأدمن لحظيًا */
+    fetch("/api/public-config")
+      .then((r) => r.json())
+      .then((c: { DISCUSS_BADGE?: string; DISCUSS_OPENING?: string; DISCUSS_DISCLAIMER?: string }) => {
+        if (c?.DISCUSS_BADGE) setCfgBadge(c.DISCUSS_BADGE);
+        if (c?.DISCUSS_OPENING) setCfgOpening(c.DISCUSS_OPENING);
+        if (c?.DISCUSS_DISCLAIMER) setCfgDisclaimer(c.DISCUSS_DISCLAIMER);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (open && listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -292,7 +312,7 @@ export function DiscussCompanion({
                     <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
                     <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
                   </svg>
-                  مساعد ذكاء اصطناعي
+                  {cfgBadge}
                 </span>
               </div>
               <p className="mt-0.5 truncate text-xs" style={{ color: "var(--ink-muted)" }}>
@@ -343,7 +363,7 @@ export function DiscussCompanion({
                 className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-7"
                 style={{ background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }}
               >
-                أنا هنا لأحاورك حول الأفكار الواردة في هذا المقال ومساعدتك في تحليلها واستخراج أبعادها.
+                {cfgOpening}
               </div>
             </div>
 
@@ -448,7 +468,7 @@ export function DiscussCompanion({
             </div>
             {/* شريط التنويه السفلي الثابت — هوية المحاور وأمانة الإحالة */}
             <p className="select-none py-1.5 text-center text-xs text-zinc-500 dark:text-zinc-400">
-              المحاور هو نموذج ذكاء اصطناعي تحليلي، وقد تقع منه أخطاء أو تأويلات؛ يُرجى الرجوع لمتن المقال والمصادر الأصلية دائمًا.
+              {cfgDisclaimer}
             </p>
           </div>
         </aside>

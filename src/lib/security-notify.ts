@@ -176,6 +176,11 @@ async function sendSecurityEmail(to: string, html: string, subject: string): Pro
       signal: controller.signal,
     });
     clearTimeout(timer);
+    if (res.ok) {
+      /* عداد الاستهلاك الرقابي — شاشة الحصص بلوحة الأدمن */
+      const { bumpApiUsage } = await import("@/lib/api-usage");
+      void bumpApiUsage("RESEND_EMAIL");
+    }
     return res.ok;
   } catch {
     return false;

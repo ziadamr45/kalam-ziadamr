@@ -12,6 +12,7 @@ import { SECTIONS } from "@/lib/sections";
  * hydration)، ثم يُستبدل بعد التحميل بنص التذييل المُدار من لوحة التحكم.
  */
 const DEFAULT_FOOTER_TEXT = "نُشر بعناية.. لكلام له لازمة.";
+const DEFAULT_COPYRIGHT = "© كلام له لازمة — جميع الحقوق محفوظة";
 
 /* روابط صاحب المنصة الرسمية — كل منصاته في مكان واحد */
 const SOCIALS: { label: string; href: string; icon: React.ReactNode }[] = [
@@ -96,6 +97,9 @@ const SOCIALS: { label: string; href: string; icon: React.ReactNode }[] = [
 
 export function Footer() {
   const [footerText, setFooterText] = useState(DEFAULT_FOOTER_TEXT);
+  /* التكوين السيادي: نص حقوق النشر وروابط التواصل — يحكمهما الأدمن لحظيًا */
+  const [copyright, setCopyright] = useState(DEFAULT_COPYRIGHT);
+  const [socials, setSocials] = useState(SOCIALS);
 
   /* جلب نص التذييل المُدار من لوحة التحكم — بعد الرسم الأول حتى لا نكسر الترطيب */
   useEffect(() => {
@@ -104,6 +108,25 @@ export function Footer() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (alive && d?.FOOTER_TEXT) setFooterText(d.FOOTER_TEXT);
+        if (alive && d?.COPYRIGHT_TEXT) setCopyright(d.COPYRIGHT_TEXT);
+        if (alive && Array.isArray(d?.SOCIAL_LINKS) && d.SOCIAL_LINKS.length > 0) {
+          /* روابط التكوين تُدمج على الأيقونات الافتراضية: نفس الرابط يستبدل
+             الأصل، والرابط الجديد يُضاف بأيقونة عامة (◈) */
+          const overrides = d.SOCIAL_LINKS as { label: string; url: string }[];
+          const mapped = SOCIALS.map((base) => {
+            const hit = overrides.find((o) => o.label === base.label);
+            return hit ? { ...base, href: hit.url } : base;
+          });
+          const known = new Set(SOCIALS.map((b) => b.label));
+          const extras = overrides
+            .filter((o) => !known.has(o.label) && o.label && o.url)
+            .map((o) => ({
+              label: o.label,
+              href: o.url,
+              icon: <span className="text-sm leading-none">◈</span> as React.ReactNode,
+            }));
+          setSocials([...mapped, ...extras]);
+        }
       })
       .catch(() => {});
     return () => {
@@ -126,7 +149,7 @@ export function Footer() {
             </p>
             {/* منصات صاحب المنصة */}
             <div className="mt-5 flex flex-wrap gap-2">
-              {SOCIALS.map((s) => (
+              {socials.map((s) => (
                 <a
                   key={s.label}
                   href={s.href}
@@ -205,7 +228,9 @@ export function Footer() {
           className="mt-10 border-t pt-6 text-center text-xs leading-6"
           style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
         >
-          {footerText} © {new Date().getFullYear()}
+          {footerText}
+          <br />
+          {copyright}
         </div>
       </div>
     </footer>

@@ -177,10 +177,13 @@ export default async function ArticlePage({
               readingTimeSec: article.readingTimeSec,
             }}
             tashkeelAllowed={tashkeelAllowed}
+            audioEnabled={siteCfg.AUDIO_PLAYER_ENABLED}
           />
 
-          {/* الرفيق الفكري — ناقش أفكار المقال (حصة صارمة من الخادم) */}
-          <DiscussCompanion articleId={article.id} articleTitle={article.title} />
+          {/* الرفيق الفكري — ناقش أفكار المقال (بوابة خادمية + مفتاح سيادة من التكوين) */}
+          {siteCfg.AI_DISCUSS_ENABLED && (
+            <DiscussCompanion articleId={article.id} articleTitle={article.title} />
+          )}
 
           {/* التفاعل والمشاركة */}
           <div className="page-chrome no-print mt-10 border-t pt-8" style={{ borderColor: "var(--border)" }}>

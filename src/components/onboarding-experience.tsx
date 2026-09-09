@@ -71,7 +71,7 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
-const SLIDES = [
+const SLIDES: { glyph: string; title: string; body: string }[] = [
   {
     glyph: "✦",
     title: "مرحبًا بك في «كلام له لازمة»",
@@ -89,9 +89,23 @@ const SLIDES = [
   },
 ];
 
+/** الشرائح الحية: نصوص التكوين السيادي تُعيد كتابة الافتراضيات عند وجودها */
+function buildSlides(cfg: { title: string; text: string }[], threshold: number) {
+  return SLIDES.map((d, i) => ({
+    glyph: d.glyph,
+    title: cfg[i]?.title ?? d.title,
+    /* العتبة الحية تُستبدل موضع «350» في النص الافتراضي إن لم يُقدَّم نص مخصص */
+    body: cfg[i]?.text ?? d.body.replace(/350/g, String(threshold)),
+  }));
+}
+
 export function OnboardingExperience() {
   const { status } = useSession();
   const [stage, setStage] = useState<Stage>("idle");
+  /* التكوين السيادي: نصوص الشرائح الحية + مفتاح التشغيل + العتبة الحية */
+  const [cfgSlides, setCfgSlides] = useState<{ title: string; text: string }[]>([]);
+  const [cfgEnabled, setCfgEnabled] = useState<boolean | null>(null);
+  const [cfgThreshold, setCfgThreshold] = useState(350);
   const [slide, setSlide] = useState(0);
   const [step, setStep] = useState(0);
   const [satisfied, setSatisfied] = useState(false);
@@ -99,6 +113,7 @@ export function OnboardingExperience() {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [dimmed, setDimmed] = useState(true);
   const finishingRef = useRef(false);
+  const slides = buildSlides(cfgSlides, cfgThreshold);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   /* ================= فحص أهلية التهيئة (حقل قاعدة البيانات الحي) ================= */
@@ -106,13 +121,31 @@ export function OnboardingExperience() {
     if (status !== "authenticated") return;
     let alive = true;
     setStage("checking");
-    fetch("/api/onboarding")
-      .then((r) => r.json())
-      .then((d: { needed?: boolean }) => {
-        if (alive) setStage(d.needed ? "slides" : "idle");
-      })
-      .catch(() => {
-        if (alive) setStage("idle");
+    Promise.all([
+      fetch("/api/onboarding").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/public-config").then((r) => r.json()).catch(() => ({})),
+    ])
+      .then(([ob, cfg]) => {
+        if (!alive) return;
+        const c = cfg as {
+          ONBOARDING_ENABLED?: boolean;
+          ONBOARDING_SLIDES?: { title: string; text: string }[];
+          IMPACT_ELDERS_THRESHOLD?: number;
+        };
+        if (c && Array.isArray(c.ONBOARDING_SLIDES) && c.ONBOARDING_SLIDES.length > 0) {
+          setCfgSlides(c.ONBOARDING_SLIDES.slice(0, 3));
+        }
+        if (typeof c?.IMPACT_ELDERS_THRESHOLD === "number" && c.IMPACT_ELDERS_THRESHOLD > 0) {
+          setCfgThreshold(c.IMPACT_ELDERS_THRESHOLD);
+        }
+        if (c && c.ONBOARDING_ENABLED === false) {
+          setCfgEnabled(false);
+          setStage("idle");
+          return;
+        }
+        setCfgEnabled(true);
+        const d = ob as { needed?: boolean };
+        setStage(d.needed ? "slides" : "idle");
       });
     return () => {
       alive = false;
@@ -226,11 +259,11 @@ export function OnboardingExperience() {
 
   /* ================= المرحلة الأولى: نافذة الشرائح ================= */
   if (stage === "slides") {
-    const s = SLIDES[slide];
-    const isLast = slide === SLIDES.length - 1;
+    const s = slides[slide];
+    const isLast = slide === slides.length - 1;
     return (
       <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="ترحيب بالعضو الجديد">
-        <div className="absolute inset-0 backdrop-blur-md bg-zinc-950/80" onClick={isLast ? undefined : () => setSlide((v) => Math.min(SLIDES.length - 1, v + 1))} />
+        <div className="absolute inset-0 backdrop-blur-md bg-zinc-950/80" onClick={isLast ? undefined : () => setSlide((v) => Math.min(slides.length - 1, v + 1))} />
 
         <div
           className="relative w-full max-w-md overflow-hidden rounded-3xl border shadow-lift animate-fade-in"
@@ -261,7 +294,7 @@ export function OnboardingExperience() {
 
             {/* مؤشر التقدم النقطي */}
             <div className="mb-6 mt-2 flex items-center justify-center gap-2">
-              {SLIDES.map((_, i) => (
+              {slides.map((_, i) => (
                 <span
                   key={i}
                   className="h-2 rounded-full transition-all duration-300"

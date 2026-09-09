@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 /**
  * إعادة التحقق الفوري (On-Demand ISR)
  * تستدعيه لوحة التحكم لحظة النشر لتظهر المقالات فورًا دون انتظار 5 دقائق
+ * + إبطال وسوم الكاش (site-config) لحظة تعديل التكوين السيادي
  */
 export async function POST(request: Request) {
   const secret = request.headers.get("x-revalidate-secret");
@@ -16,8 +17,15 @@ export async function POST(request: Request) {
       paths?: string[];
       slug?: string;
       layout?: boolean;
+      tag?: string;
     };
-    const paths = body.paths?.length ? body.paths : ["/"];
+
+    /* إبطال وسم الكاش — تكوين المنصة السيادي أو غيره */
+    if (body.tag) {
+      revalidateTag(body.tag);
+    }
+
+    const paths = body.paths?.length ? body.paths : [];
 
     for (const path of paths) {
       /* layout: إعادة تحقق على مستوى التخطيط المشترك — تُحدّث القائمة

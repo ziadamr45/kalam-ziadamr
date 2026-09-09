@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { analyzeComment } from "@/lib/moderation";
 import { aiModerate } from "@/lib/ai-moderation";
 import { pushAdmins } from "@/lib/push";
-import { awardImpact, IMPACT_POINTS } from "@/lib/impact";
+import { awardImpact } from "@/lib/impact";
+import { getSiteConfigFresh } from "@/lib/site-config";
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -35,6 +36,15 @@ export async function POST(request: Request) {
     const { articleId, content, fp } = body;
     if (!articleId || !content?.trim()) {
       return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
+    }
+
+    /* مفتاح السيادة: قفل الحوار عامًا بإدارة المنصة — باب يُغلق فورًا من التكوين */
+    const flags = await getSiteConfigFresh().catch(() => null);
+    if (flags && !flags.COMMENTS_ENABLED) {
+      return NextResponse.json(
+        { error: "الحوار مغلق مؤقتًا بإدارة المنصة — عد قريبًا" },
+        { status: 403 },
+      );
     }
 
     const rateKey = session.user.id;
@@ -108,7 +118,7 @@ export async function POST(request: Request) {
         impact = await awardImpact({
           userId: session.user.id,
           actionType: "COMMENT_APPROVED",
-          points: IMPACT_POINTS.COMMENT_APPROVED,
+          /* الوزن الحي من التكوين السيادي — الافتراضي +2 */
           articleId,
           dedupKey: `COMMENT:${created.id}`,
           dailyCap: 3,

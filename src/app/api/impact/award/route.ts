@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { awardImpact, IMPACT_POINTS, requiredReadSeconds, AwardResult } from "@/lib/impact";
+import { awardImpact, requiredReadSeconds, AwardResult } from "@/lib/impact";
 import { logEvent, getClientIp } from "@/lib/audit";
 
 /**
@@ -78,10 +78,9 @@ export async function POST(request: Request) {
       result = await awardImpact({
         userId,
         actionType: "READ_COMPLETE",
-        points: IMPACT_POINTS.READ_COMPLETE,
+        /* الوزن والسقف الحيان من التكوين السيادي */
         articleId,
         dedupKey: `READ:${userId}:${articleId}`,
-        dailyCap: 2, // مرة لكل مقال، ومرتان يوميًا كحد أقصى — اقتصاد رصين
       });
     } else if (actionType === "AI_DISCUSS") {
       /* ==================== النقاش الفكري العميق +1 ==================== */
@@ -95,7 +94,6 @@ export async function POST(request: Request) {
       result = await awardImpact({
         userId,
         actionType: "AI_DISCUSS",
-        points: IMPACT_POINTS.AI_DISCUSS,
         articleId,
         dedupKey: `AIDISC:${userId}:${articleId}`,
       });
@@ -104,7 +102,7 @@ export async function POST(request: Request) {
       result = await awardImpact({
         userId,
         actionType: "QUOTE_SHARE",
-        points: IMPACT_POINTS.QUOTE_SHARE,
+        /* الوزن الحي من التكوين السيادي — الافتراضي +1 */
         articleId,
         dailyCap: 2,
       });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { uploadImage, cloudinaryConfigured } from "@/lib/cloudinary";
+import { bumpApiUsage } from "@/lib/api-usage";
 
 /**
  * رفع صور سحابي عبر Cloudinary — السيرفر فقط.
@@ -38,6 +39,9 @@ export async function POST(request: Request) {
     const filename = (form.get("filename") as string) || "image";
     const folder = (form.get("folder") as string) === "account" ? "kalam/accounts" : "kalam/articles";
     const result = await uploadImage(file, filename, folder);
+
+    /* عداد الاستهلاك الرقابي — شاشة الحصص بلوحة الأدمن */
+    void bumpApiUsage("CLOUDINARY_UPLOAD");
 
     return NextResponse.json(result);
   } catch (err) {

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rankForScore, canSendProposals } from "@/lib/ranks";
 import { ELDERS_THRESHOLD } from "@/lib/impact";
+import { getSiteConfigFresh } from "@/lib/site-config";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { pushAdmins } from "@/lib/push";
 
@@ -22,6 +23,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    /* مفتاحا السيادة: إغلاق القناة كليًا + العتبة الحية من التكوين السيادي */
+    const cfg = await getSiteConfigFresh().catch(() => null);
+    const threshold = cfg?.IMPACT_ELDERS_THRESHOLD ?? ELDERS_THRESHOLD;
+    if (cfg && !cfg.PROPOSALS_ENABLED) {
+      return NextResponse.json(
+        { error: "قناة المقترحات مغلقة مؤقتًا بإدارة المنصة" },
+        { status: 403 },
+      );
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { banned: true, impactScore: true, customName: true, name: true },
@@ -32,10 +43,10 @@ export async function POST(request: Request) {
 
     /* بوابة الرصيد الحي — تُحتسب من الرصيد الفعلي المحدث لحظيًا (350 فأكثر)
        لا من نص رتبة مخزّن قد يتأخر — لا تجاوز برمجي ممكن */
-    if (!canSendProposals(rankForScore(user.impactScore)) || user.impactScore < ELDERS_THRESHOLD) {
+    if (!canSendProposals(rankForScore(user.impactScore)) || user.impactScore < threshold) {
       return NextResponse.json(
         {
-          error: `قناة المقترحات الخاصة حصرية لـ«أهل الكلمة» (عتبة ${ELDERS_THRESHOLD} نقطة) — رصيدك الحالي ${user.impactScore}، تابع بناء أثرك`,
+          error: `قناة المقترحات الخاصة حصرية لـ«أهل الكلمة» (عتبة ${threshold} نقطة) — رصيدك الحالي ${user.impactScore}، تابع بناء أثرك`,
         },
         { status: 403 },
       );

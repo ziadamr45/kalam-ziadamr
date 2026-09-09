@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { ArticleCard } from "@/components/article-card";
 import { getLatestArticles, getActiveSections } from "@/lib/db-queries";
+import { getSiteConfig } from "@/lib/site-config";
 import { SECTIONS } from "@/lib/sections";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 
@@ -24,9 +25,10 @@ const PHILOSOPHY = [
 ];
 
 export default async function HomePage() {
-  const [articles, dbSections] = await Promise.all([
+  const [articles, dbSections, cfg] = await Promise.all([
     getLatestArticles(9),
     getActiveSections(),
+    getSiteConfig().catch(() => null),
   ]);
 
   const sections =
@@ -50,13 +52,16 @@ export default async function HomePage() {
           />
           <div className="relative mx-auto max-w-3xl px-4 sm:px-6">
             <h1 className="font-body text-4xl font-bold leading-[1.6] sm:text-5xl sm:leading-[1.6]" style={{ color: "var(--ink)" }}>
-              كلام له لازمة
+              {cfg?.SITE_NAME ?? "كلام له لازمة"}
             </h1>
             <div className="mx-auto my-6 h-[3px] w-24 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
             <p className="font-body text-xl leading-9 sm:text-2xl sm:leading-10" style={{ color: "var(--ink-muted)" }}>
-              مش كل كلام لازم يتقال..
-              <br />
-              بس فيه كلام له لازمة.
+              {(cfg?.WELCOME_MESSAGE ?? "مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.").split("\n").map((line, i) => (
+                <span key={i}>
+                  {i > 0 && <br />}
+                  {line}
+                </span>
+              ))}
             </p>
             <p className="font-ui mt-8 text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
               منصة فكرية ومعرفية عربية.. نقية من الضجيج، غنية بالعمق.

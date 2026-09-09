@@ -9,6 +9,8 @@ import {
   decodeGuestQuota,
   readCookieFromRequest,
 } from "@/lib/ai-quota";
+import { getSiteConfigFresh } from "@/lib/site-config";
+import { bumpApiUsage } from "@/lib/api-usage";
 
 /**
  * ============================================================
@@ -235,6 +237,15 @@ export async function GET(request: Request) {
 /* ==================== رسالة نقاش ==================== */
 export async function POST(request: Request) {
   try {
+    /* مفتاح السيادة: إيقاف المحاورة الذكية كليًا من التكوين — يخفيها الواجهة ويغلق المسار */
+    const flags = await getSiteConfigFresh().catch(() => null);
+    if (flags && !flags.AI_DISCUSS_ENABLED) {
+      return NextResponse.json(
+        { error: "المحاورة الذكية متوقفة مؤقتًا بإدارة المنصة" },
+        { status: 503 },
+      );
+    }
+
     if (!geminiConfigured()) {
       return NextResponse.json(
         { error: "مساعد النقاش غير متاح حاليًا — عُد بعد قليل" },
@@ -331,6 +342,9 @@ export async function POST(request: Request) {
       temperature: 0.75,
       timeoutMs: 25_000,
     });
+
+    /* عداد الاستهلاك الرقابي — يظهر في شاشة الحصص بلوحة الأدمن */
+    void bumpApiUsage("GEMINI_CHAT");
 
     if (reply === "") {
       return NextResponse.json(
