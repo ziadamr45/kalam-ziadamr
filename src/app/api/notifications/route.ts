@@ -4,9 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { recordServerError } from "@/lib/error-alert";
 
 /**
- * جرس إشعارات المستخدم — قائمة الإشعارات الداخلية + عداد غير المقروء.
- * GET: آخر 30 إشعارًا | POST: تعليم إشعارًا أو الكل كمقروء.
+ * واجهة الإشعارات الموحدة — تقرأ من الجدول المركزي Notification
+ * (المنفذ عبر المرسل المركزي lib/notifications/dispatcher.ts):
+ *  GET  — آخر 30 إشعارًا + عدد غير المقروء
+ *  POST — تعليم الكل أو إشعار بعينه كمقروء
  */
+
 export async function GET() {
   try {
     const session = await auth();
@@ -16,12 +19,22 @@ export async function GET() {
     const userId = session.user.id;
 
     const [items, unread] = await Promise.all([
-      prisma.userNotification.findMany({
+      prisma.notification.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 30,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          message: true,
+          link: true,
+          isRead: true,
+          readAt: true,
+          createdAt: true,
+        },
       }),
-      prisma.userNotification.count({ where: { userId, readAt: null } }),
+      prisma.notification.count({ where: { userId, isRead: false } }),
     ]);
 
     return NextResponse.json({ items, unread });
@@ -41,20 +54,26 @@ export async function POST(request: Request) {
     const userId = session.user.id;
 
     if (body.all) {
-      await prisma.userNotification.updateMany({
-        where: { userId, readAt: null },
-        data: { readAt: new Date() },
+      await prisma.notification.updateMany({
+        where: { userId, isRead: false },
+        data: { isRead: true, readAt: new Date() },
       });
     } else if (body.id) {
-      await prisma.userNotification.updateMany({
+      await prisma.notification.updateMany({
         where: { userId, id: body.id },
-        data: { readAt: new Date() },
+        data: { isRead: true, readAt: new Date() },
       });
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    await recordServerError({ err, app: "PUBLIC", path: "/api/notifications", method: "GET", requestId: null, url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
+    await recordServerError({
+      err,
+      app: "PUBLIC",
+      path: "/api/notifications",
+      method: "POST",
+      requestId: request.headers.get("x-kalam-rid"),
+    });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

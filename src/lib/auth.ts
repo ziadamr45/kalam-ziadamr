@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import { dispatchAdminEvent } from "@/lib/notifications/dispatcher";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Adapter } from "next-auth/adapters";
 import { headers } from "next/headers";
@@ -237,6 +238,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         actorLabel: user?.email ?? user?.name ?? null,
         message: isNewUser ? "انضمام قارئ جديد عبر Google" : "تسجيل دخول ناجح عبر Google",
       }).catch(() => {});
+
+      /* حدث سيادة: قارئ جديد انضم — جرس لوحة الأدمن + رنين هواتف الإدارة */
+      if (isNewUser && user?.id) {
+        void dispatchAdminEvent({
+          type: "ADMIN_NEW_USER",
+          title: "قارئ جديد انضم إلى المنصة",
+          message: `${user.name ?? "عضو جديد"} (${user.email ?? "بلا بريد"}) — أهلًا به ضمن مجتمع الفكر والأثر`,
+          link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/users`,
+          pushTag: "new-user",
+          metadata: { userId: user.id, email: user.email ?? null },
+        }).catch(() => {});
+      }
 
       /* الميثاق الأمني السيادي: التقاط الدخول (IP + الجهاز + الموقع التقريبي)
          ومقارنته بالنشاط المعتاد، وإطلاق التنبيه الفوري عند جهاز جديد —

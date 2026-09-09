@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, rateLimitDurable, requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
+import { dispatchAdminEvent } from "@/lib/notifications/dispatcher";
 
 /**
  * الإبلاغ عن تعليق — مسار عام (بلا جلسة) لذا هو أكثر مسار يستهدفه
@@ -57,7 +58,8 @@ export async function POST(request: Request) {
         message: `فخ بلاغات التقط روبوتًا من ${ip}`,
         meta: { ip, path: "/api/comments/report" },
       });
-      return NextResponse.json({ ok: true });
+
+    return NextResponse.json({ ok: true });
     }
 
     /* السبب من القائمة المعتمدة حصرًا — لا نصوص حرة في خانة السبب */
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
 
     const comment = await prisma.comment.findUnique({
       where: { id: commentId },
-      select: { id: true },
+      select: { id: true, article: { select: { title: true, slug: true } } },
     });
     if (!comment) {
       return NextResponse.json({ error: "التعليق غير موجود" }, { status: 404 });
@@ -109,6 +111,17 @@ export async function POST(request: Request) {
         data: { flagged: true },
       });
     }
+
+
+      /* حدث سيادة: بلاغ جديد على تعليق — لوحة الأدمن + رنين هادئ لهواتف الإدارة */
+    void dispatchAdminEvent({
+      type: "ADMIN_COMMENT_REPORTED",
+      title: `بلاغ جديد عن تعليق في مقال: ${(comment.article?.title ?? "بدون عنوان").slice(0, 80)}`,
+      message: `السبب: ${reason}${customDetail ? ` — ${customDetail.slice(0, 100)}` : ""}`,
+      link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments?flagged=1`,
+      pushTag: "comment-reported",
+      metadata: { commentId, reason, articleSlug: comment.article?.slug ?? null },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

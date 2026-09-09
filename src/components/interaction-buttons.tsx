@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
 import { easternDigits } from "@/lib/utils";
+import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 
 /**
  * أزرار الإعجاب/عدم الإعجاب — تحديث تفاؤلي فوري بلا إعادة تحميل،
@@ -23,6 +25,8 @@ export function InteractionSlot({
   const [dislikes, setDislikes] = useState(initialDislikes);
   const [myVote, setMyVote] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const { status } = useSession();
+  const authed = status === "authenticated";
 
   /* جلب تصويت الزائر الحالي من الخادم — الصفحة نفسها مخزّنة ثابتًا (ISR) */
   useEffect(() => {
@@ -45,6 +49,12 @@ export function InteractionSlot({
   const vote = useCallback(
     async (value: 1 | -1) => {
       if (busy) return;
+
+      /* بوابة المصادقة: التصويت للأعضاء المسجلين — نافذة دخول ذكية تحتفظ بالنية */
+      if (!authed) {
+        requestAuth({ kind: "vote-article", payload: { value } });
+        return;
+      }
       setBusy(true);
 
       /* تحديث تفاؤلي فوري */
@@ -88,7 +98,23 @@ export function InteractionSlot({
         setBusy(false);
       }
     },
-    [articleId, busy, dislikes, likes, myVote],
+    [articleId, busy, dislikes, likes, myVote, authed],
+  );
+
+  /* تنفيذ النية المحفوظة — عاد المستخدم من تسجيل الدخول ليصوّت تلقائيًا */
+  const voteRef = useRef(vote);
+  useEffect(() => {
+    voteRef.current = vote;
+  });
+  useEffect(
+    () =>
+      onAuthIntent((intent) => {
+        if (intent.kind === "vote-article") {
+          const v = intent.payload?.value === -1 ? -1 : 1;
+          void voteRef.current(v);
+        }
+      }),
+    [],
   );
 
   return (

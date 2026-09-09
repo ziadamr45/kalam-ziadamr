@@ -67,29 +67,51 @@ export function verificationSealLabel(
   return verificationMeta(type)?.label ?? "حساب موثّق";
 }
 
-/** روابط البطاقة الفكرية الموسعة — المفاتيح المعتمدة فقط */
-export type PersonalLinks = {
-  portfolio?: string;
-  github?: string;
-  devto?: string;
-  linkedin?: string;
+/**
+ * روابط البطاقة الفكرية الموثقة — الحقول الاجتماعية العامة الأساسية
+ * (استبدالًا للحقول التقنية: تُعرض الحقول الممتلئة فقط للقراء)
+ */
+export type VerifiedSocialLinks = {
+  website?: string;
+  facebook?: string;
+  instagram?: string;
+  telegram?: string;
+  whatsapp?: string;
+  youtube?: string;
+  tiktok?: string;
   x?: string;
+  linkedin?: string;
 };
 
-export const PERSONAL_LINK_KEYS = ["portfolio", "github", "devto", "linkedin", "x"] as const;
+export const SOCIAL_LINK_KEYS = [
+  "website",
+  "facebook",
+  "instagram",
+  "telegram",
+  "whatsapp",
+  "youtube",
+  "tiktok",
+  "x",
+  "linkedin",
+] as const;
 
-export const PERSONAL_LINK_LABELS: Record<(typeof PERSONAL_LINK_KEYS)[number], string> = {
-  portfolio: "الموقع الشخصي",
-  github: "GitHub",
-  devto: "dev.to",
+export const SOCIAL_LINK_LABELS: Record<(typeof SOCIAL_LINK_KEYS)[number], string> = {
+  website: "الموقع الشخصي أو المدونة",
+  facebook: "فيسبوك",
+  instagram: "إنستجرام",
+  telegram: "تليجرام",
+  whatsapp: "واتساب",
+  youtube: "قناة يوتيوب",
+  tiktok: "تيك توك",
+  x: "منصة إكس",
   linkedin: "لينكد إن",
-  x: "إكس",
 };
 
-export function parsePersonalLinks(raw: unknown): PersonalLinks {
+/** مطابقة صارمة: https فقط — تُقبل روابط wa.me وt.me وكل الروابط الاجتماعية الآمنة */
+export function parseSocialLinks(raw: unknown): VerifiedSocialLinks {
   if (!raw || typeof raw !== "object") return {};
-  const out: PersonalLinks = {};
-  for (const key of PERSONAL_LINK_KEYS) {
+  const out: VerifiedSocialLinks = {};
+  for (const key of SOCIAL_LINK_KEYS) {
     const v = (raw as Record<string, unknown>)[key];
     if (typeof v === "string" && /^https:\/\/[^\s]+$/i.test(v.trim())) {
       out[key] = v.trim();

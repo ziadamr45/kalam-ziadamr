@@ -3,6 +3,8 @@
 import { SessionProvider } from "next-auth/react";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { OnboardingExperience } from "@/components/onboarding-experience";
+import { AuthGateOverlay } from "@/components/auth-gate";
+import { NotificationToasts } from "@/components/notification-bell";
 
 /* ============================ الثيم ============================ */
 
@@ -80,6 +82,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         {children}
         {/* تجربة التهيئة الموحدة — لا ترسم شيئًا إلا للأعضاء الجدد بعد حسم الجلسة */}
         <OnboardingExperience />
+        {/* بوابة المصادقة الموحدة للتفاعل الفكري — نافذة دخول ذكية تحتفظ بنية التفاعل */}
+        <AuthGateOverlay />
+        {/* التوست اللحظي للإشعارات الواردة أثناء التصفح (SSE) */}
+        <NotificationToasts />
         <ServiceWorkerRegistrar />
       </ThemeProvider>
     </SessionProvider>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
 
 /**
@@ -40,7 +41,7 @@ export function DiscussCompanion({
   const [error, setError] = useState("");
   const [exhausted, setExhausted] = useState(false);
   const [impactNote, setImpactNote] = useState("");
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -87,11 +88,29 @@ export function DiscussCompanion({
   }, [articleId]);
 
   const openDrawer = useCallback(() => {
+    /* بوابة المصادقة: محاورة المقال مع الذكاء الاصطناعي للأعضاء المسجلين حصرًا */
+    if (status === "unauthenticated") {
+      requestAuth({ kind: "ai-chat" });
+      return;
+    }
     restoreSession();
     setOpen(true);
     openRef.current = true;
     fetchQuota();
-  }, [restoreSession, fetchQuota]);
+  }, [restoreSession, fetchQuota, status]);
+
+  /* تنفيذ النية المحفوظة — عاد المستخدم من الدخول ليفتح النقاش تلقائيًا */
+  const openDrawerRef = useRef(openDrawer);
+  useEffect(() => {
+    openDrawerRef.current = openDrawer;
+  });
+  useEffect(
+    () =>
+      onAuthIntent((intent) => {
+        if (intent.kind === "ai-chat") openDrawerRef.current();
+      }),
+    [],
+  );
 
   const closeDrawer = useCallback(() => {
     setOpen(false);

@@ -5,20 +5,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { pushSupported, subscribeToPush, resyncExistingSubscription } from "@/lib/push-client";
 
 /**
- * منظومة إشعارات المستخدمين التفاعلية (المحور الرابع):
- * - سطح المكتب والتابلت: أيقونة جرس ببادج أحمر في الهيدر بجانب صورة الحساب.
- * - الهواتف: بند رئيسي بارز داخل القائمة الجانبية (درج الموبايل) حصريًا —
- *   لا شيء يُضاف للهيدر العلوي تفاديًا للتزاحم وكسر التصميم.
- * - القائمة تعرض الإشعارات الداخلية (تحديثات المنصة، البث الجماهيري،
- *   الإشعارات المخصصة) مع خيار تفعيل إشعارات المتصفح الفورية.
+ * مركز إشعارات القارئ التفاعلي — فوق الجدول المركزي الموحد (Notification):
+ * - جرس تفاعلي بالهيدر بعداد رقمي حي (SSE لحظيًا + تحديث دوري احتياطي).
+ * - نافذة منسدلة بتبويبين: «الكل» و«غير المقروءة» مع تعليم الكل كمقروء.
+ * - مؤشرات أيقونية ملونة بحسب طبيعة الحدث (نجمة الأثر، فقاعة النقاش،
+ *   درع الأمان، ماسة التوثيق، بوق النشر).
+ * - توست لحظي (NotificationToasts) يظهر أسفل الشاشة عند وصول إشعار جديد
+ *   أثناء التصفح — يُنقر فيفتح رابط الحدث.
  */
 
-type NotificationItem = {
+export type NotificationItem = {
   id: string;
+  type: string;
   title: string;
-  body: string;
-  url: string | null;
-  kind: string;
+  message: string;
+  link: string | null;
+  isRead: boolean;
   readAt: string | null;
   createdAt: string;
 };
@@ -37,100 +39,70 @@ function timeAgo(iso: string): string {
   return rtf.format(-Math.floor(hours / 24), "day");
 }
 
-function useNotifications() {
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [unread, setUnread] = useState(0);
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  const [pushState, setPushState] = useState<PushState>("unknown");
-  const [enabling, setEnabling] = useState(false);
+/* ===================== أيقونات ملونة بحسب طبيعة الحدث ===================== */
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/notifications", { cache: "no-store" });
-      if (res.status === 401) {
-        setAuthed(false);
-        setItems([]);
-        setUnread(0);
-        return;
-      }
-      if (!res.ok) return;
-      const data = (await res.json()) as { items: NotificationItem[]; unread: number };
-      setAuthed(true);
-      setItems(data.items ?? []);
-      setUnread(data.unread ?? 0);
-    } catch {
-      /* الشبكة متقطعة — يُعاد المحاولة في الدورة التالية */
-    }
-  }, []);
+type IconMeta = { color: string; label: string };
 
-  const refreshPushState = useCallback(async () => {
-    if (!pushSupported()) {
-      setPushState("unsupported");
-      return;
-    }
-    try {
-      if (Notification.permission === "denied") {
-        setPushState("denied");
-        return;
-      }
-      if (Notification.permission !== "granted") {
-        setPushState("off");
-        return;
-      }
-      const reg = await navigator.serviceWorker.getRegistration();
-      const sub = reg ? await reg.pushManager.getSubscription() : null;
-      setPushState(sub ? "on" : "off");
-    } catch {
-      setPushState("off");
-    }
-  }, []);
+export function typeIconMeta(type: string): IconMeta {
+  if (type.startsWith("ADMIN_")) return { color: "#EA580C", label: "حدث سيادة" };
+  if (type === "SECURITY_NEW_LOGIN") return { color: "#DC2626", label: "أمان" };
+  if (type === "IMPACT_POINTS_EARNED") return { color: "#D97706", label: "أثر" };
+  if (type.startsWith("COMMENT_")) return { color: "#0D9488", label: "نقاش" };
+  if (type === "AHL_AL_KALIMA_UNLOCKED" || type === "USER_VERIFIED" || type.startsWith("VIP_"))
+    return { color: "#1E3A8A", label: "توثيق وتمييز" };
+  return { color: "var(--accent-strong)", label: "تحديث" };
+}
 
-  useEffect(() => {
-    load();
-    refreshPushState();
-    resyncExistingSubscription();
-    const timer = setInterval(load, 60_000);
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [load, refreshPushState]);
-
-  const enablePush = useCallback(async () => {
-    setEnabling(true);
-    try {
-      const result = await subscribeToPush();
-      if (result.ok) setPushState("on");
-      else if (result.reason === "denied") setPushState("denied");
-      else if (result.reason === "unsupported") setPushState("unsupported");
-    } finally {
-      setEnabling(false);
-    }
-  }, []);
-
-  const markAll = useCallback(async () => {
-    setItems((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
-    setUnread(0);
-    await fetch("/api/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ all: true }),
-    }).catch(() => {});
-  }, []);
-
-  const markOne = useCallback(async (id: string) => {
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)));
-    setUnread((u) => Math.max(0, u - 1));
-    await fetch("/api/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    }).catch(() => {});
-  }, []);
-
-  return { items, unread, authed, pushState, enabling, load, enablePush, markAll, markOne };
+function TypeIcon({ type, size = 30 }: { type: string; size?: number }) {
+  const { color } = typeIconMeta(type);
+  const stroke = { stroke: color, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
+  let glyph: React.ReactNode;
+  if (type === "SECURITY_NEW_LOGIN") {
+    glyph = (
+      <>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" {...stroke} />
+        <path d="m9 12 2 2 4-4" {...stroke} />
+      </>
+    );
+  } else if (type === "IMPACT_POINTS_EARNED") {
+    glyph = (
+      <>
+        <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" {...stroke} />
+      </>
+    );
+  } else if (type.startsWith("COMMENT_") || type === "BROADCAST") {
+    glyph = (
+      <>
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z" {...stroke} />
+      </>
+    );
+  } else if (type.startsWith("VIP_") || type === "USER_VERIFIED" || type === "AHL_AL_KALIMA_UNLOCKED") {
+    glyph = (
+      <>
+        <path d="M6 3h12l4 6-10 12L2 9l4-6Z" {...stroke} />
+        <path d="M2 9h20" {...stroke} />
+        <path d="m12 3 3 6-3 12-3-12 3-6Z" {...stroke} />
+      </>
+    );
+  } else {
+    glyph = (
+      <>
+        <circle cx="12" cy="12" r="9" {...stroke} />
+        <path d="M12 8v4l3 2" {...stroke} />
+      </>
+    );
+  }
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-xl"
+      style={{ width: size, height: size, background: `${color}14` }}
+      aria-hidden
+    >
+      <svg width={size - 12} height={size - 12} viewBox="0 0 24 24">
+        {glyph}
+      </svg>
+    </span>
+  );
 }
 
 function BellGlyph({ size = 20 }: { size?: number }) {
@@ -162,6 +134,158 @@ function UnreadBadge({ count }: { count: number }) {
       {count > 99 ? "+99" : count}
     </span>
   );
+}
+
+/* ===================== طبقة البيانات — SSE لحظي + دوري احتياطي ===================== */
+
+function useNotifications() {
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [pushState, setPushState] = useState<PushState>("unknown");
+  const [enabling, setEnabling] = useState(false);
+  const [toast, setToast] = useState<NotificationItem | null>(null);
+
+  const load = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch("/api/notifications", { cache: "no-store" });
+      if (res.status === 401) {
+        setAuthed(false);
+        setItems([]);
+        setUnread(0);
+        return;
+      }
+      if (!res.ok) return;
+      const data = (await res.json()) as { items: NotificationItem[]; unread: number };
+      setAuthed(true);
+      setItems(data.items ?? []);
+      setUnread(data.unread ?? 0);
+    } catch {
+      /* الشبكة متقطعة — يُعاد المحاولة في الدورة التالية */
+    }
+  }, []);
+
+  const refreshPushState = useCallback(async (): Promise<void> => {
+    if (!pushSupported()) {
+      setPushState("unsupported");
+      return;
+    }
+    try {
+      if (Notification.permission === "denied") {
+        setPushState("denied");
+        return;
+      }
+      if (Notification.permission !== "granted") {
+        setPushState("off");
+        return;
+      }
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      setPushState(sub ? "on" : "off");
+    } catch {
+      setPushState("off");
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    refreshPushState();
+    resyncExistingSubscription();
+
+    /* التحديث الدوري الاحتياطي + عند العودة للتبويب */
+    const timer = setInterval(load, 60_000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+
+    /* القناة اللحظية SSE — تحديث العداد والتوست بلا إعادة تحميل */
+    let es: EventSource | null = null;
+    let reconnect: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+    const connect = (): void => {
+      if (disposed) return;
+      try {
+        es = new EventSource("/api/notifications/stream");
+        es.onmessage = (ev: MessageEvent<string>) => {
+          try {
+            const data = JSON.parse(ev.data) as {
+              unread?: number;
+              isNewItem?: boolean;
+              latest?: { id: string; title: string; message: string; link: string | null; type: string };
+              heartbeat?: boolean;
+            };
+            if (typeof data.unread === "number") setUnread(data.unread);
+            if (data.isNewItem && data.latest) {
+              load();
+              setToast({
+                id: data.latest.id,
+                type: data.latest.type,
+                title: data.latest.title,
+                message: data.latest.message,
+                link: data.latest.link,
+                isRead: false,
+                readAt: null,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          } catch {
+            /* نبض تالف — يتجاهل */
+          }
+        };
+        es.onerror = () => {
+          es?.close();
+          es = null;
+          if (!disposed) reconnect = setTimeout(connect, 5_000);
+        };
+      } catch {
+        /* SSE غير مدعوم — الدورة الاحتياطية تغطي */
+      }
+    };
+    connect();
+
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      es?.close();
+      if (reconnect) clearTimeout(reconnect);
+    };
+  }, [load, refreshPushState]);
+
+  const enablePush = useCallback(async (): Promise<void> => {
+    setEnabling(true);
+    try {
+      const result = await subscribeToPush();
+      if (result.ok) setPushState("on");
+      else if (result.reason === "denied") setPushState("denied");
+      else if (result.reason === "unsupported") setPushState("unsupported");
+    } finally {
+      setEnabling(false);
+    }
+  }, []);
+
+  const markAll = useCallback(async (): Promise<void> => {
+    setItems((prev) => prev.map((n) => ({ ...n, isRead: true, readAt: n.readAt ?? new Date().toISOString() })));
+    setUnread(0);
+    await fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    }).catch(() => {});
+  }, []);
+
+  const markOne = useCallback(async (id: string): Promise<void> => {
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: n.readAt ?? new Date().toISOString() } : n)));
+    setUnread((u) => Math.max(0, u - 1));
+    await fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => {});
+  }, []);
+
+  const dismissToast = useCallback((): void => setToast(null), []);
+
+  return { items, unread, authed, pushState, enabling, toast, load, enablePush, markAll, markOne, dismissToast };
 }
 
 function PushEnableRow({
@@ -238,55 +362,132 @@ function NotificationList({
   }
   return (
     <ul className="space-y-1">
-      {items.map((n) => (
-        <li key={n.id}>
-          {n.url ? (
-            <Link
-              href={n.url}
-              onClick={() => {
-                if (!n.readAt) onMarkOne(n.id);
-                onNavigate?.();
-              }}
-              className="block rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--accent-soft)]"
-            >
+      {items.map((n) => {
+        const body = n.message.length > 110 ? `${n.message.slice(0, 110)}…` : n.message;
+        const inner = (
+          <span className="flex items-start gap-2.5">
+            <TypeIcon type={n.type} />
+            <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
-                {!n.readAt && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />}
+                {!n.isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />}
                 <span className="text-xs font-bold leading-6" style={{ color: "var(--ink)" }}>
                   {n.title}
                 </span>
               </span>
               <span className="mt-0.5 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                {n.body.length > 110 ? `${n.body.slice(0, 110)}…` : n.body}
+                {body}
               </span>
               <span className="mt-1 block text-[10px]" style={{ color: "var(--ink-muted)" }}>
                 {timeAgo(n.createdAt)}
               </span>
-            </Link>
-          ) : (
-            <button
-              onClick={() => {
-                if (!n.readAt) onMarkOne(n.id);
-                onNavigate?.();
-              }}
-              className="block w-full rounded-xl px-3 py-2.5 text-right transition-colors hover:bg-[var(--accent-soft)]"
-            >
-              <span className="flex items-center gap-1.5">
-                {!n.readAt && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />}
-                <span className="text-xs font-bold leading-6" style={{ color: "var(--ink)" }}>
-                  {n.title}
-                </span>
-              </span>
-              <span className="mt-0.5 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                {n.body.length > 110 ? `${n.body.slice(0, 110)}…` : n.body}
-              </span>
-              <span className="mt-1 block text-[10px]" style={{ color: "var(--ink-muted)" }}>
-                {timeAgo(n.createdAt)}
-              </span>
-            </button>
-          )}
-        </li>
-      ))}
+            </span>
+          </span>
+        );
+        const cls = "block rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--accent-soft)]";
+        return (
+          <li key={n.id}>
+            {n.link ? (
+              <Link
+                href={n.link}
+                onClick={() => {
+                  if (!n.isRead) onMarkOne(n.id);
+                  onNavigate?.();
+                }}
+                className={cls}
+              >
+                {inner}
+              </Link>
+            ) : (
+              <button
+                onClick={() => {
+                  if (!n.isRead) onMarkOne(n.id);
+                  onNavigate?.();
+                }}
+                className={`${cls} w-full text-right`}
+              >
+                {inner}
+              </button>
+            )}
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+/* ===================== التوست اللحظي — وصول إشعار أثناء التصفح ===================== */
+
+export function NotificationToasts() {
+  const { toast, dismissToast, markOne } = useNotifications();
+  const [stack, setStack] = useState<NotificationItem[]>([]);
+  const seen = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!toast || seen.current.has(toast.id)) return;
+    seen.current.add(toast.id);
+    setStack((prev) => [toast, ...prev].slice(0, 3));
+    const timer = setTimeout(() => {
+      setStack((prev) => prev.filter((t) => t.id !== toast.id));
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  if (stack.length === 0) return null;
+  return (
+    <div className="pointer-events-none fixed bottom-4 left-4 z-[90] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
+      {stack.map((t) => {
+        const body = t.message.length > 90 ? `${t.message.slice(0, 90)}…` : t.message;
+        const card = (
+          <span className="flex items-start gap-2.5">
+            <TypeIcon type={t.type} size={26} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-bold leading-5" style={{ color: "var(--ink)" }}>
+                {t.title}
+              </span>
+              <span className="block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                {body}
+              </span>
+            </span>
+          </span>
+        );
+        const cls = "pointer-events-auto block rounded-2xl border p-3 shadow-lift animate-fade-in transition-transform hover:-translate-y-0.5";
+        return (
+          <div
+            key={t.id}
+            className={cls}
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+            role="status"
+          >
+            {t.link ? (
+              <Link
+                href={t.link}
+                onClick={() => {
+                  markOne(t.id);
+                  setStack((prev) => prev.filter((x) => x.id !== t.id));
+                }}
+              >
+                {card}
+              </Link>
+            ) : (
+              <button
+                className="w-full text-right"
+                onClick={() => setStack((prev) => prev.filter((x) => x.id !== t.id))}
+              >
+                {card}
+              </button>
+            )}
+          </div>
+        );
+      })}
+      <button
+        onClick={dismissToast}
+        className="pointer-events-auto self-start text-[10px] font-bold"
+        style={{ color: "var(--ink-muted)" }}
+        aria-label="إخفاء التنبيهات"
+      >
+        إخفاء
+      </button>
+    </div>
   );
 }
 
@@ -294,6 +495,7 @@ function NotificationList({
 export function NotificationBell() {
   const { items, unread, authed, pushState, enabling, enablePush, markAll, markOne } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"all" | "unread">("all");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -311,6 +513,8 @@ export function NotificationBell() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  const shown = tab === "all" ? items : items.filter((n) => !n.isRead);
 
   return (
     <div className="relative" ref={ref}>
@@ -346,8 +550,38 @@ export function NotificationBell() {
               </button>
             )}
           </div>
+
+          {/* التبويبان: الكل / غير المقروءة */}
+          <div
+            className="mx-1 mb-1 grid grid-cols-2 gap-1 rounded-xl p-1"
+            style={{ background: "var(--bg-soft)" }}
+            role="tablist"
+          >
+            {(
+              [
+                ["all", `الكل${items.length ? ` (${items.length})` : ""}`],
+                ["unread", `غير المقروءة${unread ? ` (${unread})` : ""}`],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+                className="rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all"
+                style={
+                  tab === key
+                    ? { background: "var(--surface)", color: "var(--accent-strong)", boxShadow: "var(--shadow-soft)" }
+                    : { color: "var(--ink-muted)" }
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div className="max-h-80 overflow-y-auto overscroll-contain">
-            <NotificationList items={items} onMarkOne={markOne} onNavigate={() => setOpen(false)} />
+            <NotificationList items={shown} onMarkOne={markOne} onNavigate={() => setOpen(false)} />
           </div>
           <div className="mt-1 border-t pt-2" style={{ borderColor: "var(--border)" }}>
             <PushEnableRow authed={authed} pushState={pushState} enabling={enabling} onEnable={enablePush} />
@@ -362,6 +596,9 @@ export function NotificationBell() {
 export function DrawerNotifications() {
   const { items, unread, authed, pushState, enabling, enablePush, markAll, markOne } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"all" | "unread">("all");
+
+  const shown = tab === "all" ? items : items.filter((n) => !n.isRead);
 
   return (
     <div>
@@ -394,9 +631,29 @@ export function DrawerNotifications() {
           style={{ background: "var(--bg-soft)", borderColor: "var(--border)" }}
         >
           <div className="flex items-center justify-between px-2 py-1.5">
-            <span className="text-xs font-bold" style={{ color: "var(--ink)" }}>
-              آخر التحديثات والتنبيهات
-            </span>
+            <div className="grid grid-cols-2 gap-1" role="tablist">
+              {(
+                [
+                  ["all", "الكل"],
+                  ["unread", "غير المقروءة"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={tab === key}
+                  onClick={() => setTab(key)}
+                  className="rounded-lg px-3 py-1 text-[11px] font-bold"
+                  style={
+                    tab === key
+                      ? { background: "var(--surface)", color: "var(--accent-strong)" }
+                      : { color: "var(--ink-muted)" }
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             {unread > 0 && (
               <button
                 onClick={markAll}
@@ -408,7 +665,7 @@ export function DrawerNotifications() {
             )}
           </div>
           <div className="max-h-72 overflow-y-auto overscroll-contain">
-            <NotificationList items={items} onMarkOne={markOne} />
+            <NotificationList items={shown} onMarkOne={markOne} />
           </div>
           <div className="mt-1 border-t pt-2" style={{ borderColor: "var(--border)" }}>
             <PushEnableRow authed={authed} pushState={pushState} enabling={enabling} onEnable={enablePush} />

@@ -244,6 +244,19 @@ export async function GET(request: Request) {
 /* ==================== رسالة نقاش ==================== */
 export async function POST(request: Request) {
   try {
+    /* بوابة المصادقة الإلزامية: محاورة الذكاء الاصطناعي للأعضاء المسجلين حصرًا
+       (مطابقة شروط الاستخدام — الزائر يقرأ فقط، ودرع الـIP يبقى طبقة ثانية) */
+    const gateSession = await auth();
+    if (!gateSession?.user?.id) {
+      return NextResponse.json(
+        {
+          error: "محاورة الذكاء الاصطناعي متاحة للأعضاء المسجلين — سجّل دخولك لفتح النقاش.",
+          code: "LOGIN_REQUIRED",
+        },
+        { status: 401 },
+      );
+    }
+
     /* درع الحصة الأول: سقف IP عام 20 رسالة/دقيقة — حتى لو دوّر المهاجم
        الهويات بجلسات وكوكي متعددة يصطدم بهذا الجدار قبل استنزاف Gemini */
     if (!rateLimit(`discuss:${requestIp(request)}`, 20, 60_000).ok) {

@@ -5,7 +5,7 @@ import { rankForScore, canSendProposals } from "@/lib/ranks";
 import { ELDERS_THRESHOLD } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
 import { logEvent, getClientIp } from "@/lib/audit";
-import { pushAdmins } from "@/lib/push";
+import { dispatchAdminEvent } from "@/lib/notifications/dispatcher";
 import { userHasPrivilege } from "@/lib/vip";
 
 /**
@@ -95,12 +95,14 @@ export async function POST(request: Request) {
       ip: getClientIp(request),
     }).catch(() => {});
 
-    /* المقترحات الفكرية تستحق وصولاً فوريًا لهاتف صاحب المنصة */
-    void pushAdmins({
-      title: `مقترح فكري من ${user.customName || user.name || "قارئ"} (أهل الكلمة)`,
-      body: `${title} — ${content.slice(0, 100)}${content.length > 100 ? "…" : ""}`,
-      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/proposals`,
-      tag: "user-proposal",
+    /* حدث سيادة: مقترح جديد في قناة أهل الكلمة — جرس اللوحة + بث فوري (بادج الأدمن) */
+    void dispatchAdminEvent({
+      type: "ADMIN_NEW_PROPOSAL",
+      title: `مقترح فكري جديد ورد من عضو أهل الكلمة: ${user.customName || user.name || "قارئ"}`,
+      message: `${title} — ${content.slice(0, 100)}${content.length > 100 ? "…" : ""}`,
+      link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/proposals`,
+      pushTag: "user-proposal",
+      metadata: { proposalId: proposal.id },
     });
 
     return NextResponse.json({ ok: true, id: proposal.id });

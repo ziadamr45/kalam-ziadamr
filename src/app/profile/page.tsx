@@ -11,7 +11,7 @@ import { ProfileEditor } from "@/components/profile-editor";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
 import { parsePrivileges, PRIVILEGE_LABELS, roleLabelAr } from "@/lib/vip";
-import { verificationSealColor, verificationSealLabel, parsePersonalLinks } from "@/lib/verification-meta";
+import { verificationSealColor, verificationSealLabel, parseSocialLinks } from "@/lib/verification-meta";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 import { displayName } from "@/lib/identity";
 import { IMPACT_ACTION_LABEL, ImpactLogButton } from "@/components/impact-log-modal";
@@ -63,7 +63,8 @@ export default async function ProfilePage() {
       vipGrantedAt: true,
       vipPrivileges: true,
       extendedBio: true,
-      personalLinks: true,
+      verifiedSocialLinks: true,
+      notificationPrefs: true,
       _count: { select: { comments: true, savedArticles: true, interactions: true } },
     },
   });
@@ -280,7 +281,7 @@ export default async function ProfilePage() {
             <div className="h-2 overflow-hidden rounded-full" style={{ background: "var(--bg-soft)" }}>
               <div
                 className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${Math.max(4, progress)}%`, background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }}
+                style={{ width: `${Math.min(100, Math.max(0, progress))}%`, background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }}
               />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -299,8 +300,8 @@ export default async function ProfilePage() {
               ))}
             </div>
             <p className="mt-3 text-[11px] leading-6" style={{ color: "var(--ink-muted)" }}>
-              {meta.hint}. تُكتسب النقاط بالقراءة المتأنية (+10)، والنقاش العميق (+5)،
-              والتعليق الهادف (+15)، والاقتباس المشارَك (+3)، وتمييز التحرير لتعليقك (+30).
+              {meta.hint}. تُكتسب النقاط بالقراءة المتأنية (+1)، والنقاش العميق مع الذكاء الاصطناعي (+1)،
+              والتعليق المعتمد (+2)، وإعجاب قارئ بتعليقك (+1)، وتمييز التحرير لتعليقك (+10).
             </p>
           </div>
         </section>
@@ -315,7 +316,13 @@ export default async function ProfilePage() {
               customImage: user.customImage,
               bio: user.bio,
               extendedBio: user.extendedBio,
-              personalLinks: parsePersonalLinks(user.personalLinks),
+              verifiedSocialLinks: parseSocialLinks(user.verifiedSocialLinks),
+              notificationPrefs: (() => {
+                const p = user.notificationPrefs as { pushNewArticles?: boolean; impactAndReplies?: boolean } | null;
+                return p
+                  ? { pushNewArticles: p.pushNewArticles !== false, impactAndReplies: p.impactAndReplies !== false }
+                  : null;
+              })(),
             }}
             isVerified={user.isVerified}
           />

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { pushUsers } from "@/lib/push";
+import { dispatchBroadcast } from "@/lib/notifications/dispatcher";
 
 /**
  * مهمة Vercel Cron الأصلية — النشر المجدول التلقائي (المحور الثاني).
@@ -75,31 +75,16 @@ export async function GET(request: Request) {
       }
     }
 
-    /* جرس المقال الجديد: إشعار داخلي لكل المسجلين غير الموقوفين + ويب بوش فوري —
-       محمي كليًا: فشل الإشعارات لا يمس النشر أبدًا */
+    /* إشعار «مقال جديد» عبر المرسل المركزي الموحد: جرس لكل المسجلين غير الموقوفين
+       + بث ويب فوري مع احترام تفضيلات بث المقالات لكل قارئ — محمي كليًا */
     try {
-      const users = await prisma.user.findMany({
-        where: { banned: false },
-        select: { id: true },
-      });
       for (const article of due) {
-        const url = `/article/${article.slug}`;
-        if (users.length > 0) {
-          await prisma.userNotification.createMany({
-            data: users.map((u) => ({
-              userId: u.id,
-              title: `مقال جديد: ${article.title}`,
-              body: "حديثًا على منصة كلام له لازمة — اقرأه الآن قبل أن تلهث عيناك.",
-              url,
-              kind: "UPDATE",
-            })),
-          });
-        }
-        await pushUsers({
+        await dispatchBroadcast({
+          type: "ARTICLE_PUBLISHED",
           title: `مقال جديد: ${article.title}`,
-          body: "حديثًا على منصة كلام له لازمة",
-          url,
-          tag: "new-article",
+          message: "حديثًا على منصة كلام له لازمة — اقرأه الآن قبل أن تلهث عيناك.",
+          link: `/article/${article.slug}`,
+          pushTag: "new-article",
         });
       }
     } catch {

@@ -5,9 +5,10 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { analyzeComment } from "@/lib/moderation";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
+import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { formatArabicDate } from "@/lib/utils";
 import { RankBadge } from "@/components/rank-badge";
-import { PERSONAL_LINK_LABELS, type PersonalLinks } from "@/lib/verification-meta";
+import { SOCIAL_LINK_LABELS, type VerifiedSocialLinks } from "@/lib/verification-meta";
 
 type PublicComment = {
   id: string;
@@ -29,7 +30,7 @@ type PublicComment = {
   /* إطار التعليق الفخم — لون شارة الكاتب عند امتلاكه الصلاحية */
   authorAccent?: string | null;
   /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
-  authorCard?: { extendedBio: string | null; links: PersonalLinks } | null;
+  authorCard?: { extendedBio: string | null; links: VerifiedSocialLinks } | null;
   /* تثبيت ذاتي من كاتبه */
   selfPinned?: boolean;
   likes: number;
@@ -49,7 +50,17 @@ function VerifiedSeal({ color, title }: { color: string; title: string }) {
 }
 
 /* روابط البطاقة الغنية بأيقونات نصية رصينة — المفاتيح المعتمدة فقط */
-const CARD_LINK_ORDER = ["portfolio", "github", "devto", "linkedin", "x"] as const;
+const CARD_LINK_ORDER = [
+  "website",
+  "facebook",
+  "instagram",
+  "telegram",
+  "whatsapp",
+  "youtube",
+  "tiktok",
+  "x",
+  "linkedin",
+] as const;
 
 const REPORT_REASONS = ["إساءة أو لغة غير لائقة", "إعلان أو سبام", "مخالفة القيم", "سبب آخر"];
 const CUSTOM_REASON = "سبب آخر";
@@ -215,11 +226,24 @@ export function CommentsSection({
     }
   };
 
+  /* تنفيذ النية المحفوظة — عاد المستخدم من الدخول ليشارك في الحوار */
+  useEffect(
+    () =>
+      onAuthIntent((intent) => {
+        if (intent.kind !== "comment") return;
+        document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.setTimeout(() => {
+          document.querySelector<HTMLTextAreaElement>("#comments form textarea")?.focus();
+        }, 700);
+      }),
+    [],
+  );
+
   /* التصويت على تعليق — الزائر يُستقبَل بردّ هادئ يوجهه للبوابة */
   const vote = async (commentId: string, value: "LIKE" | "DISLIKE") => {
+    /* بوابة المصادقة: التصويت للأعضاء — نافذة دخول ذكية تحتفظ بنية التفاعل */
     if (!loggedIn) {
-      setVoteNotice("سجّل الدخول أولًا لتفعيل التفاعل — الإعجاب وعدم الإعجاب للقارئين المسجلين فقط.");
-      window.setTimeout(() => setVoteNotice(null), 6000);
+      requestAuth({ kind: "vote-comment" });
       return;
     }
     setVoteBusy(commentId);
@@ -352,14 +376,15 @@ export function CommentsSection({
           <p className="font-body leading-8" style={{ color: "var(--ink-muted)" }}>
             سجّل الدخول بحساب Google للمشاركة في الحوار — للحفاظ على مساحة نقية بلا مزعجين.
           </p>
-          <Link
-            href={`/auth/login?callback=${encodeURIComponent(`/article/${articleSlug ?? ""}#comments`)}`}
+          <button
+            type="button"
+            onClick={() => requestAuth({ kind: "comment" })}
             className="flex shrink-0 items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold shadow-soft transition-all hover:scale-105"
             style={{ background: "var(--surface)", color: "var(--ink)", borderColor: "var(--border)" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.97 10.97 0 0 0 1 12c0 1.77.43 3.45 1.18 4.94l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52Z"/></svg>
             دخول بحساب Google
-          </Link>
+          </button>
         </div>
       )}
 
@@ -528,7 +553,7 @@ export function CommentsSection({
                             className="rounded-full border px-3 py-1 text-[11px] font-bold transition-all hover:-translate-y-0.5"
                             style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
                           >
-                            {PERSONAL_LINK_LABELS[k]}
+                            {SOCIAL_LINK_LABELS[k]}
                           </a>
                         );
                       })}

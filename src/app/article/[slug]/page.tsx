@@ -15,7 +15,7 @@ import { InteractionSlot } from "@/components/interaction-buttons";
 import { displayName, displayAvatar } from "@/lib/identity";
 import { requiredReadSeconds } from "@/lib/impact";
 import { hasPrivilege } from "@/lib/vip";
-import { verificationSealColor, verificationSealLabel, parsePersonalLinks } from "@/lib/verification-meta";
+import { verificationSealColor, verificationSealLabel, parseSocialLinks } from "@/lib/verification-meta";
 import {
   getArticleBySlug,
   safeDecodeSlug,
@@ -243,7 +243,7 @@ export default async function ArticlePage({
                   c.user?.isVerified && c.user
                     ? {
                         extendedBio: c.user.extendedBio ?? null,
-                        links: parsePersonalLinks(c.user.personalLinks),
+                        links: parseSocialLinks(c.user.verifiedSocialLinks),
                       }
                     : null,
                 selfPinned: Boolean(c.selfPinnedAt),

@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { pushUsers } from "@/lib/push";
+import { dispatchNotification } from "@/lib/notifications/dispatcher";
 
 /**
  * محرك أمن الحسابات السيادي — يلتقط كل دخول Google ويقارنه بالنشاط المعتاد:
@@ -159,35 +159,6 @@ function securityEmailHtml(input: {
 </body></html>`;
 }
 
-async function sendSecurityEmail(to: string, html: string, subject: string): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return false; // القناة غير مفعلَّة بعد — التنبيه يصل عبر القناتين الأخريين
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.SECURITY_EMAIL_FROM ?? "كلام له لازمة <onboarding@resend.dev>",
-        to: [to],
-        subject,
-        html,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (res.ok) {
-      /* عداد الاستهلاك الرقابي — شاشة الحصص بلوحة الأدمن */
-      const { bumpApiUsage } = await import("@/lib/api-usage");
-      void bumpApiUsage("RESEND_EMAIL");
-    }
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 /* ===================== التقاط الدخول — النقطة المركزية ===================== */
 
 const DEVICE_LABELS: Record<string, string> = {
@@ -250,7 +221,7 @@ export async function captureLoginSecurity(input: {
 
     if (!isNewDevice) return; // نشاط معتاد — توثيق صامت بلا إزعاج
 
-    /* ==================== التنبيه الأمني الفوري ==================== */
+    /* ==================== التنبيه الأمني الفوري — عبر المرسل المركزي ==================== */
     const deviceLabel = `${DEVICE_LABELS[ua.deviceType] ?? "جهاز"} — ${ua.browser} على ${ua.os}`;
     const locationLabel = [geo.city, geo.region, geo.country].filter(Boolean).join("، ") || "غير معروف";
     const whenLabel = new Intl.DateTimeFormat("ar-EG", {
@@ -258,28 +229,29 @@ export async function captureLoginSecurity(input: {
       timeStyle: "short",
       timeZone: "Africa/Cairo",
     }).format(row.createdAt);
-    const subject = "[كلام له لازمة] إشعار أمان: تسجيل دخول جديد لحسابك";
     const title = "إشعار أمان: تسجيل دخول جديد لحسابك";
-    const body = `رصدنا دخولًا من جهاز جديد: ${deviceLabel} — من ${locationLabel} — ${whenLabel}. إن لم تكن أنت، فأمّن حساب Google الخاص بك فورًا.`;
+    const message = `رصدنا دخولًا من جهاز جديد: ${deviceLabel} — من ${locationLabel} — ${whenLabel}. إن لم تكن أنت، فأمّن حساب Google الخاص بك فورًا.`;
+
+    /* مصفوفة الإرسال: دخول من جهاز جديد = بريد إلكتروني فوري إلزامي + بث ويب + جرس.
+       البريد الأمني لا يخضع لتفضيلات القارئ أبدًا (forceEmail + forceInApp). */
+    const result = await dispatchNotification({
+      userId: input.userId,
+      type: "SECURITY_NEW_LOGIN",
+      title,
+      message,
+      link: "/me",
+      pushTag: "security-login",
+      metadata: { device: deviceLabel, location: locationLabel, ip: input.ip ?? null, when: whenLabel },
+      channels: "ALL",
+      forceEmail: true,
+      forceInApp: true,
+      emailHtml: input.email ? securityEmailHtml({ deviceLabel, locationLabel, whenLabel }) : null,
+    }).catch(() => ({ inApp: false, pushSent: false, emailSent: false, adminPushed: false }));
+
     const channels: string[] = [];
-
-    /* 1) البريد الأمني الفوري (يُفعَّل بوجود RESEND_API_KEY) */
-    if (input.email && (await sendSecurityEmail(input.email, securityEmailHtml({ deviceLabel, locationLabel, whenLabel }), subject))) {
-      channels.push("email");
-    }
-
-    /* 2) إشعار ويب فوري لكل أجهزة المستخدم + 3) إشعار داخلي بالجرس */
-    const [pushed] = await Promise.all([
-      pushUsers({ title, body, url: "/me", tag: "security-login" }, { userIds: [input.userId] }),
-      prisma.userNotification
-        .create({
-          data: { userId: input.userId, title, body, url: "/me", kind: "TARGETED" },
-          select: { id: true },
-        })
-        .catch(() => ({ id: null })),
-    ]);
-    if (pushed > 0) channels.push("push");
-    if (pushed >= 0) channels.push("inapp");
+    if (result.emailSent) channels.push("email");
+    if (result.pushSent) channels.push("push");
+    if (result.inApp) channels.push("inapp");
 
     await prisma.loginLog
       .update({ where: { id: row.id }, data: { notified: true, channels: channels.join(",") } })

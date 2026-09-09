@@ -3,7 +3,11 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayName, validateCustomName, validateBio } from "@/lib/identity";
-import { PERSONAL_LINK_KEYS, PERSONAL_LINK_LABELS, type PersonalLinks } from "@/lib/verification-meta";
+import {
+  SOCIAL_LINK_KEYS,
+  SOCIAL_LINK_LABELS,
+  type VerifiedSocialLinks,
+} from "@/lib/verification-meta";
 
 /**
  * ============================================================
@@ -22,7 +26,8 @@ type Initial = {
   customImage: string | null;
   bio: string | null;
   extendedBio?: string | null;
-  personalLinks?: PersonalLinks;
+  verifiedSocialLinks?: VerifiedSocialLinks;
+  notificationPrefs?: { pushNewArticles: boolean; impactAndReplies: boolean } | null;
 };
 
 export function ProfileEditor({
@@ -48,7 +53,12 @@ export function ProfileEditor({
   const [dragging, setDragging] = useState(false);
   /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
   const [extendedBio, setExtendedBio] = useState(initial.extendedBio ?? "");
-  const [links, setLinks] = useState<PersonalLinks>(initial.personalLinks ?? {});
+  const [links, setLinks] = useState<VerifiedSocialLinks>(initial.verifiedSocialLinks ?? {});
+  /* مركز تفضيلات الإشعارات — بريد الأمان إلزامي دائمًا ولا يُعرض كخيار */
+  const [prefs, setPrefs] = useState({
+    pushNewArticles: initial.notificationPrefs?.pushNewArticles !== false,
+    impactAndReplies: initial.notificationPrefs?.impactAndReplies !== false,
+  });
 
   const currentAvatar = imageUrl || googleImage;
   const nameError = name.trim() ? validateCustomName(name) : null;
@@ -59,7 +69,9 @@ export function ProfileEditor({
     (imageUrl ?? "") !== (initial.customImage ?? "") ||
     (isVerified && extendedBio.trim() !== (initial.extendedBio ?? "")) ||
     (isVerified &&
-      PERSONAL_LINK_KEYS.some((k) => (links[k] ?? "") !== (initial.personalLinks?.[k] ?? "")));
+      SOCIAL_LINK_KEYS.some((k) => (links[k] ?? "") !== (initial.verifiedSocialLinks?.[k] ?? ""))) ||
+    prefs.pushNewArticles !== (initial.notificationPrefs?.pushNewArticles !== false) ||
+    prefs.impactAndReplies !== (initial.notificationPrefs?.impactAndReplies !== false);
 
   const uploadAvatar = async (file: File) => {
     setMessage(null);
@@ -104,12 +116,13 @@ export function ProfileEditor({
           customName: name.trim() || null,
           customImage: imageUrl,
           bio: bio.trim() || null,
+          notificationPrefs: prefs,
           ...(isVerified
             ? {
                 extendedBio: extendedBio.trim() || null,
-                personalLinks: PERSONAL_LINK_KEYS.some((k) => links[k]?.trim())
+                verifiedSocialLinks: SOCIAL_LINK_KEYS.some((k) => links[k]?.trim())
                   ? Object.fromEntries(
-                      PERSONAL_LINK_KEYS.filter((k) => links[k]?.trim()).map((k) => [k, links[k]?.trim()]),
+                      SOCIAL_LINK_KEYS.filter((k) => links[k]?.trim()).map((k) => [k, links[k]?.trim()]),
                     )
                   : null,
               }
@@ -309,13 +322,13 @@ export function ProfileEditor({
               </p>
 
               <p className="mb-2 mt-4 block text-xs font-bold" style={{ color: "var(--ink)" }}>
-                روابطك الشخصية
+                روابطك الاجتماعية العامة
               </p>
               <div className="grid gap-2.5 sm:grid-cols-2">
-                {PERSONAL_LINK_KEYS.map((k) => (
+                {SOCIAL_LINK_KEYS.map((k) => (
                   <div key={k}>
                     <label htmlFor={`link-${k}`} className="mb-1 block text-[11px] font-bold" style={{ color: "var(--ink-muted)" }}>
-                      {PERSONAL_LINK_LABELS[k]}
+                      {SOCIAL_LINK_LABELS[k]}
                     </label>
                     <input
                       id={`link-${k}`}
@@ -339,6 +352,57 @@ export function ProfileEditor({
               </p>
             </div>
           )}
+
+          {/* ==================== مركز تفضيلات الإشعارات — لكل القراء ==================== */}
+          <div
+            className="rounded-2xl border p-4"
+            style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
+          >
+            <p className="mb-1 text-xs font-bold" style={{ color: "var(--ink)" }}>
+              مركز تفضيلات الإشعارات
+            </p>
+            <p className="mb-3 text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+              اختر ما يصلك ومن أين. بريد التنبيهات الأمنية إلزامي لحماية حسابك ولا يمكن إلغاؤه.
+            </p>
+            <ul className="space-y-2.5">
+              <li>
+                <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
+                  <input
+                    type="checkbox"
+                    className="mt-1.5 accent-[var(--accent)]"
+                    checked={prefs.pushNewArticles}
+                    onChange={(e) => {
+                      setPrefs((p) => ({ ...p, pushNewArticles: e.target.checked }));
+                      setMessage(null);
+                    }}
+                  />
+                  <span>إشعارات المتصفح للمقالات الجديدة.</span>
+                </label>
+              </li>
+              <li>
+                <label className="flex items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
+                  <input type="checkbox" className="mt-1.5" checked disabled aria-label="بريد التنبيهات الأمنية إلزامي" />
+                  <span style={{ color: "var(--ink-muted)" }}>
+                    إشعارات البريد الإلكتروني للتنبيهات الأمنية (إلزامية مسبقًا ولا يمكن إلغاؤها).
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
+                  <input
+                    type="checkbox"
+                    className="mt-1.5 accent-[var(--accent)]"
+                    checked={prefs.impactAndReplies}
+                    onChange={(e) => {
+                      setPrefs((p) => ({ ...p, impactAndReplies: e.target.checked }));
+                      setMessage(null);
+                    }}
+                  />
+                  <span>إشعارات الأثر والردود على التعليقات.</span>
+                </label>
+              </li>
+            </ul>
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button

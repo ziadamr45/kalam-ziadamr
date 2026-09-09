@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeComment } from "@/lib/moderation";
 import { aiModerate } from "@/lib/ai-moderation";
-import { pushAdmins } from "@/lib/push";
+import { dispatchAdminEvent } from "@/lib/notifications/dispatcher";
 import { awardImpact } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
 import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
@@ -183,14 +183,16 @@ export async function POST(request: Request) {
       }
     }
 
-    /* إشعار ويب فوري لهاتف صاحب المنصة — تعليق جديد وارد يحتاج مراجعة */
-    void pushAdmins({
+    /* حدث سيادة: تعليق جديد وارد — سجل موحد لحساب المالك (جرس اللوحة) + رنين هواتف الإدارة */
+    void dispatchAdminEvent({
+      type: "ADMIN_NEW_COMMENT",
       title: `تعليق جديد وارد على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
-      body: `${session.user.name ?? "قارئ"}: ${trimmed.slice(0, 110)}${
+      message: `${session.user.name ?? "قارئ"}: ${trimmed.slice(0, 110)}${
         trimmed.length > 110 ? "…" : ""
       }`,
-      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments`,
-      tag: "new-comment",
+      link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments`,
+      pushTag: "new-comment",
+      metadata: { articleId, authorEmail: session.user.email ?? null },
     });
 
     return NextResponse.json({

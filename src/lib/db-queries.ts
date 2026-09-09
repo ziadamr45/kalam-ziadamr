@@ -192,7 +192,7 @@ export async function getApprovedComments(articleId: string) {
             vipPrivileges: true,
             /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
             extendedBio: true,
-            personalLinks: true,
+            verifiedSocialLinks: true,
           },
         },
       },

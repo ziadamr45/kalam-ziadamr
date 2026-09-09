@@ -6,7 +6,7 @@ import { analyzeComment } from "@/lib/moderation";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { recordServerError } from "@/lib/error-alert";
 import { parsePrivileges } from "@/lib/vip";
-import { PERSONAL_LINK_KEYS, type PersonalLinks } from "@/lib/verification-meta";
+import { SOCIAL_LINK_KEYS, type VerifiedSocialLinks } from "@/lib/verification-meta";
 
 /**
  * ============================================================
@@ -31,7 +31,8 @@ export async function PUT(request: Request) {
       customImage?: string | null;
       bio?: string | null;
       extendedBio?: string | null;
-      personalLinks?: PersonalLinks | null;
+      verifiedSocialLinks?: VerifiedSocialLinks | null;
+      notificationPrefs?: { pushNewArticles?: boolean; impactAndReplies?: boolean } | null;
     };
 
     const data: {
@@ -39,7 +40,8 @@ export async function PUT(request: Request) {
       customImage?: string | null;
       bio?: string | null;
       extendedBio?: string | null;
-      personalLinks?: PersonalLinks | null;
+      verifiedSocialLinks?: VerifiedSocialLinks | null;
+      notificationPrefs?: { pushNewArticles?: boolean; impactAndReplies?: boolean } | null;
     } = {};
 
     /* ==================== الاسم المعروض ==================== */
@@ -108,13 +110,26 @@ export async function PUT(request: Request) {
     }
 
     /* ==================== الروابط الشخصية (المفاتيح المعتمدة فقط) ==================== */
-    if (body.personalLinks !== undefined) {
-      if (body.personalLinks === null) {
-        data.personalLinks = null;
+    if (body.notificationPrefs !== undefined) {
+      /* مركز تفضيلات الإشعارات — كائن مغلق المفاتيح (بريد الأمان خارج التحكم عمدًا) */
+      const raw = body.notificationPrefs;
+      if (raw === null) {
+        data.notificationPrefs = null;
       } else {
-        const clean: PersonalLinks = {};
-        for (const key of PERSONAL_LINK_KEYS) {
-          const v = (body.personalLinks as Record<string, unknown>)[key];
+        data.notificationPrefs = {
+          pushNewArticles: raw.pushNewArticles !== false,
+          impactAndReplies: raw.impactAndReplies !== false,
+        };
+      }
+    }
+
+    if (body.verifiedSocialLinks !== undefined) {
+      if (body.verifiedSocialLinks === null) {
+        data.verifiedSocialLinks = null;
+      } else {
+        const clean: VerifiedSocialLinks = {};
+        for (const key of SOCIAL_LINK_KEYS) {
+          const v = (body.verifiedSocialLinks as Record<string, unknown>)[key];
           if (typeof v !== "string" || !v.trim()) continue;
           const url = v.trim();
           if (!/^https:\/\/[^\s]{4,300}$/i.test(url)) {
@@ -125,7 +140,7 @@ export async function PUT(request: Request) {
           }
           clean[key] = url;
         }
-        data.personalLinks = Object.keys(clean).length > 0 ? clean : null;
+        data.verifiedSocialLinks = Object.keys(clean).length > 0 ? clean : null;
       }
     }
 
@@ -136,7 +151,7 @@ export async function PUT(request: Request) {
     const updated = await prisma.user.update({
       where: { id: userId },
       data: data as never,
-      select: { customName: true, customImage: true, bio: true, extendedBio: true, personalLinks: true },
+      select: { customName: true, customImage: true, bio: true, extendedBio: true, verifiedSocialLinks: true, notificationPrefs: true },
     });
 
     logEvent({

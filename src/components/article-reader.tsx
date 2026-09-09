@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
 import { ArticleBlocks } from "@/components/markdown-blocks";
@@ -125,7 +126,8 @@ export function ArticleReader({
   const handleSaveCloud = useCallback(async () => {
     if (saveBusy || cloudSaved) return;
     if (!loggedIn) {
-      window.location.href = `/auth/login?callback=/article/${encodeURIComponent(article.slug)}`;
+      /* بوابة المصادقة: الحفظ السحابي للأعضاء — نافذة ذكية تحتفظ بنية الحفظ */
+      requestAuth({ kind: "save" });
       return;
     }
     setSaveBusy(true);
@@ -139,6 +141,19 @@ export function ArticleReader({
     } catch {}
     setSaveBusy(false);
   }, [article.id, article.slug, cloudSaved, saveBusy, loggedIn]);
+
+  /* تنفيذ النية المحفوظة — عاد المستخدم من الدخول ليُكمل الحفظ تلقائيًا */
+  const saveCloudRef = useRef(handleSaveCloud);
+  useEffect(() => {
+    saveCloudRef.current = handleSaveCloud;
+  });
+  useEffect(
+    () =>
+      onAuthIntent((intent) => {
+        if (intent.kind === "save") void saveCloudRef.current();
+      }),
+    [],
+  );
 
   /* حفظ لقطة محلية على هذا الجهاز — للقراءة دون اتصال */
   const handleSaveLocal = useCallback(async () => {

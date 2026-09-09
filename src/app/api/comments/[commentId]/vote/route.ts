@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { pushUsers } from "@/lib/push";
+import { dispatchNotification } from "@/lib/notifications/dispatcher";
 import { logEvent } from "@/lib/audit";
 import { awardImpact } from "@/lib/impact";
 import { recordServerError } from "@/lib/error-alert";
@@ -111,24 +111,19 @@ export async function POST(
     const likes = grouped.find((g) => g.value === "LIKE")?._count.value ?? 0;
     const dislikes = grouped.find((g) => g.value === "DISLIKE")?._count.value ?? 0;
 
-    /* إشعار صاحب التعليق — تفاعل جديد فقط (لا إشعار عند الإلغاء) */
+    /* إشعار صاحب التعليق — المرسل المركزي الموحد (تفاعل جديد فقط، لا إشعار عند الإلغاء) */
     if (notifyOwner && comment.userId) {
       const voterName = voter.customName?.trim() || voter.name || "قارئ";
-      const verb = value === "LIKE" ? "أبدى إعجابه" : "أبدى عدم إعجابه";
-      const title = "تفاعل جديد مع تعليقك";
-      const bodyText = `${voterName} ${verb} بتعليقك على مقال «${comment.article.title.slice(0, 60)}»`;
-      const url = `/article/${comment.article.slug}#comments`;
-
-      await prisma.userNotification
-        .create({
-          data: { userId: comment.userId, title, body: bodyText, url, kind: "TARGETED" },
-        })
-        .catch(() => {});
-
-      /* إشعار ويب فوري لهاتف صاحب التعليق — زينة لا تعطل أبدًا */
-      void pushUsers({ title, body: bodyText, url, tag: "comment-vote" }, {
-        userIds: [comment.userId],
-      });
+      void dispatchNotification({
+        userId: comment.userId,
+        type: "COMMENT_LIKED",
+        title: "تفاعل جديد مع تعليقك",
+        message: `${voterName} أبدى إعجابه بتعليقك على مقال «${comment.article.title.slice(0, 60)}»`,
+        link: `/article/${comment.article.slug}#comments`,
+        pushTag: "comment-vote",
+        metadata: { commentId, value, voterId: session.user.id },
+        channels: "ALL",
+      }).catch(() => {});
     }
 
     logEvent({

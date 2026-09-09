@@ -59,32 +59,35 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    /* بوابة المصادقة الإلزامية: التصويت على المقال للأعضاء المسجلين حصرًا
+       (مطابقة شروط الاستخدام — الزائر يقرأ فقط ولا يولّد أثرًا).
+       الفحص أولًا قبل قراءة أي مدخلات — لا يقبل المسار أي طلب مجهول. */
+    const session = await auth();
+    const userId = session?.user?.id || null;
+    if (!userId) {
+      return NextResponse.json(
+        { error: "التصويت متاح فقط للأعضاء المسجلين.", code: "LOGIN_REQUIRED" },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json()) as {
       articleId?: string;
       value?: number;
       fp?: string;
     };
 
-    const { articleId, value, fp } = body;
+    const { articleId, value } = body;
     if (!articleId || (value !== 1 && value !== -1)) {
       return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
     }
 
-    const session = await auth();
-    const userId = session?.user?.id || null;
-
-    if (!userId && !fp) {
-      return NextResponse.json({ error: "هوية الزائر مطلوبة" }, { status: 400 });
-    }
-
-    if (!allow(userId || fp || "anon")) {
+    if (!allow(userId)) {
       return NextResponse.json({ error: "طلبات كثيرة جدًا، مهّل قليلًا" }, { status: 429 });
     }
 
-    /* تفرد التصويت: حسب المستخدم أو بصمة الزائر */
-    const where = userId
-      ? { articleId_userId: { articleId, userId } }
-      : { articleId_visitorFp: { articleId, visitorFp: fp as string } };
+    /* تفرد التصويت: بهوية العضو المسجل حصرًا */
+    const where = { articleId_userId: { articleId, userId } } as const;
 
     const existing = await prisma.interaction.findUnique({ where });
 
@@ -103,7 +106,7 @@ export async function POST(request: Request) {
           articleId,
           value,
           userId,
-          visitorFp: userId ? null : fp,
+          visitorFp: null,
         },
       });
       myVote = value;
