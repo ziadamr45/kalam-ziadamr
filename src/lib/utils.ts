@@ -40,3 +40,9 @@ export function wordCount(text: string): number {
   const stripped = text.replace(/[\u064B-\u0652\u0670\u0640]/g, "");
   return stripped.split(/\s+/).filter(Boolean).length;
 }
+
+/** تجريد الحركات والتشكيل والمد من النص — لمطابقة الكلمات بالفهرس
+ *  بين النص المشكول (المسموع) والنص المجرد (المعروض) في المزامنة الصوتية */
+export function stripDiacritics(s: string): string {
+  return s.replace(/[\u064B-\u0652\u0653-\u0658\u0670\u0640]/g, "");
+}

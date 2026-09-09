@@ -11,7 +11,8 @@ import {
   saveOfflineArticle,
   isArticleSaved,
 } from "@/lib/indexeddb";
-import { parseBlocks, blockWordCount, type Block } from "@/lib/content-blocks";
+import { parseBlocks, blockWordCount, blockPlainWords, type Block } from "@/lib/content-blocks";
+import { stripDiacritics } from "@/lib/utils";
 import type { OfflineArticle } from "@/types/offline";
 
 type ReaderArticle = {
@@ -84,6 +85,60 @@ export function ArticleReader({
   );
   /* مفتاح إعادة مسح عناصر الكلمات في المشغل عند أي تغيير في العرض */
   const syncKey = `${article.id}:${tashkeel ? "t" : "p"}:${blocks.length}:${source.length}`;
+
+  /* ============ المواءمة الصوتية الموحدة (Normalized Audio-Word Mapping) ============
+     التوقيتات مولدة من النص المشكول، والعرض قد يكون مجردًا — المطابقة إذن
+     بالفهرس الرقمي (wordIndex) عبر تجريد الحركات من الطرفين، لا بالسلاسل
+     ولا بالأطوال: الكلمة رقم (5) في المشكول تلائم رقم (5) في المجرد تلقائيًا،
+     وحتى لو اختلفت العدّة (دمج/تفريق AI) تعيد المحاذاة الجشعة بناء السلم. */
+  const audioMaps = useMemo(() => {
+    if (!audioWords || audioWords.length === 0) return null;
+    const audio = audioWords.map((w) => stripDiacritics(w.w));
+    const gather = (src: string) => {
+      const arr: string[] = [];
+      try {
+        for (const b of parseBlocks(src)) arr.push(...blockPlainWords(b));
+      } catch {}
+      return arr;
+    };
+    const tash = gather(article.contentWithTashkeel || article.content).map(stripDiacritics);
+    const plain = gather(article.content).map(stripDiacritics);
+    const align = (from: string[], to: string[]) => {
+      const map = new Array<number>(from.length).fill(-1);
+      let j = 0;
+      let matched = 0;
+      for (let i = 0; i < from.length; i++) {
+        const a = from[i];
+        if (!a) {
+          map[i] = j > 0 ? j - 1 : 0;
+          continue;
+        }
+        let k = j;
+        while (k < to.length && to[k] !== a) k++;
+        if (k < to.length) {
+          map[i] = k;
+          j = k + 1;
+          matched++;
+        } else {
+          map[i] = j > 0 ? j - 1 : 0;
+        }
+      }
+      return { map, rate: from.length ? matched / from.length : 0 };
+    };
+    const at = align(audio, tash);
+    const ap = align(audio, plain);
+    /* اختيار المصدر الأقرب لتوقيتات الصوت — التشكيل مولد منها أصلًا */
+    const useTash = at.rate >= ap.rate;
+    const toDisplay = useTash ? at.map : ap.map; // فهرس الصوت ← فهرس العرض
+    const toAudio = new Array<number>((useTash ? tash : plain).length).fill(-1); // فهرس العرض ← الصوت
+    toDisplay.forEach((d, i) => {
+      if (d >= 0 && toAudio[d] < 0) toAudio[d] = i;
+    });
+    return { toDisplay, toAudio, displayIsTashkeel: useTash };
+  }, [audioWords, article.content, article.contentWithTashkeel]);
+
+  /* عند العرض على نفس مصدر الصوت المواءمة هوية — ولا حاجة لأي تحويل */
+  const needsMap = audioMaps !== null && audioMaps.displayIsTashkeel !== tashkeel;
 
   /* الحفظ: منظومة مزدوجة مستقلة — مزامنة سحابية في الحساب + لقطة محلية على الجهاز،
      ولكلٍّ منفذُه الخاص وقائمته المفهومة (لا دمج عشوائي بين القناتين) */
@@ -356,16 +411,19 @@ export function ArticleReader({
               )}
             </div>
 
-            {/* تحميل المقال كـ PDF — ورقة طباعة قارئة بهوامش متزنة يولّدها المتصفح */}
-            <button
-              onClick={() => window.print()}
+            {/* تحميل المقال PDF — الوثيقة التحريرية الرسمية الصالحة للطباعة:
+                ترويسة سيادية + غلاف متناسق + رمز QR + تذييل بأرقام الصفحات،
+                مولدة خادميًا خاليةً من أي عناصر واجهة تفاعلية */}
+            <a
+              href={`/api/articles/${encodeURIComponent(article.slug)}/pdf`}
+              download
               className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}
-              title="نسخة منسقة بعناية للطباعة أو الحفظ PDF"
+              title="نسخة ورقية رسمية منسقة للطباعة والحفظ المكتبي"
             >
               <span className="sm:hidden">PDF</span>
               <span className="hidden sm:inline">تحميل كـ PDF</span>
-            </button>
+            </a>
 
             {/* مولد الاقتباسات */}
             <div className="flex min-h-11 items-center">
@@ -433,6 +491,8 @@ export function ArticleReader({
             cues={Array.isArray(article.audioCues) ? (article.audioCues as { t: number; id: string }[]) : null}
             blocks={blocks.map((b) => ({ id: b.id, words: blockWordCount(b) }))}
             words={audioWords}
+            highlightMap={needsMap ? (audioMaps?.toDisplay ?? null) : null}
+            jumpMap={needsMap ? (audioMaps?.toAudio ?? null) : null}
             slug={article.slug}
             syncKey={syncKey}
             title={article.title}

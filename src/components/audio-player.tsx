@@ -31,6 +31,8 @@ export function AudioPlayer({
   cues,
   blocks,
   words,
+  highlightMap,
+  jumpMap,
   slug,
   syncKey,
   title,
@@ -42,6 +44,10 @@ export function AudioPlayer({
   cues: Cue[] | null;
   blocks: BlockMeta[];
   words?: WordTiming[] | null;
+  /* خريطة فهرس الصوت ← فهرس العرض (مواءمة تجريد التشكيل) — null = هوية */
+  highlightMap?: number[] | null;
+  /* خريطة فهرس العرض ← فهرس الصوت للقفز بالنقر على كلمة */
+  jumpMap?: number[] | null;
   slug: string;
   syncKey?: string;
   title?: string;
@@ -109,10 +115,34 @@ export function AudioPlayer({
 
   useEffect(() => {
     wordElsRef.current = null;
-    activeWordRef.current = -1;
     return () => {
       wordElsRef.current = null;
     };
+  }, [syncKey]);
+
+  /* أحدث نسخ من الدوال للمزامنة — تُستدعى من تأثير syncKey دون إعادة تشغيله
+     (تُعرّف بعد إعلان setActiveWord وactiveWordIndex أسفل لتفادي TDZ) */
+
+  /* ============ تطهير التحديد الشبحي عند تبديل وضع التشكيل ============
+     أي تظليل ثابت معلّق يُزال فورًا من الـ DOM، ثم يستدعى
+     requestAnimationFrame لإعادة رسم كبسولة التظليل النشطة على
+     موقع الكلمة الحالية الصحيح وفق أبعاد النص الجديدة */
+  useEffect(() => {
+    document
+      .querySelectorAll(".audio-word-active")
+      .forEach((n) => n.classList.remove("audio-word-active"));
+    document
+      .querySelectorAll("#article-body .audio-active")
+      .forEach((n) => n.classList.remove("audio-active"));
+    activeWordRef.current = -1;
+
+    const audio = audioRef.current;
+    if (audio && !audio.paused && !audio.ended) {
+      const raf = requestAnimationFrame(() => {
+        setActiveWordRef.current(activeWordIndexRef.current(audio.currentTime));
+      });
+      return () => cancelAnimationFrame(raf);
+    }
   }, [syncKey]);
 
   const wordElements = useCallback((): Map<number, Element> => {
@@ -143,7 +173,12 @@ export function AudioPlayer({
       }
       activeWordRef.current = idx;
 
-      const el = idx >= 0 ? els.get(idx) : null;
+      /* المواءمة الموحدة: فهرس الصوت ← فهرس كلمة العرض المعروضة
+         (المشكول أو المجرد) — بلا مطابقة نصية ولا اعتماد على الأطوال */
+      const domIdx =
+        idx >= 0 && highlightMap ? (highlightMap[idx] ?? -1) : idx;
+
+      const el = domIdx >= 0 ? els.get(domIdx) : null;
       if (el) {
         el.classList.add("audio-word-active");
         const blockEl = el.closest("[id^='blk-']");
@@ -163,7 +198,7 @@ export function AudioPlayer({
         document.querySelectorAll("#article-body .audio-active").forEach((n) => n.classList.remove("audio-active"));
       }
     },
-    [follow, wordElements],
+    [follow, highlightMap, wordElements],
   );
 
   /** البحث الثنائي عن الكلمة المقروءة الآن */
@@ -188,6 +223,17 @@ export function AudioPlayer({
     },
     [wordList],
   );
+
+  /* أحدث نسخ من الدوال للمزامنة — يستدعيهما تأثير تطهير syncKey أعلاه
+     عبر المراجع دون إعادة تشغيله عند كل تغيّر تبعية */
+  const setActiveWordRef = useRef(setActiveWord);
+  useEffect(() => {
+    setActiveWordRef.current = setActiveWord;
+  }, [setActiveWord]);
+  const activeWordIndexRef = useRef(activeWordIndex);
+  useEffect(() => {
+    activeWordIndexRef.current = activeWordIndex;
+  }, [activeWordIndex]);
 
   /* ==================== وضع الفقرات (توافقية الرفع اليدوي) ==================== */
 
@@ -336,14 +382,16 @@ export function AudioPlayer({
     [duration],
   );
 
-  /* القفز بالنقر على أي كلمة داخل المقال */
+  /* القفز بالنقر على أي كلمة داخل المقال — الفهرس المعروض يُترجم
+     إلى فهرس الصوت عبر خريطة المواءمة (تجريد التشكيل) قبل القفز */
   useEffect(() => {
     if (!wordList) return;
     const handler = (e: Event) => {
       const target = (e.target as HTMLElement | null)?.closest?.("[data-wi]") as HTMLElement | null;
       if (!target) return;
-      const wi = Number(target.dataset.wi);
-      const word = wordList[wi];
+      const domIdx = Number(target.dataset.wi);
+      const audioIdx = jumpMap ? (jumpMap[domIdx] ?? -1) : domIdx;
+      const word = audioIdx >= 0 ? wordList[audioIdx] : undefined;
       const audio = audioRef.current;
       if (!word || !audio) return;
       if (!audio.src) {
@@ -360,7 +408,7 @@ export function AudioPlayer({
     const body = document.getElementById("article-body");
     body?.addEventListener("click", handler);
     return () => body?.removeEventListener("click", handler);
-  }, [resolveSrc, wordList]);
+  }, [jumpMap, resolveSrc, wordList]);
 
   /* تنظيف الإبراز عند التفكيك */
   useEffect(() => {

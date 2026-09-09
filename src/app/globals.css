@@ -691,10 +691,21 @@ body.immersion .page-chrome {
     background: #ffffff !important;
   }
 
-  /* كل واجهة المنصة تختفي — يبقى المقال وحده بورقة نظيفة */
+  /* كل واجهة المنصة تختفي — يبقى المقال وحده بورقة نظيفة:
+     الهيدر والفوتر والتنقل ومشغل الصوت وكبسولات التشكيل وأزرار
+     القراءة المتزامنة والتعليقات — كلها مستبعدة من الورق */
   .no-print,
   .site-header,
-  .site-footer {
+  .site-footer,
+  header,
+  footer,
+  nav,
+  .audio-player-capsule,
+  .audio-controls,
+  .bottom-toolbar,
+  .interactive-sync-hint,
+  .comments-section,
+  .action-buttons {
     display: none !important;
   }
 
@@ -714,7 +725,14 @@ body.immersion .page-chrome {
     display: block !important;
   }
 
-  /* منع كسر الكتل الفكرية بين الصفحات */
+  /* منع كسر الكتل الفكرية والفقرات والصور بنصف الصفحة */
+  p,
+  blockquote,
+  img {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
   .quran-block,
   .hadith-block,
   blockquote {

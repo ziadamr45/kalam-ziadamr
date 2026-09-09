@@ -17,6 +17,24 @@ const lsKey = (slug: string) => `kalam_progress:${slug}`;
 
 type SavedProgress = { pct: number; scrollY: number; at: number };
 
+/**
+ * حساب التقدم المحدد بحاوية المتن (Container-Bound) — نفس معادلة شريط التقدم:
+ * 0% عند لمس أعلى المتن قمة النافذة، و100% عند بلوغ أسفل آخر فقرة أسفل الشاشة،
+ * بلا احتساب التعليقات أو المقترحات أو الفوتر.
+ */
+function calculateProgress(): number {
+  const content = document.getElementById("article-body");
+  if (!content) return 0;
+  const rect = content.getBoundingClientRect();
+  const windowHeight = window.innerHeight;
+  const totalContentHeight = rect.height;
+  const scrolled = windowHeight - rect.top;
+
+  if (scrolled <= 0) return 0;
+  if (scrolled >= totalContentHeight) return 100;
+  return Math.min(100, Math.max(0, Math.round((scrolled / totalContentHeight) * 100)));
+}
+
 export default function ContinueReadingBadge({ slug, articleId }: { slug: string; articleId: string }) {
   const { status } = useSession();
   const [resume, setResume] = useState<SavedProgress | null>(null);
@@ -25,6 +43,8 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
   const [dismissed, setDismissed] = useState(false);
 
   const latest = useRef({ pct: 0, scrollY: 0 });
+  /* أقصى تقدم محقق — لا تراجع أبدًا حتى لو صعد القارئ للغلاف أو العنوان */
+  const maxMilestone = useRef({ pct: 0, scrollY: 0 });
   const lastSaved = useRef(0);
   const resumed = useRef(false);
 
@@ -34,6 +54,8 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       const raw = window.localStorage.getItem(lsKey(slug));
       if (!raw) return;
       const saved = JSON.parse(raw) as SavedProgress;
+      /* أعلى نقطة محفوظة هي نقطة انطلاق الميلستون — لا يبدأ التقدم من الصفر */
+      maxMilestone.current = { pct: saved.pct ?? 0, scrollY: saved.scrollY ?? 0 };
       if (saved.pct >= 5 && saved.pct <= 95 && Date.now() - (saved.at ?? 0) < 90 * 24 * 3600 * 1000) {
         setResume(saved);
       }
@@ -49,6 +71,12 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
           if (prev && prev.at >= (d.savedAt ?? 0)) return prev;
           return { pct: d.progress, scrollY: d.scrollY ?? 0, at: d.savedAt ?? Date.now() };
         });
+        /* قاعدة البيانات أصدق إن كانت أحدث — ترفع الميلستون لا تخفضه */
+        maxMilestone.current = {
+          pct: Math.max(maxMilestone.current.pct, d.progress),
+          scrollY:
+            d.progress > maxMilestone.current.pct ? (d.scrollY ?? maxMilestone.current.scrollY) : maxMilestone.current.scrollY,
+        };
       })
       .catch(() => {});
   }, [slug, articleId, status]);
@@ -59,14 +87,21 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
 
     const measure = () => {
       ticking = false;
-      const doc = document.documentElement;
-      const max = doc.scrollHeight - window.innerHeight;
       const y = Math.max(0, window.scrollY);
-      const pct = max > 0 ? Math.min(100, Math.round((y / max) * 100)) : 0;
+      const pct = calculateProgress();
       latest.current = { pct, scrollY: y };
       setProgress(pct);
 
-      /* بلوغ النهاية يمحو موضع الاستئناف — المقال أُقرأ */
+      /* تثبيت أقصى تقدم محقق (Highest Milestone Preservation):
+         savedMax = Math.max(currentProgress, previousMaxProgress) —
+         الرجوع للغلاف أو العنوان لا يمحو ما سبق (44% تبقى 44%)،
+         وموضع الاستئناف هو موضع نقطة القمة لا موضع التراجع */
+      if (pct > maxMilestone.current.pct) {
+        maxMilestone.current = { pct, scrollY: y };
+      }
+      const savedMax = maxMilestone.current;
+
+      /* بلوغ نهاية المتن يمحو موضع الاستئناف — المقال أُقرأ */
       if (pct >= 96) {
         try {
           window.localStorage.removeItem(lsKey(slug));
@@ -76,22 +111,22 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
         return;
       }
 
-      /* حفظ محلي خفيف كل تغيّر 2% (بلا إزعاج للتخزين) */
+      /* حفظ محلي خفيف: أقصى تقدم كل تغيّر 2% — لا نُسجل التراجع أبدًا */
       try {
         const prev = JSON.parse(window.localStorage.getItem(lsKey(slug)) ?? "null") as SavedProgress | null;
-        if (!prev || Math.abs(prev.pct - pct) >= 2 || (!resumed.current && pct >= 5)) {
-          const payload: SavedProgress = { pct, scrollY: y, at: Date.now() };
-          if (pct >= 2) window.localStorage.setItem(lsKey(slug), JSON.stringify(payload));
+        if (!prev || Math.abs(prev.pct - savedMax.pct) >= 2 || (!resumed.current && savedMax.pct >= 5)) {
+          const payload: SavedProgress = { pct: savedMax.pct, scrollY: savedMax.scrollY, at: Date.now() };
+          if (savedMax.pct >= 2) window.localStorage.setItem(lsKey(slug), JSON.stringify(payload));
         }
       } catch {}
 
-      /* مزامنة قاعدة البيانات للمسجلين — كل 20 ثانية كحد أقصى */
-      if (status === "authenticated" && Date.now() - lastSaved.current > 20000 && pct >= 2) {
+      /* مزامنة قاعدة البيانات للمسجلين — كل 20 ثانية كحد أقصى، بأقصى قيمة */
+      if (status === "authenticated" && Date.now() - lastSaved.current > 20000 && savedMax.pct >= 2) {
         lastSaved.current = Date.now();
         fetch("/api/progress", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ articleId, progress: pct, scrollY: y }),
+          body: JSON.stringify({ articleId, progress: savedMax.pct, scrollY: savedMax.scrollY }),
           keepalive: true,
         }).catch(() => {});
       }
@@ -104,10 +139,10 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       }
     };
 
-    /* حفظ أخير عند مغادرة الصفحة */
+    /* حفظ أخير عند مغادرة الصفحة — بأقصى تقدم محقق لا اللحظي */
     const onLeave = () => {
       if (status !== "authenticated") return;
-      const { pct, scrollY } = latest.current;
+      const { pct, scrollY } = maxMilestone.current;
       if (pct < 2 || pct >= 96) return;
       fetch("/api/progress", {
         method: "POST",

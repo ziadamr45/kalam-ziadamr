@@ -13,6 +13,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "2.11.3",
     "@prisma/client": "6.19.3",
+    "@react-pdf/renderer": "^4.9.0",
     "idb-keyval": "6.2.2",
     "jose": "5.9.6",
     "next": "15.5.25",

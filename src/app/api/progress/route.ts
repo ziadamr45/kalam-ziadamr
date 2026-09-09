@@ -26,8 +26,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
     }
 
-    const progress = Math.max(0, Math.min(100, Math.round(body.progress ?? 0)));
-    const scrollY = Math.max(0, Math.round(body.scrollY ?? 0));
+    const incoming = Math.max(0, Math.min(100, Math.round(body.progress ?? 0)));
+    const incomingY = Math.max(0, Math.round(body.scrollY ?? 0));
+
+    /* تثبيت أقصى تقدم محقق (Highest Milestone Preservation):
+       الرجوع لأعلى الصفحة لا يمحو ما سبق — نقطة الاستئناف هي أعلى
+       نسبة وصل إليها القارئ بين المحفوظ والوارد، وموضع التمرير
+       المحفوظ هو موضع نقطة القمة تلك لا موضع التراجع. */
+    const existing = await prisma.readingProgress.findUnique({
+      where: { userId_articleId: { userId, articleId: body.articleId } },
+      select: { progress: true, scrollY: true },
+    });
+    const progress = Math.max(existing?.progress ?? 0, incoming);
+    const scrollY = (existing?.progress ?? 0) > incoming ? (existing?.scrollY ?? incomingY) : incomingY;
 
     await prisma.readingProgress.upsert({
       where: { userId_articleId: { userId, articleId: body.articleId } },

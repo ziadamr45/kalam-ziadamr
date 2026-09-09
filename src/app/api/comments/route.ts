@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +11,25 @@ import { getSiteConfigFresh } from "@/lib/site-config";
 import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
 import { hasPrivilege } from "@/lib/vip";
+
+/**
+ * قراءة حية لمفتاح «اعتماد التعليقات تلقائيًا» من لوحة الأدمن —
+ * المصدر الأول: SystemSetting «system_settings» (مفتاح لوحة التحكم المباشر)،
+ * والمصدر الاحتياطي: مفتاح SiteConfig بنفس الاسم (توافق مع المواصفة).
+ * قراءة طازة في كل طلب — التبديل من اللوحة يسري فورًا بلا كاش ولا نشر.
+ */
+async function readAutoApprove(): Promise<boolean> {
+  try {
+    const row = await prisma.systemSetting.findUnique({ where: { key: "system_settings" } });
+    const v = (row?.value ?? null) as { AUTO_APPROVE_COMMENTS?: boolean } | null;
+    if (v && typeof v.AUTO_APPROVE_COMMENTS === "boolean") return v.AUTO_APPROVE_COMMENTS;
+  } catch {}
+  try {
+    const cfg = await prisma.siteConfig.findFirst({ where: { key: "AUTO_APPROVE_COMMENTS" } });
+    return (cfg?.value as boolean | undefined) === true;
+  } catch {}
+  return false;
+}
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -125,7 +145,7 @@ export async function POST(request: Request) {
 
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      select: { id: true, title: true, commentsEnabled: true },
+      select: { id: true, title: true, slug: true, commentsEnabled: true },
     });
     if (!article) {
       return NextResponse.json({ error: "المقال غير موجود" }, { status: 404 });
@@ -149,12 +169,20 @@ export async function POST(request: Request) {
     }
 
     const trimmed = content.trim();
+
+    /* ============ «اعتماد التعليقات تلقائيًا» — المفتاح الحي من لوحة الأدمن ============
+       الاعتماد الآمن فقط: تعليق نظيف من الفلترة الأخلاقية والرقابة AI وخطورة منخفضة.
+       المُعلَّم بالفلترة أو ذو الخطورة المرتفعة يبقى PENDING للمراجعة البشرية مهما
+       كان المفتاح — فالأتمتة لا تتجاوز الحارس أبدًا. */
+    const autoApprove = await readAutoApprove();
+    const autoApproved = autoApprove && !verdict.flagged && verdict.riskScore < 0.4;
+
     const created = await prisma.comment.create({
       data: {
         articleId,
         userId: session.user.id,
         content: trimmed,
-        status: "PENDING",
+        status: autoApproved ? "APPROVED" : "PENDING",
         flagged: verdict.flagged,
         flagReasons: verdict.reasons,
         riskScore: verdict.riskScore,
@@ -162,6 +190,13 @@ export async function POST(request: Request) {
         ...(canSelfPin ? { selfPinnedAt: new Date() } : {}),
       },
     });
+
+    /* الاعتماد التلقائي يجعل التعليق حاضرًا لحظته — إعادة توليد فورية لصفحة المقال */
+    if (autoApproved) {
+      try {
+        revalidatePath(`/article/${article.slug}`);
+      } catch {}
+    }
 
     /* ============ «التعليق الهادف المعتمد» +2 نقطة أثر ============
        تُمنح للتعليق الذي اجتاز الفلترة الأخلاقية متعددة المستويات أعلاه
@@ -197,7 +232,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير",
+      autoApproved,
+      message: autoApproved
+        ? "تعليقك منشور الآن — أُعتمد تلقائيًا لكلامٍ له لازمة"
+        : "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير",
       impact: impact?.awarded
         ? { points: impact.points, impactScore: impact.impactScore, rank: impact.rank, rankUp: impact.rankUp }
         : null,
