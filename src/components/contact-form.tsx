@@ -6,6 +6,14 @@ import { useState } from "react";
 const VALIDATION_MESSAGE =
   "الاسم والرسالة حقلان إلزاميان، ويشترط أن تكون رسالتك أطول من سطر واحد؛ ليثمر حوارك نفعًا.";
 
+/* مواضيع سريعة — نقرة واحدة تعبئ الموضوع */
+const QUICK_TOPICS = [
+  "اقتراح تطوير",
+  "ملاحظة على مقال",
+  "طلب محو حسابي وبياناتي نهائيًا",
+  "كلمة طيبة للإدارة",
+];
+
 export function ContactForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -141,6 +149,23 @@ export function ContactForm() {
         <label className="mb-1.5 block text-xs font-bold" style={{ color: "var(--ink)" }}>
           الموضوع
         </label>
+        <div className="mb-2 flex flex-wrap gap-2">
+          {QUICK_TOPICS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setSubject(t)}
+              className="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all hover:scale-[1.03]"
+              style={{
+                borderColor: subject === t ? "var(--accent)" : "var(--border)",
+                color: subject === t ? "var(--accent-strong)" : "var(--ink-muted)",
+                background: subject === t ? "var(--accent-soft)" : "transparent",
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
         <input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
@@ -149,6 +174,13 @@ export function ContactForm() {
           style={{ borderColor: "var(--border)", color: "var(--ink)" }}
           placeholder="اقتراح.. ملاحظة.. أو كلمة طيبة"
         />
+        {subject === "طلب محو حسابي وبياناتي نهائيًا" && (
+          <p className="mt-2 rounded-xl px-3.5 py-2.5 text-[11px] leading-6" style={{ background: "var(--accent-soft)", color: "var(--ink)" }}>
+            لتقديم طلب المحو: اكتب في الرسالة بريد حسابك المسجّل وعبارة تأكيد واضحة، وسينفّذ صاحب المنصة
+            المحو البرمجي الشامل موثقًا بالسبب خلال مدة لا تتجاوز ١٤ يومًا من الطلب. ولمحو أسرع فوري،
+            يمكنك حذف حسابك بنفسك من صفحة «ملفي» — المحو هناك لحظي وبرمجي بلا انتظار.
+          </p>
+        )}
       </div>
 
       <div className="mt-4">
