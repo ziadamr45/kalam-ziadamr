@@ -13,6 +13,7 @@ import { getSiteConfigFresh } from "@/lib/site-config";
 import { bumpApiUsage } from "@/lib/api-usage";
 import { rateLimit, requestIp } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
+import { hasPrivilege, userHasPrivilege } from "@/lib/vip";
 
 /**
  * ============================================================
@@ -48,15 +49,19 @@ function quotaKey(articleId: string, readerKey: string): string {
   return `${articleId}:${readerKey}`;
 }
 
-/** حصة القارئ: الأساس + تمديد الرتبة للمسجلين بحساب حقيقي غير محظور */
+/** حصة القارئ: الأساس + تمديد الرتبة للمسجلين بحساب حقيقي غير محظور
+    + الحصة السيادية غير المحدودة لحاملي صلاحية unlimitedAiChat */
 async function limitFor(readerKey: string): Promise<number> {
   if (readerKey.startsWith("u:")) {
     try {
       const u = await prisma.user.findUnique({
         where: { id: readerKey.slice(2) },
-        select: { impactScore: true, banned: true },
+        select: { impactScore: true, banned: true, vipPrivileges: true },
       });
-      if (u && !u.banned) return aiQuotaForScore(u.impactScore);
+      if (u && !u.banned) {
+        if (hasPrivilege(u.vipPrivileges, "unlimitedAiChat")) return Number.MAX_SAFE_INTEGER;
+        return aiQuotaForScore(u.impactScore);
+      }
     } catch {}
   }
   return BASE_PER_READER_PER_ARTICLE;
@@ -282,7 +287,11 @@ export async function POST(request: Request) {
     const session = await auth().catch(() => null);
     const readerKey = getReaderKey(session, fp ?? null);
 
-    if (!allowBurst(readerKey)) {
+    /* مانع الاندفاع يُحال عن حاملي صلاحية unlimitedAiChat — السيادة بلا انتظار */
+    const unlimitedAi =
+      session?.user?.id &&
+      (await userHasPrivilege(session.user.id, "unlimitedAiChat").catch(() => false));
+    if (!unlimitedAi && !allowBurst(readerKey)) {
       return NextResponse.json(
         { error: "رسائل متتالية سريعة — خذ نفسًا ثم أرسل" },
         { status: 429 },

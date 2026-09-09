@@ -19,11 +19,16 @@ export async function POST(request: Request) {
       slug?: string;
       layout?: boolean;
       tag?: string;
+      tags?: string[];
     };
 
-    /* إبطال وسم الكاش — تكوين المنصة السيادي أو غيره */
+    /* إبطال وسوم الكاش — تكوين المنصة السيادي أو الأقسام الحية أو غيرها */
     if (body.tag) {
       revalidateTag(body.tag);
+    }
+    /* وسوم متعددة — تُمرر من لوحة التحكم في عملية واحدة */
+    if (Array.isArray(body.tags) && body.tags.length > 0) {
+      for (const t of body.tags) revalidateTag(String(t));
     }
 
     const paths = body.paths?.length ? body.paths : [];

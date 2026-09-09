@@ -134,6 +134,9 @@ export async function getSiteConfigFresh(): Promise<SiteConfig> {
 /** الحزمة القابلة للنشر للعميل — لا أسرار ولا إعدادات حساسة */
 export async function getPublicBundle() {
   const cfg = await getSiteConfig();
+  /* الأقسام الحية من قاعدة البيانات للتذييل الديناميكي — كاش موسوم بـ «sections» */
+  const { getActiveSections } = await import("@/lib/sections-data");
+  const liveSections = await getActiveSections();
   return {
     SITE_NAME: cfg.SITE_NAME,
     FOOTER_TEXT: cfg.FOOTER_TEXT,
@@ -151,6 +154,8 @@ export async function getPublicBundle() {
     PROPOSALS_ENABLED: cfg.PROPOSALS_ENABLED,
     /* العتبة الحية لعتبة «أهل الكلمة» — تُستبدل موضع 350 في نصوص التهيئة */
     IMPACT_ELDERS_THRESHOLD: cfg.IMPACT_ELDERS_THRESHOLD,
+    /* الأقسام الفعلية المعتمدة — التذييل يرندرها ديناميكيًا، والثابتة fallback */
+    LIVE_SECTIONS: liveSections,
   };
 }
 

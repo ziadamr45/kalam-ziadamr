@@ -10,6 +10,7 @@ import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
+import { parsePrivileges, PRIVILEGE_LABELS, roleLabelAr } from "@/lib/vip";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 import { displayName } from "@/lib/identity";
 import { IMPACT_ACTION_LABEL, ImpactLogButton } from "@/components/impact-log-modal";
@@ -48,6 +49,15 @@ export default async function ProfilePage() {
       impactScore: true,
       intellectualRank: true,
       createdAt: true,
+      /* منظومة التوثيق السيادي — البطاقة الغنية للمموّهقين */
+      role: true,
+      isVerified: true,
+      verifiedType: true,
+      vipBadgeTitle: true,
+      vipBadgeColor: true,
+      vipReason: true,
+      vipGrantedAt: true,
+      vipPrivileges: true,
       _count: { select: { comments: true, savedArticles: true, interactions: true } },
     },
   });
@@ -127,14 +137,34 @@ export default async function ProfilePage() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <h1 className="font-body text-2xl font-bold" style={{ color: "var(--ink)" }}>
-                {displayName(user)}
-              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-body text-2xl font-bold" style={{ color: "var(--ink)" }}>
+                  {displayName(user)}
+                </h1>
+                {/* ختم التوثيق الرسمي — بلون تصنيف الحساب */}
+                {user.isVerified && (
+                  <span
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                    style={{
+                      background: `${user.vipBadgeColor || "#2563EB"}1f`,
+                      color: user.vipBadgeColor || "#2563EB",
+                      border: `1px solid ${user.vipBadgeColor || "#2563EB"}55`,
+                    }}
+                    title={user.vipReason ?? "حساب موثّق رسميًا"}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+                      <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                    </svg>
+                    {user.vipBadgeTitle || "حساب موثّق"}
+                  </span>
+                )}
+              </div>
               <p className="mt-1 truncate text-sm" dir="ltr" style={{ color: "var(--ink-muted)" }}>
                 {user.email}
               </p>
               <p className="mt-2 text-xs" style={{ color: "var(--ink-muted)" }}>
-                قارئ معنا منذ {formatArabicDate(user.createdAt)} · رصيد أثرك{" "}
+                {roleLabelAr(user.role)} · قارئ معنا منذ {formatArabicDate(user.createdAt)} · رصيد أثرك{" "}
                 <strong style={{ color: "var(--accent-strong)" }}>
                   {new Intl.NumberFormat("ar-EG").format(user.impactScore)}
                 </strong>
@@ -149,6 +179,60 @@ export default async function ProfilePage() {
             <SignOutButton />
           </div>
         </section>
+
+        {/* ==================== بطاقة المزايا الفكرية الممنوحة ==================== */}
+        {user.isVerified && (() => {
+          const privs = parsePrivileges(user.vipPrivileges);
+          const granted = (Object.keys(PRIVILEGE_LABELS) as (keyof typeof PRIVILEGE_LABELS)[]).filter((k) => privs[k]);
+          if (!granted.length && !user.vipReason) return null;
+          return (
+            <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+              <div
+                className="rounded-2xl border p-5 shadow-soft"
+                style={{
+                  background: `linear-gradient(135deg, ${user.vipBadgeColor || "#D97706"}0d, var(--surface))`,
+                  borderColor: `${user.vipBadgeColor || "#D97706"}44`,
+                }}
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="flex items-center gap-2 text-sm font-bold" style={{ color: user.vipBadgeColor || "#D97706" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <path d="M12 2l2.6 6.2L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.4-.8L12 2z" />
+                    </svg>
+                    مزاياك الفكرية المميزة
+                  </p>
+                  {user.vipGrantedAt && (
+                    <p className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                      مُنحت في {formatArabicDate(user.vipGrantedAt)}
+                    </p>
+                  )}
+                </div>
+                {granted.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {granted.map((k) => (
+                      <span
+                        key={k}
+                        className="rounded-full border px-3 py-1 text-xs font-medium"
+                        style={{ borderColor: `${user.vipBadgeColor || "#D97706"}44`, color: "var(--ink)" }}
+                      >
+                        {PRIVILEGE_LABELS[k]}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
+                    توثيقك أعلى اسمك في كل النقاشات — واصل بناء أثرك لفتح مزايا أعمق.
+                  </p>
+                )}
+                {user.vipReason && (
+                  <p className="mt-3 border-t pt-3 text-xs leading-6" style={{ borderColor: `${user.vipBadgeColor || "#D97706"}22`, color: "var(--ink-muted)" }}>
+                    سبب التمييز من الإدارة: {user.vipReason}
+                  </p>
+                )}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* ==================== شريط الرحلة نحو الرتبة التالية ==================== */}
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">

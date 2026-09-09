@@ -19,6 +19,9 @@ export type AuditEventType =
   | "ACCOUNT_SELF_DELETED"
   | "PROFILE_UPDATED"
   | "PROPOSAL_SENT"
+  | "USER_VERIFIED"
+  | "NOTIFICATION_DISPATCHED_VIP"
+  | "COMMENT_SELF_PINNED"
   | `IMPACT_${string}`;
 
 export async function logEvent(input: {

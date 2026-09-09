@@ -9,6 +9,7 @@ import { awardImpact } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
 import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
+import { hasPrivilege, userHasPrivilege } from "@/lib/vip";
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -31,6 +32,8 @@ const commentSchema = z.object({
   fp: z.string().max(128).optional().default(""),
   /* فخ الروبوتات — حقل مخفي لا يراه الإنسان */
   honey: z.string().max(200).optional().default(""),
+  /* التثبيت الذاتي — حصري لحاملي صلاحية selfPinComment */
+  selfPin: z.boolean().optional().default(false),
 });
 
 export async function POST(request: Request) {
@@ -47,7 +50,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
     }
-    const { articleId, content, fp, honey } = parsed.data;
+    const { articleId, content, fp, honey, selfPin } = parsed.data;
 
     /* فخ السبام — بوت يملأ الحقل المخفي: تجاهل صامت بلا أي معالجة */
     if (honey) {
@@ -73,17 +76,21 @@ export async function POST(request: Request) {
     }
 
     const rateKey = session.user.id;
-    if (!allow(rateKey)) {
+    /* حاملو صلاحية bypassRateLimits/bypassCooldowns معفون من مهلة التعليقات
+       — لكن الفلترة الأخلاقية ومراجعة التحرير تبقى عليهم كالجميع */
+    const vipBypass = await userHasPrivilege(session.user.id, "bypassRateLimits")
+      .catch(() => false);
+    if (!vipBypass && !allow(rateKey)) {
       return NextResponse.json(
         { error: "أرسلت عدة تعليقات خلال دقائق.. خذ نفسًا وعد لاحقًا" },
         { status: 429 },
       );
     }
 
-    /* التحقق من حظر المستخدم */
+    /* التحقق من حظر المستخدم + صلاحياته */
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { banned: true, name: true },
+      select: { banned: true, name: true, vipPrivileges: true },
     });
     if (!user || user.banned) {
       return NextResponse.json({ error: "تم إيقاف المشاركة لهذا الحساب" }, { status: 403 });
@@ -113,10 +120,27 @@ export async function POST(request: Request) {
 
     const article = await prisma.article.findUnique({
       where: { id: articleId },
-      select: { id: true, title: true },
+      select: { id: true, title: true, commentsEnabled: true },
     });
     if (!article) {
       return NextResponse.json({ error: "المقال غير موجود" }, { status: 404 });
+    }
+    /* باب التعليق لكل مقال — يُطوى من التيرمينال السيادي دون نشر */
+    if (article.commentsEnabled === false) {
+      return NextResponse.json(
+        { error: "التعليقات مغلقة على هذا المقال بإدارة المنصة" },
+        { status: 403 },
+      );
+    }
+
+    /* التثبيت الذاتي — حصري لحاملي صلاحية selfPinComment، وتثبيت
+       جديد يفك تثبيت تعليقهم السابق في المقال نفسه (واحد لكل كاتب) */
+    const canSelfPin = selfPin && hasPrivilege(user.vipPrivileges, "selfPinComment");
+    if (canSelfPin) {
+      await prisma.comment.updateMany({
+        where: { articleId, userId: session.user.id, selfPinnedAt: { not: null } },
+        data: { selfPinnedAt: null },
+      });
     }
 
     const trimmed = content.trim();
@@ -130,6 +154,7 @@ export async function POST(request: Request) {
         flagReasons: verdict.reasons,
         riskScore: verdict.riskScore,
         guestFp: fp || null,
+        ...(canSelfPin ? { selfPinnedAt: new Date() } : {}),
       },
     });
 

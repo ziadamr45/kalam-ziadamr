@@ -66,7 +66,8 @@ function startOfCairoDay(): Date {
 
 /**
  * الاحتفال بعبور عتبة «أهل الكلمة» — يُنفَّذ مرة واحدة في عمر الحساب:
- * توثيق احتفالي في السجل + إشعار جرس + بث فوري لهاتف القارئ.
+ * توثيق احتفالي في السجل + منح توثيق «النخبة الفكرية» (Impact Elite Track)
+ * + إشعار جرس + بث فوري لهاتف القارئ.
  * يُستدعى بعد نجاح المعاملة فقط، وتفرّده محمي بقيد CH:{userId} الفريد.
  */
 async function celebrateEldersThreshold(userId: string): Promise<void> {
@@ -80,12 +81,38 @@ async function celebrateEldersThreshold(userId: string): Promise<void> {
         dedupKey: `CH:${userId}`,
       },
     });
+
+    /* المسار التلقائي للتوثيق (Impact Elite Track): أول من يبلغ 350
+       يُوثَّق فورًا بشارة «عضو أهل الكلمة» الكحلية — من موثق مسبقًا
+       برتبة أعلى لا يُمس شيء */
+    try {
+      const u = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isVerified: true, verifiedType: true, vipBadgeTitle: true },
+      });
+      if (u && !u.isVerified) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            isVerified: true,
+            verifiedType: "IMPACT_ELITE",
+            vipBadgeTitle: "عضو أهل الكلمة",
+            vipBadgeColor: "#1E3A8A",
+            vipReason: "الاستحقاق التلقائي: بلوغ عتبة الـ350 نقطة أثر",
+            vipGrantedAt: new Date(),
+          },
+        });
+      }
+    } catch {
+      /* منح التوثيق زينة لا تعطل الاحتفال */
+    }
+
     await prisma.userNotification
       .create({
         data: {
           userId,
           title: "تهانينا! أنت الآن من «أهل الكلمة» ✦",
-          body: "بلغ رصيد أثرك عتبة الـ350 نقطة، وفُتحت لك قناة المقترحات الخاصة في ملفك — كلمتك لها وزن الآن.",
+          body: "بلغ رصيد أثرك عتبة الـ350 نقطة، ووُثّق حسابك رسميًا كعضو في «أهل الكلمة»، وفُتحت لك قناة المقترحات الخاصة — كلمتك لها وزن الآن.",
           url: "/profile",
           kind: "TARGETED",
         },
@@ -95,12 +122,22 @@ async function celebrateEldersThreshold(userId: string): Promise<void> {
     void pushUsers(
       {
         title: "تهانينا! أنت الآن من «أهل الكلمة» ✦",
-        body: "+350 رصيد أثر — فُتحت لك قناة المقترحات الخاصة",
+        body: "+350 رصيد أثر — وُثّق حسابك وفُتحت لك قناة المقترحات الخاصة",
         url: "/profile",
         tag: "channel-unlocked",
       },
       { userIds: [userId] },
     );
+
+    /* توثيق حي في سجل الأحداث — يصل لمركز نشاط الأدمن فورًا */
+    const { logEvent } = await import("@/lib/audit");
+    void logEvent({
+      type: "USER_VERIFIED",
+      actorType: "SYSTEM",
+      actorId: userId,
+      message: "توثيق تلقائي: بلوغ عتبة «أهل الكلمة» — شارة عضو أهل الكلمة",
+      meta: { verifiedType: "IMPACT_ELITE", badge: "عضو أهل الكلمة" },
+    });
   } catch {
     /* ازدواج الاحتفال مستحيل بقيد فريد، وأي خطأ هنا زينة لا تُعطل */
   }

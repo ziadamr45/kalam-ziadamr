@@ -100,6 +100,10 @@ export function Footer() {
   /* التكوين السيادي: نص حقوق النشر وروابط التواصل — يحكمهما الأدمن لحظيًا */
   const [copyright, setCopyright] = useState(DEFAULT_COPYRIGHT);
   const [socials, setSocials] = useState(SOCIALS);
+  /* الأقسام الحية — الثابتة مرسومة فورًا (بلا مشاكل hydration)،
+     وتُستبدل بعد التحميل بالأقسام الفعلية من قاعدة البيانات: ما يظهر
+     في التذييل يطابق دائمًا ما يعتمده الأدمن في لوحة التحكم */
+  const [sections, setSections] = useState<{ slug: string; name: string }[]>(SECTIONS);
 
   /* جلب نص التذييل المُدار من لوحة التحكم — بعد الرسم الأول حتى لا نكسر الترطيب */
   useEffect(() => {
@@ -109,6 +113,13 @@ export function Footer() {
       .then((d) => {
         if (alive && d?.FOOTER_TEXT) setFooterText(d.FOOTER_TEXT);
         if (alive && d?.COPYRIGHT_TEXT) setCopyright(d.COPYRIGHT_TEXT);
+        if (alive && Array.isArray(d?.LIVE_SECTIONS) && d.LIVE_SECTIONS.length > 0) {
+          /* الأقسام الحية من قاعدة البيانات — مصدر الحقيقة الواحد للتذييل */
+          const live = (d.LIVE_SECTIONS as { slug: string; name: string }[]).filter(
+            (s) => s.slug && s.name,
+          );
+          if (live.length > 0) setSections(live);
+        }
         if (alive && Array.isArray(d?.SOCIAL_LINKS) && d.SOCIAL_LINKS.length > 0) {
           /* روابط التكوين تُدمج على الأيقونات الافتراضية: نفس الرابط يستبدل
              الأصل، والرابط الجديد يُضاف بأيقونة عامة (◈) */
@@ -171,7 +182,7 @@ export function Footer() {
               الأقسام
             </p>
             <ul className="space-y-2.5 text-sm">
-              {SECTIONS.map((s) => (
+              {sections.map((s) => (
                 <li key={s.slug}>
                   <Link
                     href={`/section/${s.slug}`}

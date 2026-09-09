@@ -6,6 +6,7 @@ import { ELDERS_THRESHOLD } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { pushAdmins } from "@/lib/push";
+import { userHasPrivilege } from "@/lib/vip";
 
 /**
  * ============================================================
@@ -41,9 +42,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "المشاركة موقوفة لهذا الحساب" }, { status: 403 });
     }
 
+    /* صلاحية ahlAlKalimaAccess تفتح القناة فورًا بغض النظر عن الرصيد */
+    const channelPrivilege = await userHasPrivilege(session.user.id, "ahlAlKalimaAccess");
+
     /* بوابة الرصيد الحي — تُحتسب من الرصيد الفعلي المحدث لحظيًا (350 فأكثر)
        لا من نص رتبة مخزّن قد يتأخر — لا تجاوز برمجي ممكن */
-    if (!canSendProposals(rankForScore(user.impactScore)) || user.impactScore < threshold) {
+    if (
+      !channelPrivilege &&
+      (!canSendProposals(rankForScore(user.impactScore)) || user.impactScore < threshold)
+    ) {
       return NextResponse.json(
         {
           error: `قناة المقترحات الخاصة حصرية لـ«أهل الكلمة» (عتبة ${threshold} نقطة) — رصيدك الحالي ${user.impactScore}، تابع بناء أثرك`,

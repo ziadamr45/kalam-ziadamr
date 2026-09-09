@@ -17,9 +17,29 @@ type PublicComment = {
   authorImage: string | null;
   authorRank: string | null;
   isInspiring: boolean;
+  /* منظومة التوثيق السيادي — شارة الحسابات المميزة */
+  authorVerified?: boolean;
+  authorBadgeTitle?: string | null;
+  authorBadgeColor?: string | null;
+  /* إطار التعليق الفخم — لون شارة الكاتب عند امتلاكه الصلاحية */
+  authorAccent?: string | null;
+  /* تثبيت ذاتي من كاتبه */
+  selfPinned?: boolean;
   likes: number;
   dislikes: number;
 };
+
+/** ختم التوثيق الرسمي — يظهر بجانب أسماء الحسابات الموثقة في كل النقاشات */
+function VerifiedSeal({ color, title }: { color: string; title: string }) {
+  return (
+    <span title={`${title} — حساب موثّق رسميًا`} aria-label={`حساب موثق: ${title}`}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill={color} aria-hidden className="shrink-0">
+        <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+        <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+      </svg>
+    </span>
+  );
+}
 
 const REPORT_REASONS = ["إساءة أو لغة غير لائقة", "إعلان أو سبام", "مخالفة القيم", "سبب آخر"];
 const CUSTOM_REASON = "سبب آخر";
@@ -61,6 +81,38 @@ export function CommentsSection({
 
   const loggedIn = (isLoggedIn ?? true) && Boolean(session?.user);
   const myId = session?.user?.id ?? null;
+
+  /* صلاحيات المشاهد — التثبيت الذاتي يُقرأ من الخادم بعد الجلسة (لا ثقة بالعميل) */
+  const [canSelfPin, setCanSelfPin] = useState(false);
+  const [pinBusy, setPinBusy] = useState<string | null>(null);
+  useEffect(() => {
+    if (!loggedIn) {
+      setCanSelfPin(false);
+      return;
+    }
+    fetch("/api/profile", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setCanSelfPin(Boolean(d?.canSelfPin)))
+      .catch(() => {});
+  }, [loggedIn]);
+
+  /* التثبيت الذاتي — يُنفذ في الخادم بعد فحص الصلاحية مرة أخرى */
+  const togglePin = async (commentId: string, pin: boolean) => {
+    setPinBusy(commentId);
+    try {
+      const res = await fetch(`/api/comments/${commentId}/pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      if (res.ok) {
+        /* إعادة تحميل خفيفة للصفحة تعكس الترتيب الجديد من الخادم */
+        window.location.reload();
+      }
+    } finally {
+      setPinBusy(null);
+    }
+  };
 
   /* أصواتي على تعليقات هذا المقال */
   useEffect(() => {
@@ -310,14 +362,25 @@ export function CommentsSection({
               key={c.id}
               className="rounded-2xl border p-5 shadow-soft transition-colors"
               style={
-                mine
-                  ? /* تعليقك أنت — خلفية كهرمانية هادئة وإطار مميز */
-                    { background: "#FFFBEB", borderColor: "#FCD34D" }
-                  : c.isInspiring
-                    ? { background: "var(--accent-soft)", borderColor: "var(--accent)" }
-                    : { background: "var(--surface)", borderColor: "var(--border)" }
+                c.authorAccent
+                  ? /* إطار التعليق الفخم — بلون شارة الكاتب الموثق */
+                    { background: "var(--surface)", borderColor: c.authorAccent, borderWidth: 2 }
+                  : mine
+                    ? /* تعليقك أنت — خلفية كهرمانية هادئة وإطار مميز */
+                      { background: "#FFFBEB", borderColor: "#FCD34D" }
+                    : c.isInspiring
+                      ? { background: "var(--accent-soft)", borderColor: "var(--accent)" }
+                      : { background: "var(--surface)", borderColor: "var(--border)" }
               }
             >
+              {c.selfPinned && (
+                <p className="mb-3 flex items-center gap-1.5 text-xs font-bold" style={{ color: c.authorAccent ?? "var(--accent-strong)" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M16 3l5 5-1.4 1.4-1-1-4.2 4.2.6 4.6-1.4 1.4-3.5-3.5L6 19.4 4.6 18l4.3-4.1-3.5-3.5L6.8 9l4.6.6L15.6 5.4l-1-1L16 3z" />
+                  </svg>
+                  مثبَّت من كاتبه — صلاحية الحسابات المميزة
+                </p>
+              )}
               {c.isInspiring && (
                 <p className="mb-3 flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -352,6 +415,21 @@ export function CommentsSection({
                       <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
                         {c.authorName}
                       </p>
+                      {/* ختم التوثيق الرسمي + مسمى الشارة — بلون تصنيف الحساب */}
+                      {c.authorVerified && (
+                        <VerifiedSeal color={c.authorBadgeColor || "#2563EB"} title={c.authorBadgeTitle || "حساب موثّق"} />
+                      )}
+                      {c.authorVerified && c.authorBadgeTitle && (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                          style={{
+                            background: `${c.authorBadgeColor || "#2563EB"}1f`,
+                            color: c.authorBadgeColor || "#2563EB",
+                          }}
+                        >
+                          {c.authorBadgeTitle}
+                        </span>
+                      )}
                       {/* شارة «أنت» — بجانب اسمك واضحة بلون كهرماني مميز */}
                       {mine && (
                         <span className="text-amber-500 font-medium text-xs">(أنت)</span>
@@ -422,6 +500,23 @@ export function CommentsSection({
                   <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
                   <span>{counts.dislikes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.dislikes) : "لم يعجبني"}</span>
                 </button>
+                {/* التثبيت الذاتي — زر يظهر على تعليقك فقط عند امتلاكك الصلاحية */}
+                {mine && canSelfPin && (
+                  <button
+                    onClick={() => togglePin(c.id, !c.selfPinned)}
+                    disabled={pinBusy === c.id}
+                    className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
+                    style={
+                      c.selfPinned
+                        ? { background: c.authorAccent ?? "var(--accent)", color: "#fff", borderColor: c.authorAccent ?? "var(--accent)" }
+                        : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                    }
+                    title={c.selfPinned ? "فك التثبيت" : "ثبّت تعليقك أعلى النقاش"}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l5 5-1.4 1.4-1-1-4.2 4.2.6 4.6-1.4 1.4-3.5-3.5L6 19.4 4.6 18l4.3-4.1-3.5-3.5L6.8 9l4.6.6L15.6 5.4l-1-1L16 3z" /></svg>
+                    {c.selfPinned ? "مثبَّت" : "تثبيت"}
+                  </button>
+                )}
               </div>
 
               {reportFor === c.id && (

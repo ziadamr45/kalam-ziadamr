@@ -14,6 +14,7 @@ import { ImpactReadTracker } from "@/components/impact-read-tracker";
 import { InteractionSlot } from "@/components/interaction-buttons";
 import { displayName, displayAvatar } from "@/lib/identity";
 import { requiredReadSeconds } from "@/lib/impact";
+import { hasPrivilege } from "@/lib/vip";
 import {
   getArticleBySlug,
   safeDecodeSlug,
@@ -219,6 +220,15 @@ export default async function ArticlePage({
                 authorImage: displayAvatar(c.user),
                 authorRank: c.user?.intellectualRank ?? null,
                 isInspiring: c.isInspiring,
+                authorVerified: c.user?.isVerified ?? false,
+                authorBadgeTitle: c.user?.vipBadgeTitle ?? null,
+                authorBadgeColor: c.user?.vipBadgeColor ?? null,
+                /* إطار التعليق الفخم — بلون شارة الكاتب فقط عند امتلاكه الصلاحية */
+                authorAccent:
+                  c.user && hasPrivilege(c.user.vipPrivileges, "vipCommentBorder")
+                    ? c.user.vipBadgeColor
+                    : null,
+                selfPinned: Boolean(c.selfPinnedAt),
                 likes: voteStats[c.id]?.likes ?? 0,
                 dislikes: voteStats[c.id]?.dislikes ?? 0,
               }))}

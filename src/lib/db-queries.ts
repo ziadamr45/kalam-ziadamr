@@ -156,12 +156,19 @@ export async function getRelatedArticles(
   }
 }
 
-/** التعليقات المعتمدة لمقال — بالهوية المعروضة والرتبة، و«التعليق الملهم» مثبتًا أعلى القائمة */
+/** التعليقات المعتمدة لمقال — بالهوية المعروضة والرتبة، مع خوارزمية أولوية
+    «النقاشات الموثقة»: المُلهم مثبتًا أعلى، ثم تثبيت الكاتب الذاتي،
+    ثم تعليقات الحسابات الموثقة لتظهر في مقدمة الحوار، ثم الأحدث */
 export async function getApprovedComments(articleId: string) {
   try {
     return await prisma.comment.findMany({
       where: { articleId, status: "APPROVED" },
-      orderBy: [{ isInspiring: "desc" }, { createdAt: "desc" }],
+      orderBy: [
+        { isInspiring: "desc" },
+        { selfPinnedAt: { sort: "desc", nulls: "last" } },
+        { user: { isVerified: "desc" } },
+        { createdAt: "desc" },
+      ],
       take: 100,
       include: {
         user: {
@@ -173,6 +180,11 @@ export async function getApprovedComments(articleId: string) {
             customImage: true,
             impactScore: true,
             intellectualRank: true,
+            /* منظومة التوثيق السيادي: الشارة واللون وإطار التعليق الفخم */
+            isVerified: true,
+            vipBadgeTitle: true,
+            vipBadgeColor: true,
+            vipPrivileges: true,
           },
         },
       },

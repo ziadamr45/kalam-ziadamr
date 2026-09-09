@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { logEvent } from "@/lib/audit";
 import { captureLoginSecurity } from "@/lib/security-notify";
+import { ensureOwnerSovereign } from "@/lib/vip";
 
 /**
  * هل مُهِّئت مفاتيح Google الحقيقية؟
@@ -225,6 +226,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     /* كل دخول وخروج Google يُسجل في سجلات الشفافية للوحة التحكم */
     async signIn({ user, isNewUser }) {
+      /* البذر السيادي لحساب صاحب المنصة — عند كل دخول له يُفحص ويُكمل
+         ما نقص من رتبة/توثيق/شارة/رصيد سيادي/صلاحيات كاملة (idempotent) */
+      void ensureOwnerSovereign(user?.email).catch(() => {});
+
       logEvent({
         type: "AUTH_LOGIN_SUCCESS",
         actorType: "USER",
