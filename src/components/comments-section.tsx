@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { analyzeComment } from "@/lib/moderation";
@@ -12,13 +12,17 @@ type PublicComment = {
   id: string;
   content: string;
   createdAt: string;
+  authorId: string | null;
   authorName: string;
   authorImage: string | null;
   authorRank: string | null;
   isInspiring: boolean;
+  likes: number;
+  dislikes: number;
 };
 
 const REPORT_REASONS = ["إساءة أو لغة غير لائقة", "إعلان أو سبام", "مخالفة القيم", "سبب آخر"];
+const CUSTOM_REASON = "سبب آخر";
 
 export function CommentsSection({
   articleId,
@@ -40,10 +44,33 @@ export function CommentsSection({
   const [blockReason, setBlockReason] = useState<string>("");
   const [reportFor, setReportFor] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
+  const [customReason, setCustomReason] = useState("");
   const [reportSent, setReportSent] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [impactNote, setImpactNote] = useState<string>("");
 
+  /* التصويت — أصواتي تُجلب من الخادم بعد الرسم الأولي (الصفحة ISR ثابتة) */
+  const [myVotes, setMyVotes] = useState<Record<string, "LIKE" | "DISLIKE">>({});
+  const [voteCounts, setVoteCounts] = useState<Record<string, { likes: number; dislikes: number }>>(
+    () => Object.fromEntries(initialComments.map((c) => [c.id, { likes: c.likes, dislikes: c.dislikes }])),
+  );
+  const [voteBusy, setVoteBusy] = useState<string | null>(null);
+  const [voteNotice, setVoteNotice] = useState<string | null>(null);
+
   const loggedIn = (isLoggedIn ?? true) && Boolean(session?.user);
+  const myId = session?.user?.id ?? null;
+
+  /* أصواتي على تعليقات هذا المقال */
+  useEffect(() => {
+    if (!loggedIn) {
+      setMyVotes({});
+      return;
+    }
+    fetch(`/api/comments/votes?articleId=${encodeURIComponent(articleId)}`)
+      .then((r) => r.json())
+      .then((d) => setMyVotes(d?.myVotes ?? {}))
+      .catch(() => {});
+  }, [articleId, loggedIn]);
 
   /* الفلترة اللحظية قبل الإرسال */
   const onContentChange = (value: string) => {
@@ -91,15 +118,80 @@ export function CommentsSection({
   };
 
   const sendReport = async (commentId: string) => {
+    setReportError(null);
+    /* «سبب آخر» إلزامي الوصف — نفحص قبل الإرسال */
+    if (reportReason === CUSTOM_REASON && customReason.trim().length < 5) {
+      setReportError("صف المخالفة بدقة في الحقل المخصص — الوصف إلزامي.");
+      return;
+    }
     try {
-      await fetch("/api/comments/report", {
+      const res = await fetch("/api/comments/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentId, reason: reportReason, fp: getVisitorFingerprint() }),
+        body: JSON.stringify({
+          commentId,
+          reason: reportReason,
+          details: reportReason === CUSTOM_REASON ? customReason.trim() : undefined,
+          fp: getVisitorFingerprint(),
+        }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setReportError(data?.error ?? "تعذر إرسال الإبلاغ — جرّب مرة أخرى.");
+        return;
+      }
       setReportSent(commentId);
       setReportFor(null);
-    } catch {}
+      setCustomReason("");
+    } catch {
+      setReportError("تعذر إرسال الإبلاغ — تحقق من اتصالك.");
+    }
+  };
+
+  /* التصويت على تعليق — الزائر يُستقبَل بردّ هادئ يوجهه للبوابة */
+  const vote = async (commentId: string, value: "LIKE" | "DISLIKE") => {
+    if (!loggedIn) {
+      setVoteNotice("سجّل الدخول أولًا لتفعيل التفاعل — الإعجاب وعدم الإعجاب للقارئين المسجلين فقط.");
+      window.setTimeout(() => setVoteNotice(null), 6000);
+      return;
+    }
+    setVoteBusy(commentId);
+    const prev = { myVotes, voteCounts };
+    try {
+      const res = await fetch(`/api/comments/${commentId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        setVoteNotice("سجّل الدخول أولًا لتفعيل التفاعل.");
+        window.setTimeout(() => setVoteNotice(null), 6000);
+        return;
+      }
+      if (!res.ok) {
+        setVoteNotice(data?.error ?? "تعذر التصويت — جرّب مرة أخرى.");
+        window.setTimeout(() => setVoteNotice(null), 6000);
+        return;
+      }
+      /* التحديث المتفائل المؤكد من رد الخادم */
+      setMyVotes((prevVotes) => {
+        const next = { ...prevVotes };
+        if (data.myVote) next[commentId] = data.myVote;
+        else delete next[commentId];
+        return next;
+      });
+      setVoteCounts((prevCounts) => ({
+        ...prevCounts,
+        [commentId]: { likes: data.likes ?? 0, dislikes: data.dislikes ?? 0 },
+      }));
+    } catch {
+      setVoteNotice("تعذر التصويت — تحقق من اتصالك.");
+      window.setTimeout(() => setVoteNotice(null), 6000);
+      void prev; // استعادة غير ضرورية — الخادم هو المرجع دائمًا
+    } finally {
+      setVoteBusy(null);
+    }
   };
 
   return (
@@ -107,6 +199,24 @@ export function CommentsSection({
       <h2 className="font-ui mb-6 text-xl font-bold" style={{ color: "var(--ink)" }}>
         الحوار ({comments.length > 0 ? new Intl.NumberFormat("ar-EG").format(comments.length) : "لا تعليقات بعد"})
       </h2>
+
+      {/* التنبيه الهادئ للزائر عند محاولة التفاعل */}
+      {voteNotice && (
+        <div
+          className="mb-5 flex flex-col items-start justify-between gap-3 rounded-2xl border p-4 text-sm sm:flex-row sm:items-center"
+          style={{ background: "var(--accent-soft)", borderColor: "var(--accent)", color: "var(--ink)" }}
+          role="status"
+        >
+          <span className="leading-7">{voteNotice}</span>
+          <Link
+            href={`/auth/login?callback=${encodeURIComponent(`/article/${articleSlug ?? ""}#comments`)}`}
+            className="shrink-0 rounded-full px-4 py-2 text-xs font-bold shadow-soft transition-all hover:scale-105"
+            style={{ background: "var(--accent)", color: "#fff" }}
+          >
+            تسجيل الدخول باستخدام Google
+          </Link>
+        </div>
+      )}
 
       {/* نموذج التعليق */}
       {loggedIn ? (
@@ -165,7 +275,7 @@ export function CommentsSection({
             سجّل الدخول بحساب Google للمشاركة في الحوار — للحفاظ على مساحة نقية بلا مزعجين.
           </p>
           <Link
-            href={`/login?callback=${encodeURIComponent(`/article/${articleSlug ?? ""}`)}`}
+            href={`/auth/login?callback=${encodeURIComponent(`/article/${articleSlug ?? ""}#comments`)}`}
             className="flex shrink-0 items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold shadow-soft transition-all hover:scale-105"
             style={{ background: "var(--surface)", color: "var(--ink)", borderColor: "var(--border)" }}
           >
@@ -177,111 +287,185 @@ export function CommentsSection({
 
       {/* قائمة التعليقات */}
       <ul className="space-y-4">
-        {comments.map((c) => (
-          <li
-            key={c.id}
-            className="rounded-2xl border p-5 shadow-soft"
-            style={
-              c.isInspiring
-                ? { background: "var(--accent-soft)", borderColor: "var(--accent)" }
-                : { background: "var(--surface)", borderColor: "var(--border)" }
-            }
-          >
-            {c.isInspiring && (
-              <p className="mb-3 flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <path d="M12 2l2.6 6.2L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.4-.8L12 2z" />
-                </svg>
-                تعليق فكري ملهم — مثبَّت أعلى الحوار بتمييز التحرير
-              </p>
-            )}
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                {c.authorImage ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={c.authorImage}
-                    alt={c.authorName}
-                    width={36}
-                    height={36}
-                    referrerPolicy="no-referrer"
-                    className="h-9 w-9 rounded-full border-2 object-cover"
-                    style={{ borderColor: "var(--accent-soft)" }}
-                  />
-                ) : (
-                  <span
-                    className="flex h-9 w-9 items-center justify-center rounded-full font-bold"
-                    style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                  >
-                    {c.authorName.charAt(0)}
-                  </span>
-                )}
-                <div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
-                      {c.authorName}
-                    </p>
-                    {c.authorRank && c.authorRank !== "قارئ متأمل" && <RankBadge rank={c.authorRank} />}
-                  </div>
-                  <p className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                    {formatArabicDate(c.createdAt)}
-                  </p>
-                </div>
-              </div>
-
-              {reportSent === c.id ? (
-                <span className="text-xs" style={{ color: "var(--accent-strong)" }}>
-                  تم استلام الإبلاغ، شكرًا لك
-                </span>
-              ) : (
-                <button
-                  onClick={() => setReportFor(reportFor === c.id ? null : c.id)}
-                  className="rounded-full p-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
-                  style={{ color: "var(--ink-muted)" }}
-                  title="إبلاغ عن التعليق"
-                  aria-label="إبلاغ عن التعليق"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" /></svg>
-                </button>
-              )}
-            </div>
-
-            <p className="font-body leading-9" style={{ color: "var(--ink)" }}>
-              {c.content}
-            </p>
-
-            {reportFor === c.id && (
-              <div className="mt-3 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}>
-                <p className="mb-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
-                  سبب الإبلاغ:
+        {comments.map((c) => {
+          const mine = Boolean(myId && c.authorId && c.authorId === myId);
+          const counts = voteCounts[c.id] ?? { likes: c.likes, dislikes: c.dislikes };
+          const myVote = myVotes[c.id] ?? null;
+          return (
+            <li
+              key={c.id}
+              className="rounded-2xl border p-5 shadow-soft transition-colors"
+              style={
+                mine
+                  ? /* تعليقك أنت — خلفية كهرمانية هادئة وإطار مميز */
+                    { background: "#FFFBEB", borderColor: "#FCD34D" }
+                  : c.isInspiring
+                    ? { background: "var(--accent-soft)", borderColor: "var(--accent)" }
+                    : { background: "var(--surface)", borderColor: "var(--border)" }
+              }
+            >
+              {c.isInspiring && (
+                <p className="mb-3 flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M12 2l2.6 6.2L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.4-.8L12 2z" />
+                  </svg>
+                  تعليق فكري ملهم — مثبَّت أعلى الحوار بتمييز التحرير
                 </p>
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {REPORT_REASONS.map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => setReportReason(r)}
-                      className="rounded-full border px-3 py-1.5 text-xs transition-all"
-                      style={
-                        reportReason === r
-                          ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
-                          : { color: "var(--ink-muted)", borderColor: "var(--border)" }
-                      }
+              )}
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  {c.authorImage ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={c.authorImage}
+                      alt={c.authorName}
+                      width={36}
+                      height={36}
+                      referrerPolicy="no-referrer"
+                      className="h-9 w-9 rounded-full border-2 object-cover"
+                      style={{ borderColor: "var(--accent-soft)" }}
+                    />
+                  ) : (
+                    <span
+                      className="flex h-9 w-9 items-center justify-center rounded-full font-bold"
+                      style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
                     >
-                      {r}
-                    </button>
-                  ))}
+                      {c.authorName.charAt(0)}
+                    </span>
+                  )}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
+                        {c.authorName}
+                      </p>
+                      {/* شارة «أنت» — بجانب اسمك واضحة بلون كهرماني مميز */}
+                      {mine && (
+                        <span className="text-amber-500 font-medium text-xs">(أنت)</span>
+                      )}
+                      {c.authorRank && c.authorRank !== "قارئ متأمل" && <RankBadge rank={c.authorRank} />}
+                    </div>
+                    <p className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                      {formatArabicDate(c.createdAt)}
+                    </p>
+                  </div>
                 </div>
+
+                {reportSent === c.id ? (
+                  <span className="text-xs" style={{ color: "var(--accent-strong)" }}>
+                    تم استلام الإبلاغ، شكرًا لك
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setReportFor(reportFor === c.id ? null : c.id);
+                      setReportError(null);
+                    }}
+                    className="rounded-full p-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+                    style={{ color: "var(--ink-muted)" }}
+                    title="إبلاغ عن التعليق"
+                    aria-label="إبلاغ عن التعليق"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" /></svg>
+                  </button>
+                )}
+              </div>
+
+              <p className="font-body leading-9" style={{ color: "var(--ink)" }}>
+                {c.content}
+              </p>
+
+              {/* شريط التفاعل — إعجاب/عدم إعجاب بعدادات وألوان تعكس اختيارك */}
+              <div className="mt-3 flex items-center gap-1.5">
                 <button
-                  onClick={() => sendReport(c.id)}
-                  className="rounded-full px-4 py-2 text-xs font-bold"
-                  style={{ background: "var(--accent)", color: "#fff" }}
+                  onClick={() => vote(c.id, "LIKE")}
+                  disabled={voteBusy === c.id}
+                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
+                  style={
+                    myVote === "LIKE"
+                      ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
+                      : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                  }
+                  title="إعجاب"
+                  aria-label="أبدى إعجابي بهذا التعليق"
+                  aria-pressed={myVote === "LIKE"}
                 >
-                  إرسال الإبلاغ
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "LIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                  <span>{counts.likes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.likes) : "إعجاب"}</span>
+                </button>
+                <button
+                  onClick={() => vote(c.id, "DISLIKE")}
+                  disabled={voteBusy === c.id}
+                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
+                  style={
+                    myVote === "DISLIKE"
+                      ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" }
+                      : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                  }
+                  title="عدم إعجاب"
+                  aria-label="أبدى عدم إعجابي بهذا التعليق"
+                  aria-pressed={myVote === "DISLIKE"}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                  <span>{counts.dislikes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.dislikes) : "لم يعجبني"}</span>
                 </button>
               </div>
-            )}
-          </li>
-        ))}
+
+              {reportFor === c.id && (
+                <div className="mt-3 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}>
+                  <p className="mb-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
+                    سبب الإبلاغ:
+                  </p>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {REPORT_REASONS.map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => {
+                          setReportReason(r);
+                          setReportError(null);
+                        }}
+                        className="rounded-full border px-3 py-1.5 text-xs transition-all"
+                        style={
+                          reportReason === r
+                            ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
+                            : { color: "var(--ink-muted)", borderColor: "var(--border)" }
+                        }
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                  {/* «سبب آخر» — حقل نصي إلزامي يظهر تلقائيًا */}
+                  {reportReason === CUSTOM_REASON && (
+                    <textarea
+                      value={customReason}
+                      onChange={(e) => {
+                        setCustomReason(e.target.value);
+                        setReportError(null);
+                      }}
+                      rows={2}
+                      maxLength={500}
+                      placeholder="صف المخالفة بدقة.."
+                      className="textarea-bordered mt-2 w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]"
+                      style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+                    />
+                  )}
+                  {reportError && (
+                    <p className="mt-2 text-xs font-semibold" style={{ color: "#DC2626" }}>
+                      {reportError}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => sendReport(c.id)}
+                    className="mt-2 rounded-full px-4 py-2 text-xs font-bold"
+                    style={{ background: "var(--accent)", color: "#fff" }}
+                  >
+                    إرسال الإبلاغ
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

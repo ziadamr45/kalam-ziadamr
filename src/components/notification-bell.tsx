@@ -178,7 +178,7 @@ function PushEnableRow({
   if (authed === false) {
     return (
       <Link
-        href="/login"
+        href="/auth/login"
         className="block rounded-xl px-3 py-2.5 text-center text-xs font-bold transition-colors hover:bg-[var(--accent-soft)]"
         style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
       >

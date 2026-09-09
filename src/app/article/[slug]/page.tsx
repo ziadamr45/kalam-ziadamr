@@ -18,6 +18,7 @@ import {
   safeDecodeSlug,
   getRelatedArticles,
   getApprovedComments,
+  getCommentVoteStats,
   getInteractionCounts,
   getPublishedSlugs,
 } from "@/lib/db-queries";
@@ -93,11 +94,12 @@ export default async function ArticlePage({
   const article = await getArticleBySlug(slug);
   if (!article) notFound();
 
-  const [related, comments, counts, siteCfg] = await Promise.all([
+  const [related, comments, counts, siteCfg, voteStats] = await Promise.all([
     getRelatedArticles(article.id, article.sectionId, 3),
     getApprovedComments(article.id),
     getInteractionCounts(article.id),
     getSiteConfig(),
+    getCommentVoteStats(article.id),
   ]);
 
   /* سيادة الأدمن: تعطيل التشكيل إذا عطّله عامًا أو لهذا المقال تحديدًا */
@@ -207,10 +209,13 @@ export default async function ArticlePage({
                 id: c.id,
                 content: c.content,
                 createdAt: c.createdAt.toISOString(),
+                authorId: c.user?.id ?? null,
                 authorName: displayName(c.user),
                 authorImage: displayAvatar(c.user),
                 authorRank: c.user?.intellectualRank ?? null,
                 isInspiring: c.isInspiring,
+                likes: voteStats[c.id]?.likes ?? 0,
+                dislikes: voteStats[c.id]?.dislikes ?? 0,
               }))}
             />
           ) : (

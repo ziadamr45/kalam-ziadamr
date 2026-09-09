@@ -51,6 +51,14 @@ model Article {
   audioVoice          String?    // صوت Gemini المستخدم في التوليد
   audioPublicId       String?    // معرف Cloudinary للحذف والاستبدال الآمن
   audioGeneratedAt    DateTime?  // وقت التوليد الآلي
+  /* دورة حياة التوليد الخلفي غير المتزامن — المهمة تعيش في الخادم لا في المتصفح */
+  audioStatus         String     @default("NONE") // NONE | PROCESSING | READY | FAILED
+  audioProgress       Int        @default(0)      // المقاطع المكتملة
+  audioTotal          Int        @default(0)      // إجمالي مقاطع المهمة الحالية
+  audioChunks         Json?      // سجل المقاطع المؤقت [{text, words, url, publicId, durationSec, timings, attempts, notBefore, mime}]
+  audioError          String?    // ملاحظة/خطأ آخر خطوة (تُمسح عند النجاح)
+  audioJobId          String?    // معرف المهمة الحالية — يحرس سلاسل المعالجة اليتيمة ويقتل التسابق
+  audioUpdatedAt      DateTime?  // نبض آخر خطوة معالجة — لكشف التعليق وعرض stale
   readingTimeSec      Int           @default(60)
   status              ArticleStatus @default(DRAFT)
   authorIntent        String?       @db.Text // التغذية الفكرية السرية لمساعد النقاش — لا تُعرض للجمهور إطلاقًا، تُحقن في System Prompt حصريًا
@@ -110,6 +118,7 @@ model User {
   accounts     Account[]
   sessions     Session[]
   comments     Comment[]
+  commentVotes CommentVote[]
   interactions Interaction[]
   savedArticles SavedArticle[]
   pushSubscriptions UserPushSubscription[]
@@ -149,6 +158,11 @@ model SavedArticle {
   @@index([userId, createdAt(sort: Desc)])
 }
 
+enum CommentVoteType {
+  LIKE
+  DISLIKE
+}
+
 model Comment {
   id            String        @id @default(cuid())
   articleId     String
@@ -168,6 +182,7 @@ model Comment {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   reports       CommentReport[]
+  votes         CommentVote[]
 
   @@index([articleId, status])
   @@index([status, createdAt(sort: Desc)])
@@ -183,6 +198,21 @@ model CommentReport {
   createdAt  DateTime @default(now())
 
   @@index([commentId])
+}
+
+/* تصويتات القارئين على التعليقات — إعجاب أو عدم إعجاب، صوت واحد لكل قارئ لكل تعليق */
+model CommentVote {
+  id        String          @id @default(cuid())
+  commentId String
+  comment   Comment         @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  value     CommentVoteType
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([userId, commentId])
+  @@index([commentId, value])
 }
 
 model Interaction {

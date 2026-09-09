@@ -15,6 +15,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
     }
 
+    /* «سبب آخر» يستوجب وصفًا مخصصًا إلزاميًا — بلا وصف يُرفض الإبلاغ */
+    const isCustom = reason.trim() === "سبب آخر";
+    const customDetail = details?.trim() || "";
+    if (isCustom && customDetail.length < 5) {
+      return NextResponse.json(
+        { error: "صف المخالفة بدقة في الحقل المخصص — الوصف إلزامي لسبب آخر" },
+        { status: 400 },
+      );
+    }
+    if (customDetail.length > 500) {
+      return NextResponse.json({ error: "الوصف طويل جدًا — 500 حرف كحد أقصى" }, { status: 400 });
+    }
+
     const comment = await prisma.comment.findUnique({
       where: { id: commentId },
       select: { id: true },
@@ -28,7 +41,7 @@ export async function POST(request: Request) {
         data: {
           commentId,
           reason: reason.trim(),
-          details: details?.trim() || null,
+          details: customDetail || null,
           reporterFp: fp || null,
         },
       }),

@@ -195,7 +195,7 @@ export default function SavedClient() {
 
           {!loggedIn && (
             <p className="text-center text-xs" style={{ color: "var(--ink-muted)" }}>
-              <Link href="/login?callback=/saved" className="underline" style={{ color: "var(--accent-strong)" }}>
+              <Link href="/auth/login?callback=/saved" className="underline" style={{ color: "var(--accent-strong)" }}>
                 سجّل الدخول بحساب Google
               </Link>{" "}
               لتحصل على مكتبة متزامنة تلاحظك أينما قرأت.

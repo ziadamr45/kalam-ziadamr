@@ -41,6 +41,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         Google({
           clientId: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          /* استراتيجية السيادة: ربط الحسابات بالبريد صريحًا —
+             أي دخول Google ببريد مطابق لحساب قائم يرتبط به فورًا
+             حتى من جهاز جديد تمامًا، فلا يُنشأ حساب مكرر ولا يُرمى
+             OAuthAccountNotLinked الذي يولّد شاشة الخطأ السوداء */
+          allowDangerousEmailAccountLinking: true,
           authorization: {
             params: {
               prompt: "select_account",
@@ -52,7 +57,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     : [],
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30 },
   trustHost: true,
-  pages: { signIn: "/login" },
+  /* بوابة الوصول المخصصة: كل مسار — دخول أو خطأ — يهبط في صفحتنا الراقية
+     /auth/login برسائل ودية، فلا تظهر أبدًا شاشة Auth.js السوداء الافتراضية */
+  pages: { signIn: "/auth/login", error: "/auth/login" },
   cookies: {
     sessionToken: {
       name: `${cookiePrefix}next-auth.session-token`,
@@ -121,12 +128,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return base;
       }
     },
-    async signIn({ user }) {
+    async signIn({ user, account }) {
       if (!user?.email) return true;
       try {
+        const email = user.email.toLowerCase().trim();
         const existing = await prisma.user.findUnique({
-          where: { email: user.email },
-          select: { id: true, banned: true, name: true },
+          where: { email },
+          select: { id: true, banned: true },
         });
         if (existing?.banned) {
           /* محاولة دخول محظور — يصل للأدمن فورًا في سجل الشفافية */
@@ -134,10 +142,43 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             type: "AUTH_LOGIN_BLOCKED",
             actorType: "GUEST",
             actorId: existing.id,
-            actorLabel: user.email,
+            actorLabel: email,
             message: "محاولة دخول من حساب محظور",
           });
           return false;
+        }
+
+        /* الربط الصريح بالبريد — شبكة أمان إضافية فوق
+           allowDangerousEmailAccountLinking: إن عُرف الحساب بالبريد
+           وصف الربط لم يُكتب لأي سبب، نكتبه هنا بأنفسنا */
+        if (existing && account?.provider && account?.providerAccountId) {
+          const hasLink = await prisma.account.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
+            },
+            select: { userId: true },
+          });
+          if (!hasLink && user.id && user.id === existing.id) {
+            await prisma.account
+              .create({
+                data: {
+                  userId: existing.id,
+                  type: account.type ?? "oauth",
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                  refresh_token: account.refresh_token ?? null,
+                  access_token: account.access_token ?? null,
+                  expires_at: account.expires_at ?? null,
+                  token_type: account.token_type ?? null,
+                  scope: account.scope ?? null,
+                  id_token: account.id_token ?? null,
+                },
+              })
+              .catch(() => {}); // سباق بلا ضرر — الربط كُتب بالتوازي
+          }
         }
         return true;
       } catch {

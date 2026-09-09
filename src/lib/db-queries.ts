@@ -166,6 +166,7 @@ export async function getApprovedComments(articleId: string) {
       include: {
         user: {
           select: {
+            id: true,
             name: true,
             image: true,
             customName: true,
@@ -178,6 +179,32 @@ export async function getApprovedComments(articleId: string) {
     });
   } catch {
     return [];
+  }
+}
+
+/** إحصاءات إعجاب/عدم إعجاب تعليقات مقال — خريطة commentId → { likes, dislikes } */
+export async function getCommentVoteStats(articleId: string) {
+  try {
+    const comments = await prisma.comment.findMany({
+      where: { articleId, status: "APPROVED" },
+      select: { id: true },
+    });
+    const ids = comments.map((c) => c.id);
+    if (!ids.length) return {};
+    const grouped = await prisma.commentVote.groupBy({
+      by: ["commentId", "value"],
+      where: { commentId: { in: ids } },
+      _count: { value: true },
+    });
+    const stats: Record<string, { likes: number; dislikes: number }> = {};
+    for (const g of grouped) {
+      const row = (stats[g.commentId] ??= { likes: 0, dislikes: 0 });
+      if (g.value === "LIKE") row.likes = g._count.value;
+      else row.dislikes = g._count.value;
+    }
+    return stats;
+  } catch {
+    return {};
   }
 }
 

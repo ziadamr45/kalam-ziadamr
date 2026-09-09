@@ -41,6 +41,10 @@
     "postcss": "8.5.23"
   },
   "allowScripts": {
-    "prisma@6.19.3": true
+    "prisma@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "sharp@0.35.4": true,
+    "sharp@0.35.3": true
   }
 }

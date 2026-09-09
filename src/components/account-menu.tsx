@@ -45,7 +45,7 @@ export function AccountMenu() {
   if (status === "unauthenticated" || !session?.user) {
     return (
       <Link
-        href={`/login?callback=${encodeURIComponent(pathname || "/")}`}
+        href={`/auth/login?callback=${encodeURIComponent(pathname || "/")}`}
         title="تسجيل الدخول بحساب Google"
         className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold transition-all hover:scale-105"
         style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}

@@ -40,7 +40,7 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
 export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) {
-    redirect("/login?callback=/profile");
+    redirect("/auth/login?callback=/profile");
   }
 
   const user = await prisma.user.findUnique({
@@ -60,7 +60,7 @@ export default async function ProfilePage() {
     },
   });
 
-  if (!user) redirect("/login?callback=/profile");
+  if (!user) redirect("/auth/login?callback=/profile");
 
   const [logs, comments] = await Promise.all([
     prisma.impactLog.findMany({
