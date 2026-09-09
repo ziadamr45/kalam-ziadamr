@@ -11,6 +11,8 @@ import {
 } from "@/lib/ai-quota";
 import { getSiteConfigFresh } from "@/lib/site-config";
 import { bumpApiUsage } from "@/lib/api-usage";
+import { rateLimit, requestIp } from "@/lib/rate-limit";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * ============================================================
@@ -237,6 +239,15 @@ export async function GET(request: Request) {
 /* ==================== رسالة نقاش ==================== */
 export async function POST(request: Request) {
   try {
+    /* درع الحصة الأول: سقف IP عام 20 رسالة/دقيقة — حتى لو دوّر المهاجم
+       الهويات بجلسات وكوكي متعددة يصطدم بهذا الجدار قبل استنزاف Gemini */
+    if (!rateLimit(`discuss:${requestIp(request)}`, 20, 60_000).ok) {
+      return NextResponse.json(
+        { error: "وتيرة المحاورة عالية — مهلة قصيرة ثم عُد" },
+        { status: 429 },
+      );
+    }
+
     /* مفتاح السيادة: إيقاف المحاورة الذكية كليًا من التكوين — يخفيها الواجهة ويغلق المسار */
     const flags = await getSiteConfigFresh().catch(() => null);
     if (flags && !flags.AI_DISCUSS_ENABLED) {
@@ -385,6 +396,14 @@ export async function POST(request: Request) {
     if (err instanceof GeminiError) {
       return NextResponse.json({ error: err.message }, { status: err.status >= 500 ? 502 : err.status });
     }
+    await recordServerError({
+      err,
+      app: "PUBLIC",
+      path: "/api/ai/discuss",
+      method: "POST",
+      requestId: request.headers.get("x-kalam-rid"),
+      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors`,
+    });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

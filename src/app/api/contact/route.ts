@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { pushAdmins } from "@/lib/push";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * رسائل صفحة «اتصل بنا» — تُخزن في قاعدة البيانات
@@ -86,7 +87,8 @@ export async function POST(request: Request) {
     }).catch(() => {});
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/contact", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "تعذر إرسال الرسالة حاليًا" }, { status: 500 });
   }
 }

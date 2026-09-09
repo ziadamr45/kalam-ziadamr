@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { pushUsers } from "@/lib/push";
 import { logEvent } from "@/lib/audit";
 import { awardImpact } from "@/lib/impact";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * تصويت التعليقات — إعجاب أو عدم إعجاب.
@@ -140,7 +141,8 @@ export async function POST(
     }).catch(() => {});
 
     return NextResponse.json({ ok: true, myVote, likes, dislikes });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/comments/[commentId]/vote", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

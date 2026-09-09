@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, requestIp } from "@/lib/rate-limit";
 
 /**
  * محرك البحث الفكري الفوري — يغذي نافذة Cmd+K السينمائية.
@@ -32,6 +33,15 @@ function buildSnippet(content: string, q: string): string | null {
 
 export async function GET(request: Request) {
   try {
+    /* حصة البحث: 30 استعلامًا/دقيقة لكل IP — يحمي Neon من استنزاف
+       الاستعلامات النصية المتكررة دون أي إحساس لدى القارئ البشري */
+    if (!rateLimit(`search:${requestIp(request)}`, 30, 60_000).ok) {
+      return NextResponse.json(
+        { ok: false, error: "استعلامات كثيرة — مهلة قصيرة" },
+        { status: 429 },
+      );
+    }
+
     const q = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 80);
     if (q.length < 2) return NextResponse.json({ ok: true, hits: [] as Hit[] });
 

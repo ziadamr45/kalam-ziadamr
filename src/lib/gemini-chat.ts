@@ -6,6 +6,8 @@
  * - لا يغادر المفتاح بيئة الخادم أبدًا.
  */
 
+import "server-only";
+
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 
 const CHAT_CANDIDATES = [

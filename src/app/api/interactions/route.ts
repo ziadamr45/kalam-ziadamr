@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordServerError } from "@/lib/error-alert";
 
 /* حد معدل بسيط في الذاكرة: 20 تصويتًا/دقيقة لكل زائر */
 const rateBuckets = new Map<string, number[]>();
@@ -50,7 +51,8 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ likes, dislikes, myVote });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/interactions", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }
@@ -117,7 +119,8 @@ export async function POST(request: Request) {
     const dislikes = grouped.find((g) => g.value === -1)?._count.value ?? 0;
 
     return NextResponse.json({ likes, dislikes, myVote });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/interactions", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

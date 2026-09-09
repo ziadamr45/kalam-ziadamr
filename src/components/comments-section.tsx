@@ -48,6 +48,8 @@ export function CommentsSection({
   const [reportSent, setReportSent] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [impactNote, setImpactNote] = useState<string>("");
+  /* فخ الروبوتات — حقل مخفي عن البشر تمامًا، البوتات الملئة لكل الحقول ستملؤه */
+  const [honey, setHoney] = useState("");
 
   /* التصويت — أصواتي تُجلب من الخادم بعد الرسم الأولي (الصفحة ISR ثابتة) */
   const [myVotes, setMyVotes] = useState<Record<string, "LIKE" | "DISLIKE">>({});
@@ -95,7 +97,7 @@ export function CommentsSection({
       const res = await fetch("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleId, content: content.trim(), fp: getVisitorFingerprint() }),
+        body: JSON.stringify({ articleId, content: content.trim(), fp: getVisitorFingerprint(), honey }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
@@ -133,6 +135,7 @@ export function CommentsSection({
           reason: reportReason,
           details: reportReason === CUSTOM_REASON ? customReason.trim() : undefined,
           fp: getVisitorFingerprint(),
+          honey,
         }),
       });
       if (!res.ok) {
@@ -225,6 +228,17 @@ export function CommentsSection({
           className="rounded-2xl border p-5 shadow-soft"
           style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         >
+          {/* فخ السبام — خارج الشاشة بكل المقاييس: لا يراه الإنسان ولا يلمسه */}
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            value={honey}
+            onChange={(e) => setHoney(e.target.value)}
+            className="pointer-events-none absolute h-0 w-0 -translate-x-[9999px] opacity-0"
+          />
           <textarea
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
@@ -454,6 +468,17 @@ export function CommentsSection({
                       {reportError}
                     </p>
                   )}
+                  {/* فخ ثانٍ لنموذج الإبلاغ — نفس المبدأ خارج الشاشة */}
+                  <input
+                    type="text"
+                    name="website2"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    value={honey}
+                    onChange={(e) => setHoney(e.target.value)}
+                    className="pointer-events-none absolute h-0 w-0 -translate-x-[9999px] opacity-0"
+                  />
                   <button
                     onClick={() => sendReport(c.id)}
                     className="mt-2 rounded-full px-4 py-2 text-xs font-bold"

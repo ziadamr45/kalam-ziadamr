@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * مكتبة القارئ المتزامنة — محفوظات الحساب عبر كل الأجهزة
@@ -50,7 +51,8 @@ export async function GET() {
   }
   try {
     return NextResponse.json({ saves: await mySaves(session.user.id) });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/saves", method: "GET", requestId: null, url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }
@@ -81,7 +83,8 @@ export async function POST(request: Request) {
       update: {},
     });
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/saves", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }
@@ -100,7 +103,8 @@ export async function DELETE(request: Request) {
       where: { userId: session.user.id, articleId },
     });
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/saves", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

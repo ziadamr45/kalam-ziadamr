@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * محرك استئناف القراءة — حفظ موضع التمرير في قاعدة البيانات ليتزامن عبر
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, progress, scrollY });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/progress", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
@@ -55,7 +57,8 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ ok: true, progress: row?.progress ?? 0, scrollY: row?.scrollY ?? 0 });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/progress", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

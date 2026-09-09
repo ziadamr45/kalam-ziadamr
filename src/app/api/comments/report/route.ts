@@ -1,31 +1,76 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
+import { recordServerError } from "@/lib/error-alert";
+
+/**
+ * الإبلاغ عن تعليق — مسار عام (بلا جلسة) لذا هو أكثر مسار يستهدفه
+ * الإغراق: فخ Honeypot + حد معدل صارم لكل IP + تحقق مخطط صارم.
+ */
+
+const reportSchema = z.object({
+  commentId: z.string().min(1).max(64),
+  reason: z.string().trim().min(1).max(120),
+  details: z.string().trim().max(500).optional().default(""),
+  fp: z.string().max(128).optional().default(""),
+  /* فخ الروبوتات — حقل مخفي لا يراه الإنسان، البوت يملؤه */
+  honey: z.string().max(200).optional().default(""),
+});
+
+const REPORT_REASONS = new Set([
+  "إساءة أو لغة غير لائقة",
+  "إعلان أو سبام",
+  "مخالفة القيم",
+  "سبب آخر",
+]);
 
 export async function POST(request: Request) {
+  const ip = requestIp(request);
   try {
-    const body = (await request.json()) as {
-      commentId?: string;
-      reason?: string;
-      details?: string;
-      fp?: string;
-    };
-    const { commentId, reason, details, fp } = body;
+    /* حد المعدل: 3 بلاغات / 5 دقائق لكل IP — سد سطح الإغراق المكشوف */
+    const rl = rateLimit(`report:${ip}`, 3, 5 * 60_000);
+    if (!rl.ok) {
+      logSecurityEvent({
+        type: "RATE_LIMIT",
+        message: `تجاوز حد البلاغات من ${ip} — تعثر ${rl.retryAfterSec}ث`,
+        meta: { ip, path: "/api/comments/report" },
+      });
+      return NextResponse.json(
+        { error: "وصلنا عدد من البلاغات — حاول لاحقًا" },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
 
-    if (!commentId || !reason?.trim()) {
+    const parsed = reportSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
       return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
+    }
+    const { commentId, reason, details, fp, honey } = parsed.data;
+
+    /* فخ السبام — إن امتلأ فهو بوت: نتجاهله بصمت تامة بلا أي استهلاك موارد */
+    if (honey) {
+      logSecurityEvent({
+        type: "HONEYPOT",
+        message: `فخ بلاغات التقط روبوتًا من ${ip}`,
+        meta: { ip, path: "/api/comments/report" },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    /* السبب من القائمة المعتمدة حصرًا — لا نصوص حرة في خانة السبب */
+    if (!REPORT_REASONS.has(reason)) {
+      return NextResponse.json({ error: "سبب الإبلاغ غير معروف" }, { status: 400 });
     }
 
     /* «سبب آخر» يستوجب وصفًا مخصصًا إلزاميًا — بلا وصف يُرفض الإبلاغ */
-    const isCustom = reason.trim() === "سبب آخر";
-    const customDetail = details?.trim() || "";
+    const isCustom = reason === "سبب آخر";
+    const customDetail = details || "";
     if (isCustom && customDetail.length < 5) {
       return NextResponse.json(
         { error: "صف المخالفة بدقة في الحقل المخصص — الوصف إلزامي لسبب آخر" },
         { status: 400 },
       );
-    }
-    if (customDetail.length > 500) {
-      return NextResponse.json({ error: "الوصف طويل جدًا — 500 حرف كحد أقصى" }, { status: 400 });
     }
 
     const comment = await prisma.comment.findUnique({
@@ -40,7 +85,7 @@ export async function POST(request: Request) {
       prisma.commentReport.create({
         data: {
           commentId,
-          reason: reason.trim(),
+          reason,
           details: customDetail || null,
           reporterFp: fp || null,
         },
@@ -64,7 +109,15 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    await recordServerError({
+      err,
+      app: "PUBLIC",
+      path: "/api/comments/report",
+      method: "POST",
+      requestId: request.headers.get("x-kalam-rid"),
+      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors`,
+    });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

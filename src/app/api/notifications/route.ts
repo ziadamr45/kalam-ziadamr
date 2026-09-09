@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * جرس إشعارات المستخدم — قائمة الإشعارات الداخلية + عداد غير المقروء.
@@ -52,7 +53,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/notifications", method: "GET", requestId: null, url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

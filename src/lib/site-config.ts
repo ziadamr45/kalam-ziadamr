@@ -35,6 +35,8 @@ export type SiteConfig = {
   AUDIO_PLAYER_ENABLED: boolean;
   PROPOSALS_ENABLED: boolean;
   ONBOARDING_ENABLED: boolean;
+  /* بث تنبيهات الأخطاء 500 لهواتف الإدارة */
+  ERROR_ALERTS_ENABLED: boolean;
   /* معايير اقتصاد الأثر */
   IMPACT_READ_COMPLETE: number;
   IMPACT_READ_DAILY_CAP: number;
@@ -68,6 +70,7 @@ const DEFAULTS: SiteConfig = {
   AUDIO_PLAYER_ENABLED: true,
   PROPOSALS_ENABLED: true,
   ONBOARDING_ENABLED: true,
+  ERROR_ALERTS_ENABLED: true,
   IMPACT_READ_COMPLETE: 1,
   IMPACT_READ_DAILY_CAP: 2,
   IMPACT_COMMENT_APPROVED: 2,

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { awardImpact, requiredReadSeconds, AwardResult } from "@/lib/impact";
 import { logEvent, getClientIp } from "@/lib/audit";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * ============================================================
@@ -124,7 +125,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/impact/award", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

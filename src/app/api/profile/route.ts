@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { displayName, validateCustomName, validateBio } from "@/lib/identity";
 import { analyzeComment } from "@/lib/moderation";
 import { logEvent, getClientIp } from "@/lib/audit";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * ============================================================
@@ -101,7 +102,8 @@ export async function PUT(request: Request) {
     }).catch(() => {});
 
     return NextResponse.json({ ok: true, profile: updated });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/profile", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "تعذر حفظ التغييرات — أعد المحاولة" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeComment } from "@/lib/moderation";
@@ -6,6 +7,8 @@ import { aiModerate } from "@/lib/ai-moderation";
 import { pushAdmins } from "@/lib/push";
 import { awardImpact } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
+import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
+import { recordServerError } from "@/lib/error-alert";
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -22,6 +25,14 @@ function allow(key: string): boolean {
   return true;
 }
 
+const commentSchema = z.object({
+  articleId: z.string().min(1).max(64),
+  content: z.string().min(1).max(4000),
+  fp: z.string().max(128).optional().default(""),
+  /* فخ الروبوتات — حقل مخفي لا يراه الإنسان */
+  honey: z.string().max(200).optional().default(""),
+});
+
 export async function POST(request: Request) {
   try {
     const session = await auth();
@@ -32,8 +43,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as { articleId?: string; content?: string; fp?: string };
-    const { articleId, content, fp } = body;
+    const parsed = commentSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
+    }
+    const { articleId, content, fp, honey } = parsed.data;
+
+    /* فخ السبام — بوت يملأ الحقل المخفي: تجاهل صامت بلا أي معالجة */
+    if (honey) {
+      logSecurityEvent({
+        type: "HONEYPOT",
+        message: `فخ التعليقات التقط روبوتًا من ${requestIp(request)}`,
+        meta: { ip: requestIp(request), path: "/api/comments" },
+      });
+      return NextResponse.json({ ok: true, message: "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير" });
+    }
+
     if (!articleId || !content?.trim()) {
       return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
     }
@@ -145,7 +170,15 @@ export async function POST(request: Request) {
         ? { points: impact.points, impactScore: impact.impactScore, rank: impact.rank, rankUp: impact.rankUp }
         : null,
     });
-  } catch {
+  } catch (err) {
+    await recordServerError({
+      err,
+      app: "PUBLIC",
+      path: "/api/comments",
+      method: "POST",
+      requestId: request.headers.get("x-kalam-rid"),
+      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors`,
+    });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
   }
 }

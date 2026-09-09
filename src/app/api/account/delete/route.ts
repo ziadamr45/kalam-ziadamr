@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logEvent } from "@/lib/audit";
+import { recordServerError } from "@/lib/error-alert";
 
 /*
  * حذف الحساب الذاتي الفوري — وعد سياسة الخصوصية مُطبَّق حرفيًا:
@@ -63,7 +64,8 @@ export async function DELETE() {
     revalidatePath("/profile");
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/account/delete", method: "DELETE", requestId: null, url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json(
       { error: "تعذر إتمام الحذف الآن — جرّب مرة أخرى أو تواصل معنا" },
       { status: 500 },

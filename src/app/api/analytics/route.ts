@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, requestIp } from "@/lib/rate-limit";
 
 /**
  * تتبع التحليلات: زيارات، إكمال قراءة، مدة بقاء، مشاركات
@@ -7,6 +8,12 @@ import { prisma } from "@/lib/prisma";
  */
 export async function POST(request: Request) {
   try {
+    /* حصة سخية لكل IP (60/دقيقة) — أداة تحليل لا تُغرق القاعدة أبدًا؛
+       التجاوز يُردّ بصمت تام (ok:false) بلا أي أثر على تجربة الزائر */
+    if (!rateLimit(`analytics:${requestIp(request)}`, 60, 60_000).ok) {
+      return NextResponse.json({ ok: false });
+    }
+
     const body = (await request.json()) as {
       type?: "view" | "complete" | "dwell" | "share";
       articleId?: string;

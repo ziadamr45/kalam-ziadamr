@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordServerError } from "@/lib/error-alert";
 
 /**
  * حفظ اشتراك المستخدم المسجل بجوجل في إشعارات الويب الفورية.
@@ -46,7 +47,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    await recordServerError({ err, app: "PUBLIC", path: "/api/push/subscribe", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "تعذر حفظ الاشتراك" }, { status: 500 });
   }
 }

@@ -4,6 +4,8 @@
  * فيكبف الرفع سرعة المنصة دون أي ضغط يدوي.
  */
 
+import "server-only";
+
 const CLOUD = process.env.CLOUDINARY_CLOUD_NAME;
 const KEY = process.env.CLOUDINARY_API_KEY;
 const SECRET = process.env.CLOUDINARY_API_SECRET;

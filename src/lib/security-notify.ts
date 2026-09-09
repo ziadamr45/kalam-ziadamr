@@ -1,3 +1,4 @@
+import "server-only";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { pushUsers } from "@/lib/push";
