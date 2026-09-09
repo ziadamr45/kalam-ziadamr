@@ -107,7 +107,7 @@ export function middleware(request: NextRequest) {
       ip:
         request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
         request.headers.get("x-real-ip") ||
-        null,
+        "unknown",
       userAgent: request.headers.get("user-agent"),
       country: request.headers.get("x-vercel-ip-country"),
       cookie: request.headers.get("cookie"),
