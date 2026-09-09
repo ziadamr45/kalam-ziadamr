@@ -4,7 +4,7 @@
    الأصول الثابتة كاش أولًا. القراءة دون اتصال عبر IndexedDB.
    ============================================================ */
 
-const CACHE_VERSION = "kalam-v3";
+const CACHE_VERSION = "kalam-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -16,6 +16,7 @@ const PRECACHE_URLS = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/maskable-512.png",
+  "/badge-public-96x96.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -131,12 +132,14 @@ self.addEventListener("fetch", (event) => {
 
 /* ============================================================
    إشعارات الويب الفورية — Web Push بمعيار VAPID
-   الشعار الرسمي أيقونةً وشارةً في شريط الإشعارات العلوي،
-   والنقر يوجّه القارئ مباشرة إلى صفحة الحدث.
+   الشعار الملون أيقونةً داخل متن الإشعار، والبادج المفرّغ ألفا-فقط
+   (أبيض صافٍ على شفاف) لشريط حالة أندرويد — النظام يحوّل أي بكسل
+   غير شفاف في حقل badge إلى مربع أبيض مصمت، لذا يُمنع نهائيًا
+   وضع صور ملونة فيه. وسم افتراضي ثابت + renotify يسمح بالتحديث الصوتي.
    ============================================================ */
 
 const PUSH_ICON = "/icons/icon-192.png";
-const PUSH_BADGE = "/icons/badge-96.png";
+const PUSH_BADGE = "/badge-public-96x96.png";
 
 self.addEventListener("push", (event) => {
   let data = {};
@@ -151,7 +154,8 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: data.icon || PUSH_ICON,
     badge: data.badge || PUSH_BADGE,
-    tag: data.tag || undefined,
+    tag: data.tag || "kalam-public-notification",
+    renotify: true,
     dir: "rtl",
     lang: "ar",
     vibrate: [80, 40, 80],

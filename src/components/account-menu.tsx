@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -65,23 +66,27 @@ export function AccountMenu() {
         aria-haspopup="true"
         aria-expanded={open}
         title={u.name || "حسابي"}
-        className="rounded-full transition-all duration-300 hover:scale-110"
+        /* محاذاة رأسية صريحة: flex + items-center + justify-center + self-center
+           تقتل فجوة سطر الأساس (baseline descender) التي كانت ترفع الصورة ~2px،
+           وh-9 w-9 توحّد القياس مع جرس الإشعارات (36px) على نفس المحور */
+        className="flex h-9 w-9 items-center justify-center self-center overflow-hidden rounded-full border transition-all duration-300 hover:scale-110"
+        style={{
+          borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.2)",
+        }}
       >
         {u.image ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
+          <Image
             src={u.image}
             alt={u.name || "صورة الحساب"}
-            width={32}
-            height={32}
+            width={36}
+            height={36}
             referrerPolicy="no-referrer"
-            className="h-8 w-8 rounded-full border-2 object-cover"
-            style={{ borderColor: open ? "var(--accent)" : "var(--border)" }}
+            className="block h-9 w-9 object-cover"
           />
         ) : (
           <span
-            className="flex h-8 w-8 items-center justify-center rounded-full border text-sm font-bold"
-            style={{ borderColor: "var(--border)", background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+            className="flex h-9 w-9 items-center justify-center text-sm font-bold"
+            style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
           >
             {(u.name || "ق").trim().charAt(0)}
           </span>
