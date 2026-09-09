@@ -30,7 +30,7 @@ export function ReadingProgress() {
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-50 h-1 origin-right"
+      className="no-print fixed inset-x-0 top-0 z-50 h-1 origin-right"
       style={{
         background: "transparent",
         transform: `scaleX(${progress})`,

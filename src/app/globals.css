@@ -678,3 +678,56 @@ body.immersion .page-chrome {
     margin: 2em auto;
   }
 }
+
+/* ============ طباعة المقال وتصديره PDF — ورقة قارئة وقورة ============ */
+
+/* عنصر يظهر في الطباعة حصريًا (توقيع المقال في نسخة الـ PDF) */
+.print-only { display: none !important; }
+
+@media print {
+  @page { margin: 18mm 16mm; }
+
+  html, body {
+    background: #ffffff !important;
+  }
+
+  /* كل واجهة المنصة تختفي — يبقى المقال وحده بورقة نظيفة */
+  .no-print,
+  .site-header,
+  .site-footer {
+    display: none !important;
+  }
+
+  main,
+  article {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  body {
+    color: #000 !important;
+    font-size: 12.5pt;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* منع كسر الكتل الفكرية بين الصفحات */
+  .quran-block,
+  .hadith-block,
+  blockquote {
+    break-inside: avoid;
+  }
+
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+}

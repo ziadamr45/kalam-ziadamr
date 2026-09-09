@@ -449,6 +449,36 @@ export function QuoteGenerator({
     return () => document.removeEventListener("selectionchange", onSelectionChange);
   }, [containerSelector]);
 
+  /* نسخ التحديد مع المصدر — «…النص… — منصة كلام له لازمة» + رابط المقال */
+  const [copied, setCopied] = useState(false);
+  const copySelection = useCallback(async () => {
+    const text = stripMarkdown(selectedText);
+    const payload = `${text}\n— منصة كلام له لازمة\n${window.location.origin}/article/${articleSlug}`;
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+      trackShareBySlug(articleSlug, "copy-source", selectedText.length);
+    } catch {}
+  }, [selectedText, articleSlug]);
+
+  /* مشاركة مباشرة عبر مشاركة النظام مع سقوط آمن إلى النسخ */
+  const shareSelection = useCallback(async () => {
+    const text = stripMarkdown(selectedText);
+    const url = `${window.location.origin}/article/${articleSlug}`;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: articleTitle, text: `${text}\n— منصة كلام له لازمة`, url });
+        trackShareBySlug(articleSlug, "web-share-selection", selectedText.length);
+      } else {
+        await navigator.clipboard.writeText(`${text}\n— منصة كلام له لازمة\n${url}`);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+        trackShareBySlug(articleSlug, "copy-source", selectedText.length);
+      }
+    } catch {}
+  }, [selectedText, articleSlug, articleTitle]);
+
   /* الرسم السينمائي — ينتظر الخطوط ثم الغلاف وQR ثم يرسم دفعة واحدة */
   useEffect(() => {
     if (!open || !canvasRef.current) return;
@@ -578,8 +608,8 @@ export function QuoteGenerator({
       {chipPos && mounted && !open && (
         <div
           ref={chipRef}
-          className="quote-chip fixed z-50 -translate-x-1/2 -translate-y-full"
-          style={{ left: chipPos.x, top: chipPos.y }}
+          className="quote-chip no-print fixed z-50 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full border p-1 shadow-lift"
+          style={{ left: chipPos.x, top: chipPos.y, background: "var(--surface)", borderColor: "var(--border)" }}
         >
           <button
             onMouseDown={(e) => e.preventDefault()}
@@ -588,10 +618,34 @@ export function QuoteGenerator({
               requestOpen();
             }}
             onClick={requestOpen}
-            className="rounded-full px-4 py-2 text-xs font-bold shadow-lift transition-transform hover:scale-105"
+            className="whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-bold transition-transform hover:scale-105"
             style={{ background: "var(--accent)", color: "#fff" }}
           >
-            اقتباسها
+            اقتباس كبطاقة
+          </button>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              copySelection();
+            }}
+            onClick={copySelection}
+            className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+            style={{ color: copied ? "var(--accent-strong)" : "var(--ink)" }}
+          >
+            {copied ? "نُسخ ✓" : "نسخ مع المصدر"}
+          </button>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              shareSelection();
+            }}
+            onClick={shareSelection}
+            className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+            style={{ color: "var(--ink)" }}
+          >
+            مشاركة
           </button>
         </div>
       )}

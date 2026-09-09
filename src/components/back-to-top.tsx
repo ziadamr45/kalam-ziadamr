@@ -75,7 +75,7 @@ export function BackToTop() {
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="العودة إلى أعلى الصفحة"
       title="العودة إلى أعلى الصفحة"
-      className={`fixed z-30 flex h-12 w-12 items-center justify-center rounded-full shadow-lift transition-all duration-300 ease-out
+      className={`no-print fixed z-30 flex h-12 w-12 items-center justify-center rounded-full shadow-lift transition-all duration-300 ease-out
         ${bottomClass}
         left-6 lg:left-[max(1.5rem,calc(50%-30.5rem))]
         hover:scale-110 active:scale-95

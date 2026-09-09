@@ -216,7 +216,7 @@ export function DiscussCompanion({
   return (
     <>
       {/* الزر الانسيابي الأنيق */}
-      <div className="page-chrome mt-8 flex justify-center">
+      <div className="page-chrome no-print mt-8 flex justify-center">
         <button
           ref={triggerRef}
           type="button"

@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { ReadingProgress } from "@/components/reading-progress";
 import { BackToTop } from "@/components/back-to-top";
+import ContinueReadingBadge from "@/components/continue-reading-badge";
 import { ArticleCard } from "@/components/article-card";
 import { ArticleReader } from "@/components/article-reader";
 import { CommentsSection } from "@/components/comments-section";
@@ -123,6 +124,7 @@ export default async function ArticlePage({
       <ReadingProgress />
       <SiteHeader />
       <BackToTop />
+      <ContinueReadingBadge slug={article.slug} articleId={article.id} />
 
       <main className="flex-1">
         <article className="mx-auto max-w-3xl px-4 pt-28 pb-28 sm:px-6">
@@ -181,7 +183,7 @@ export default async function ArticlePage({
           <DiscussCompanion articleId={article.id} articleTitle={article.title} />
 
           {/* التفاعل والمشاركة */}
-          <div className="page-chrome mt-10 border-t pt-8" style={{ borderColor: "var(--border)" }}>
+          <div className="page-chrome no-print mt-10 border-t pt-8" style={{ borderColor: "var(--border)" }}>
             <p className="mb-4 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
               هل كان لهذا الكلام لازمة؟
             </p>
@@ -219,7 +221,7 @@ export default async function ArticlePage({
               }))}
             />
           ) : (
-            <section className="page-chrome mt-12 border-t pt-10 text-center" style={{ borderColor: "var(--border)" }}>
+            <section className="page-chrome no-print mt-12 border-t pt-10 text-center" style={{ borderColor: "var(--border)" }}>
               <p className="rounded-2xl border border-dashed px-6 py-8 text-sm leading-8" style={{ color: "var(--ink-muted)", borderColor: "var(--border)" }}>
                 الحوار متوقف مؤقتًا بقرار إداري.. القراءة متاحة كالعادة —
                 <br />
@@ -227,11 +229,15 @@ export default async function ArticlePage({
               </p>
             </section>
           )}
+          {/* سطر الطباعة — يظهر في نسخة الـ PDF حصريًا */}
+          <div className="print-only mt-12 border-t pt-4 text-center text-xs" style={{ borderColor: "var(--border)", color: "#555" }}>
+            منصة كلام له لازمة · {article.title}
+          </div>
         </article>
 
         {/* مقالات ذات صلة */}
         {related.length > 0 && (
-          <section className="page-chrome mx-auto max-w-5xl px-4 pb-24 sm:px-6">
+          <section className="page-chrome no-print mx-auto max-w-5xl px-4 pb-24 sm:px-6">
             <h2 className="font-ui mb-6 text-xl font-bold" style={{ color: "var(--ink)" }}>
               كلامٌ آخر له لازمة
             </h2>

@@ -490,7 +490,7 @@ export function AudioPlayer({
           - هدف لمس زر التشغيل/الإيقاف 48×48px + حالة hover ناعمة للحاسوب. */}
       {sessionActive &&
         createPortal(
-          <div dir="ltr" className="pointer-events-none fixed inset-x-0 bottom-0 z-40">
+          <div dir="ltr" className="no-print pointer-events-none fixed inset-x-0 bottom-0 z-40">
             <div className="flex justify-start pb-[calc(5rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
                 className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-zinc-900 py-2 pl-2 pr-3.5 text-white shadow-2xl transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] dark:bg-white dark:text-zinc-900 sm:py-2.5"

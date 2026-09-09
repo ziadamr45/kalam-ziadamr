@@ -32,6 +32,16 @@ type AnalyticsPayload = {
   quoteLen?: number;
 };
 
+/** نوع الجهاز من سلسلة المتصفح — يغذي لوحة تحليلات الأداء في لوحة التحكم */
+function getDeviceType(): string {
+  if (typeof navigator === "undefined") return "desktop";
+  const ua = navigator.userAgent.toLowerCase();
+  if (/ipad|tablet|playbook|silk|kindle/.test(ua)) return "tablet";
+  if (/mobi|iphone|android.*mobile|windows phone/.test(ua)) return "mobile";
+  if (/android/.test(ua)) return "tablet";
+  return "desktop";
+}
+
 export function track(payload: AnalyticsPayload): void {
   if (typeof window === "undefined") return;
   const fp =
@@ -42,7 +52,7 @@ export function track(payload: AnalyticsPayload): void {
   if (fp && !window.localStorage.getItem("kalam_fp")) {
     try { window.localStorage.setItem("kalam_fp", fp); } catch {}
   }
-  const body = JSON.stringify({ ...payload, sessionId: getSessionId(), fp });
+  const body = JSON.stringify({ ...payload, device: getDeviceType(), sessionId: getSessionId(), fp });
 
   try {
     const blob = new Blob([body], { type: "application/json" });
@@ -69,6 +79,7 @@ export async function trackView(articleId: string | null, path: string): Promise
         type: "view",
         articleId: articleId ?? undefined,
         path,
+        device: getDeviceType(),
         sessionId: getSessionId(),
         fp: window.localStorage.getItem("kalam_fp") || undefined,
       }),

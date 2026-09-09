@@ -18,6 +18,7 @@ export async function POST(request: Request) {
       readSeconds?: number;
       platform?: string;
       quoteLen?: number;
+      device?: string;
     };
 
     const { type } = body;
@@ -29,12 +30,18 @@ export async function POST(request: Request) {
         const art = await prisma.article.findUnique({ where: { slug: body.slug }, select: { id: true } });
         articleId = art?.id ?? null;
       }
+      /* الجغرافيا من ترويسات Vercel الطرفية — دقيقة وفورية وبلا أي خدمة خارجية */
+      const country = request.headers.get("x-vercel-ip-country");
+      const city = request.headers.get("x-vercel-ip-city");
       const view = await prisma.pageView.create({
         data: {
           articleId,
           path: body.path ?? "/",
           sessionId: body.sessionId,
           visitorFp: body.fp ?? null,
+          device: body.device ?? null,
+          country: country ?? null,
+          city: city ? decodeURIComponent(city) : null,
         },
         select: { id: true },
       });

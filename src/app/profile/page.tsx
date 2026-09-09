@@ -10,6 +10,7 @@ import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
+import PushPromptCapsule from "@/components/push-prompt-capsule";
 import { displayName } from "@/lib/identity";
 import { RANKS, rankMeta, canSendProposals } from "@/lib/ranks";
 import { formatArabicDate } from "@/lib/utils";
@@ -364,6 +365,8 @@ export default async function ProfilePage() {
           <AccountDangerZone />
         </section>
       </main>
+      {/* كبسولة تفعيل الإشعارات الذكية — صفحة الحساب من مواضع الظهور المشروعة */}
+      <PushPromptCapsule />
       <Footer />
     </>
   );

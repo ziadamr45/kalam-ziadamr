@@ -4,6 +4,7 @@ import { Footer } from "@/components/footer";
 import { ArticleCard } from "@/components/article-card";
 import { getLatestArticles, getActiveSections } from "@/lib/db-queries";
 import { SECTIONS } from "@/lib/sections";
+import PushPromptCapsule from "@/components/push-prompt-capsule";
 
 export const revalidate = 300;
 
@@ -152,6 +153,8 @@ export default async function HomePage() {
           </div>
         </section>
       </main>
+      {/* كبسولة تفعيل الإشعارات الذكية — الرئيسية فقط، ممنوعة في المقالات */}
+      <PushPromptCapsule />
       <Footer />
     </>
   );

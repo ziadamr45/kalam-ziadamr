@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { pushUsers } from "@/lib/push";
 
 /**
  * مهمة Vercel Cron الأصلية — النشر المجدول التلقائي (المحور الثاني).
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   try {
     const due = await prisma.article.findMany({
       where: { status: "SCHEDULED", scheduledAt: { lte: new Date() } },
-      select: { id: true, slug: true, sectionId: true },
+      select: { id: true, slug: true, title: true, sectionId: true },
     });
 
     if (due.length === 0) {
@@ -72,6 +73,37 @@ export async function GET(request: Request) {
       } catch {
         /* إعادة التحقق غير حرجة — ISR الدوري يغطي */
       }
+    }
+
+    /* جرس المقال الجديد: إشعار داخلي لكل المسجلين غير الموقوفين + ويب بوش فوري —
+       محمي كليًا: فشل الإشعارات لا يمس النشر أبدًا */
+    try {
+      const users = await prisma.user.findMany({
+        where: { banned: false },
+        select: { id: true },
+      });
+      for (const article of due) {
+        const url = `/article/${article.slug}`;
+        if (users.length > 0) {
+          await prisma.userNotification.createMany({
+            data: users.map((u) => ({
+              userId: u.id,
+              title: `مقال جديد: ${article.title}`,
+              body: "حديثًا على منصة كلام له لازمة — اقرأه الآن قبل أن تلهث عيناك.",
+              url,
+              kind: "UPDATE",
+            })),
+          });
+        }
+        await pushUsers({
+          title: `مقال جديد: ${article.title}`,
+          body: "حديثًا على منصة كلام له لازمة",
+          url,
+          tag: "new-article",
+        });
+      }
+    } catch {
+      /* الإشعارات تزيين — لا تعطل النشر قط */
     }
 
     return NextResponse.json({ ok: true, published, revalidated: [...paths] });

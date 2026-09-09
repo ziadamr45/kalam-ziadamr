@@ -195,7 +195,7 @@ export function CommentsSection({
   };
 
   return (
-    <section id="comments" className="page-chrome mt-12 border-t pt-10" style={{ borderColor: "var(--border)" }}>
+    <section id="comments" className="page-chrome no-print mt-12 border-t pt-10" style={{ borderColor: "var(--border)" }}>
       <h2 className="font-ui mb-6 text-xl font-bold" style={{ color: "var(--ink)" }}>
         الحوار ({comments.length > 0 ? new Intl.NumberFormat("ar-EG").format(comments.length) : "لا تعليقات بعد"})
       </h2>

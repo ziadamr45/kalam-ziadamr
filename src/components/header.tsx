@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationBell, DrawerNotifications } from "@/components/notification-bell";
 import { BrandMark } from "@/components/brand-mark";
+import SearchPalette from "@/components/search-palette";
 
 /* الأقسام الحية الواردة من الخادم (مجلوبة من Neon عبر مكوّن SiteHeader) */
 export type NavSection = {
@@ -268,6 +269,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
               عن المنصة
             </Link>
 
+            {/* البحث الفكري الفوري — زر بالهيدر + اختيار Cmd+K عالمي */}
+            <SearchPalette />
+
             {/* وضع القراءة المركزة — داخل صفحات المقالات حصريًا */}
             {isArticlePage && (
               <button
@@ -292,8 +296,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             <AccountMenu />
           </nav>
 
-          {/* أدوات الهاتف: ثيم + حساب + قائمة */}
+          {/* أدوات الهاتف: بحث + ثيم + حساب + قائمة */}
           <div className="flex items-center gap-1 md:hidden">
+            <SearchPalette />
             <ThemeToggle className="p-2.5" />
             <div className="account-menu-mobile">
               <AccountMenu />

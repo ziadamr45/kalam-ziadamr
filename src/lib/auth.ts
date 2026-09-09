@@ -2,8 +2,10 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Adapter } from "next-auth/adapters";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { logEvent } from "@/lib/audit";
+import { captureLoginSecurity } from "@/lib/security-notify";
 
 /**
  * هل مُهِّئت مفاتيح Google الحقيقية؟
@@ -230,6 +232,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         actorLabel: user?.email ?? user?.name ?? null,
         message: isNewUser ? "انضمام قارئ جديد عبر Google" : "تسجيل دخول ناجح عبر Google",
       }).catch(() => {});
+
+      /* الميثاق الأمني السيادي: التقاط الدخول (IP + الجهاز + الموقع التقريبي)
+         ومقارنته بالنشاط المعتاد، وإطلاق التنبيه الفوري عند جهاز جديد —
+         محصّن بحد زمني 6 ثوانٍ ولا يعطل تسجيل الدخول أبدًا مهما حدث */
+      if (user?.id) {
+        try {
+          const h = await headers();
+          await Promise.race([
+            captureLoginSecurity({
+              userId: user.id,
+              email: user.email ?? null,
+              userAgent: h.get("user-agent"),
+              ip:
+                h.get("x-real-ip") ||
+                h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+                null,
+              geoHeaders: h,
+            }),
+            new Promise((resolve) => setTimeout(resolve, 6000)),
+          ]);
+        } catch {
+          /* التقاط الأمن لا يُفشل الدخول قط */
+        }
+      }
     },
     async signOut(message) {
       const token = (message as { token?: { uid?: string; email?: string } })?.token;

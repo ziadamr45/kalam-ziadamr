@@ -193,7 +193,7 @@ export function ArticleReader({
       {/* شريط أدوات القراءة — مثبت أسفل الشاشة كشريط عائم مضغوط لا يحجب المحتوى
           (كان يطفو sticky أعلى الصفحة فوق الغلاف والنص) */}
       <div
-        className="page-chrome fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-md"
+        className="page-chrome no-print fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-md"
         style={{
           background: "color-mix(in srgb, var(--bg) 92%, transparent)",
           borderColor: "var(--border)",
@@ -253,6 +253,17 @@ export function ArticleReader({
 
         <span aria-hidden className="hidden min-h-9 sm:inline" style={{ color: "var(--border)" }}>|</span>
 
+        {/* تحميل المقال كـ PDF — ورقة طباعة قارئة بهوامش متزنة يولّدها المتصفح */}
+        <button
+          onClick={() => window.print()}
+          className="min-h-11 rounded-full px-3 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:py-1.5"
+          style={{ color: "var(--ink-muted)" }}
+          title="نسخة منسقة بعناية للطباعة أو الحفظ PDF"
+        >
+          <span className="sm:hidden">PDF</span>
+          <span className="hidden sm:inline">تحميل كـ PDF</span>
+        </button>
+
         {/* مولد الاقتباسات */}
         <QuoteGenerator
           articleId={article.id}
@@ -267,7 +278,7 @@ export function ArticleReader({
 
       {/* المختصر المفيد — لوحة عائمة تنبثق فوق شريط الأدوات السفلي */}
       <div
-        className={`page-chrome fixed inset-x-0 bottom-[68px] z-40 px-3 transition-all duration-300 ease-fluid sm:px-6 ${
+        className={`page-chrome no-print fixed inset-x-0 bottom-[68px] z-40 px-3 transition-all duration-300 ease-fluid sm:px-6 ${
           showSummary ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
         }`}
         aria-hidden={!showSummary}
