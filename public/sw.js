@@ -4,7 +4,7 @@
    الأصول الثابتة كاش أولًا. القراءة دون اتصال عبر IndexedDB.
    ============================================================ */
 
-const CACHE_VERSION = "kalam-v7";
+const CACHE_VERSION = "kalam-v8";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -109,6 +109,23 @@ self.addEventListener("fetch", (event) => {
             return response;
           }),
       ),
+    );
+    return;
+  }
+
+  /* بيان التطبيق (Manifest): الشبكة أولًا دائمًا — حتى يرى متصفح
+     أندرويد أحدث اسم وأيقونات عند تحديث WebAPK المثبّت على
+     الشاشة الرئيسية؛ تقديم نسخة قديمة من الكاش يعني بقاء اسم
+     التطبيق القديم تحت الأيقونة رغم تصحيح الملف */
+  if (url.pathname === "/manifest.webmanifest") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request)),
     );
     return;
   }

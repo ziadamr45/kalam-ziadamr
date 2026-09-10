@@ -112,6 +112,11 @@ export default function RootLayout({
       className={`${amiri.variable} ${readex.variable} ${amiriQuran.variable} ${naskh.variable}`}
     >
       <head>
+        {/* اسم التطبيق الكامل على الشاشة الرئيسية — iOS يستخدمه عند
+            «إضافة إلى الشاشة الرئيسية» بدل <title>، وAndroid يعتمده
+            كاحتياطي إن غاب بيان الويب، لضمان تطابق الاسم على المنصتين */}
+        <meta name="apple-mobile-web-app-title" content="كلام له لازمة" />
+        <meta name="application-name" content="كلام له لازمة" />
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
       </head>
       <body className="font-ui min-h-screen flex flex-col antialiased">
