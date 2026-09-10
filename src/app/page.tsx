@@ -33,8 +33,14 @@ export default async function HomePage() {
 
   const sections =
     dbSections && dbSections.length > 0
-      ? dbSections.map((s) => ({ slug: s.slug, name: s.name, description: s.description ?? "" }))
-      : SECTIONS;
+      ? dbSections.map((s) => ({
+          slug: s.slug,
+          name: s.name,
+          description: s.description ?? "",
+          color: s.color ?? null,
+          icon: s.icon ?? null,
+        }))
+      : SECTIONS.map((s) => ({ ...s, color: null, icon: null }));
 
   return (
     <>
@@ -115,21 +121,49 @@ export default async function HomePage() {
             الأقسام
           </h2>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {sections.map((s) => (
-              <Link
-                key={s.slug}
-                href={`/section/${s.slug}`}
-                className="group rounded-2xl border p-6 shadow-soft transition-all duration-500 ease-fluid hover:-translate-y-1 hover:shadow-lift"
-                style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-              >
-                <h3 className="font-ui text-lg font-bold transition-colors group-hover:text-[var(--accent)]" style={{ color: "var(--ink)" }}>
-                  {s.name}
-                </h3>
-                <p className="font-body mt-2 text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
-                  {s.description}
-                </p>
-              </Link>
-            ))}
+            {sections.map((s) => {
+              /* الهوية الديناميكية للقسم — اللون والأيقونة من لوحة التحكم:
+                 شريط جانبي + غسق لوني خافت جدًا + أيقونة في شارة ملونة،
+                 بلمسة هادئة تحافظ على روح المنصة بلا ألوان صارخة */
+              const customColor = s.color || "#a16a1f";
+              const hasCustom = Boolean(s.color);
+              return (
+                <Link
+                  key={s.slug}
+                  href={`/section/${s.slug}`}
+                  className="group relative overflow-hidden rounded-2xl border p-5 shadow-soft transition-all duration-500 ease-fluid hover:-translate-y-1 hover:shadow-lift"
+                  style={{
+                    background: hasCustom
+                      ? `linear-gradient(to bottom-left, ${customColor}0d, var(--surface) 60%)`
+                      : "var(--surface)",
+                    borderColor: hasCustom ? `${customColor}2e` : "var(--border)",
+                    borderRightColor: hasCustom ? customColor : undefined,
+                    borderRightWidth: hasCustom ? "4px" : undefined,
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    {s.icon && (
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg"
+                        style={{ backgroundColor: hasCustom ? `${customColor}15` : "var(--accent-soft)" }}
+                        aria-hidden
+                      >
+                        {s.icon}
+                      </span>
+                    )}
+                    <h3
+                      className="font-ui text-lg font-bold transition-colors"
+                      style={{ color: hasCustom ? customColor : "var(--ink)" }}
+                    >
+                      {s.name}
+                    </h3>
+                  </div>
+                  <p className="font-body mt-2 line-clamp-2 text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
+                    {s.description}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         </section>
 

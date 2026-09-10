@@ -6,6 +6,10 @@ import { toArabicDigits } from "@/lib/content-blocks";
  * + شارة توثيق السورة والآية في هامش فرعي أنيق بالأرقام العربية.
  * (تتحمل غياب السورة أو رقم الآية — تُعرض الشارة بما توفر فقط)
  */
+/* منع تكرار الأقواس: إن وضع الكاتب الأقواس يدويًا داخل نصه
+   فلا تُضاف أقواس الآية الزخرفية إطلاقًا */
+const QURAN_BRACKET_GUARD = /[﴿﴾]/;
+
 export function QuranBlock({
   id,
   text,
@@ -20,6 +24,7 @@ export function QuranBlock({
   const hasSura = Boolean(sura?.trim());
   const hasAyah = Boolean(ayah?.trim());
   const ayahNum = toArabicDigits((ayah || "").replace(/[^\d]/g, "") || ayah || "");
+  const textHasBrackets = QURAN_BRACKET_GUARD.test(text);
 
   return (
     <figure id={id} className="quran-block" dir="rtl">
@@ -27,13 +32,17 @@ export function QuranBlock({
         ۞
       </span>
       <blockquote className="quran-text">
-        <span className="quran-bracket" aria-hidden>
-          ﴿
-        </span>{" "}
+        {!textHasBrackets && (
+          <span className="quran-bracket" aria-hidden>
+            ﴿
+          </span>
+        )}{" "}
         {text}{" "}
-        <span className="quran-bracket" aria-hidden>
-          ﴾
-        </span>
+        {!textHasBrackets && (
+          <span className="quran-bracket" aria-hidden>
+            ﴾
+          </span>
+        )}
       </blockquote>
       {(hasSura || hasAyah) && (
         <figcaption className="quran-ref">
@@ -55,6 +64,11 @@ export function QuranBlock({
  */
 const PREFIX_GUARD = /^\s*(قال\s*(رسول الله|نبي الله)|ﷺ)/;
 
+/* منع تكرار الأقواس: كثير من الكتّاب يضعون « » يدويًا داخل نص الحديث —
+   إن وُجدت في النص فلا تُضاف أقواس الاقتباس المرسومة إطلاقًا
+   حتى لا تتشوه البنية ««هكذا»» بتكرار مزدوج */
+const BRACKET_GUARD = /[«»]/;
+
 export function HadithBlock({
   id,
   text,
@@ -67,6 +81,7 @@ export function HadithBlock({
   withPrefix?: boolean;
 }) {
   const showPrefix = withPrefix && !PREFIX_GUARD.test(text);
+  const textHasBrackets = BRACKET_GUARD.test(text);
 
   return (
     <figure id={id} className="hadith-block" dir="rtl">
@@ -76,13 +91,17 @@ export function HadithBlock({
         </span>
       )}
       <blockquote className="hadith-text">
-        <span className="hadith-bracket" aria-hidden>
-          «
-        </span>{" "}
+        {!textHasBrackets && (
+          <span className="hadith-bracket" aria-hidden>
+            «
+          </span>
+        )}{" "}
         {text}{" "}
-        <span className="hadith-bracket" aria-hidden>
-          »
-        </span>
+        {!textHasBrackets && (
+          <span className="hadith-bracket" aria-hidden>
+            »
+          </span>
+        )}
       </blockquote>
       {narrator?.trim() && <figcaption className="hadith-ref">{narrator}</figcaption>}
     </figure>

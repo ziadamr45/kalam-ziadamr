@@ -38,6 +38,9 @@ export function DiscussCompanion({
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [limit, setLimit] = useState<number>(6);
+  /* وصول غير محدود: حاملو صلاحية unlimitedAiChat (المؤسس والرتب السيادية)
+     — لا يُعرض لهم عداد رقمي فلكي أبدًا بل شارة هوية أنيقة */
+  const [unlimited, setUnlimited] = useState(false);
   const [error, setError] = useState("");
   const [exhausted, setExhausted] = useState(false);
   const [impactNote, setImpactNote] = useState("");
@@ -79,10 +82,13 @@ export function DiscussCompanion({
         `/api/ai/discuss?articleId=${encodeURIComponent(articleId)}&fp=${encodeURIComponent(getVisitorFingerprint())}`,
       );
       if (res.ok) {
-        const data = (await res.json()) as { remaining: number; limit: number };
+        const data = (await res.json()) as { remaining: number; limit: number; unlimited?: boolean };
         setRemaining(data.remaining);
         setLimit(data.limit);
-        setExhausted(data.remaining <= 0);
+        setExhausted(!data.unlimited && data.remaining <= 0);
+        /* الخادم هو الحكم: علم unlimited أو أي رقم فلكي (دفاع عن
+           جلسات مخزنة قديمة) يعني وصولًا غير محدود */
+        setUnlimited(data.unlimited === true || data.remaining > 1_000_000);
       }
     } catch {}
   }, [articleId]);
@@ -187,6 +193,7 @@ export function DiscussCompanion({
       const data = (await res.json().catch(() => ({}))) as {
         reply?: string;
         remaining?: number;
+        unlimited?: boolean;
         error?: string;
         exhausted?: boolean;
       };
@@ -212,9 +219,10 @@ export function DiscussCompanion({
       ];
       const rem = typeof data.remaining === "number" ? data.remaining : null;
       setMessages(finalMessages);
+      if (data.unlimited === true || (rem !== null && rem > 1_000_000)) setUnlimited(true);
       if (rem !== null) {
         setRemaining(rem);
-        if (rem <= 0) setExhausted(true);
+        if (rem <= 0 && data.unlimited !== true) setExhausted(true);
       }
       persistSession(finalMessages, rem);
 
@@ -348,17 +356,36 @@ export function DiscussCompanion({
                   ✦ {impactNote}
                 </span>
               )}
-              {remaining !== null && (
+              {unlimited || (remaining !== null && remaining > 1_000_000) ? (
+                /* شارة الوصول غير المحدود — بلا أرقام فلكية مشوهة للهيدر */
                 <span
-                  className="rounded-full px-3 py-1 text-[11px] font-bold tabular-nums"
+                  className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
                   style={{
-                    background: "var(--bg-soft)",
-                    color: remaining <= 1 ? "#DC2626" : "var(--ink-muted)",
+                    background: "rgba(245, 158, 11, 0.1)",
+                    color: "#D97706",
+                    borderColor: "rgba(245, 158, 11, 0.25)",
                   }}
-                  title="الرسائل المتبقية في حصة هذا المقال — تتمدد حصتك مع ترقية رتبتك"
+                  title="وصول سيادي بلا حصة — رتبة مميزة على المنصة"
                 >
-                  متبقٍ {arabicNum(remaining)} من {arabicNum(limit)}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+                    <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+                  </svg>
+                  وصول غير محدود
                 </span>
+              ) : (
+                remaining !== null && (
+                  <span
+                    className="rounded-full px-3 py-1 text-[11px] font-bold tabular-nums"
+                    style={{
+                      background: "var(--bg-soft)",
+                      color: remaining <= 1 ? "#DC2626" : "var(--ink-muted)",
+                    }}
+                    title="الرسائل المتبقية في حصة هذا المقال — تتمدد حصتك مع ترقية رتبتك"
+                  >
+                    متبقٍ {arabicNum(remaining)} من {arabicNum(limit)}
+                  </span>
+                )
               )}
               <button
                 type="button"
@@ -428,7 +455,7 @@ export function DiscussCompanion({
               </div>
             )}
 
-            {exhausted && (
+            {exhausted && !unlimited && (
               <p
                 className="rounded-2xl border border-dashed p-4 text-center text-xs leading-7"
                 style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
