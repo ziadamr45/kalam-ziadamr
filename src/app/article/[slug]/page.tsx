@@ -283,7 +283,7 @@ export default async function ArticlePage({
             <span>منصة كلام له لازمة — فكر بلا ضجيج</span>
             {/* الرابط المعروض عربي مقروء مفكوك الترميز — QR يحمل النسخة المرمّزة */}
             <span className="print-footer-url">{`${siteUrl.replace(/^https?:\/\//, "")}/article/${article.slug}`}</span>
-            <span className="print-footer-brand">ziadamr.me</span>
+            <span className="print-footer-brand">ziadamrme.vercel.app</span>
           </div>
         </article>
 

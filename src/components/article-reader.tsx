@@ -515,9 +515,11 @@ export function ArticleReader({
         </div>
       </div>
 
-      {/* صورة الغلاف */}
+      {/* صورة الغلاف — print-cover: استثناء مقصود يُبقي الغلاف في نسخة
+          الورق (PDF) رغم إخفاء عناصر الواجهة، لأن الغلاف جزء من الوثيقة
+          لا من الواجهة */}
       {article.coverImage && (
-        <div className="page-chrome mt-8 overflow-hidden rounded-2xl shadow-soft">
+        <div className="print-cover page-chrome mt-8 overflow-hidden rounded-2xl shadow-soft">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={article.coverImage}

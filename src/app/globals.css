@@ -746,6 +746,28 @@ body.immersion .page-chrome {
     display: block !important;
   }
 
+  /* استثناء الغلاف: صورة المقال جزء من الوثيقة الورقية لا من الواجهة —
+     تعود للورق بعرض الصفحة كاملًا وبلا ظلال أو استدارة شاشة،
+     بسقف ارتفاع يمنع ابتلاع الغلاف صفحة كاملة (الخاصية أعلى
+     من .page-chrome فلا يغلبها إخفاء الواجهة) */
+  #printable-article .print-cover {
+    display: block !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb;
+    margin: 6mm 0 8mm !important;
+    overflow: hidden !important;
+  }
+  #printable-article .print-cover img {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 105mm !important;
+    object-fit: cover !important;
+    object-position: center;
+  }
+
   html,
   body {
     background: #ffffff !important;
