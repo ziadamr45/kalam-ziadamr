@@ -21,8 +21,8 @@ import { recordServerError } from "@/lib/error-alert";
  */
 export const revalidate = 3600;
 
-/** تحويل صورة الغلاف إلى JPEG نظيف مضمّن — وفشلها لا يعطل التصدير أبدًا */
-async function coverToDataUrl(url: string): Promise<string | null> {
+/** تحويل صورة الغلاف إلى JPEG نظيف مضمّن + نسبتها الحقيقية — وفشلها لا يعطل التصدير أبدًا */
+async function coverToDataUrl(url: string): Promise<{ dataUrl: string; ratio: number | null } | null> {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -35,8 +35,13 @@ async function coverToDataUrl(url: string): Promise<string | null> {
       .resize(1400, 900, { fit: "inside", withoutEnlargement: true })
       .flatten({ background: "#FFFFFF" })
       .jpeg({ quality: 82 })
-      .toBuffer();
-    return `data:image/jpeg;base64,${jpg.toString("base64")}`;
+      .toBuffer({ resolveWithObject: true });
+    const w = jpg.info.width || 0;
+    const h = jpg.info.height || 0;
+    return {
+      dataUrl: `data:image/jpeg;base64,${jpg.data.toString("base64")}`,
+      ratio: w > 0 && h > 0 ? w / h : null,
+    };
   } catch {
     return null;
   }
@@ -65,7 +70,7 @@ export async function GET(
       color: { dark: "#1E293BFF", light: "#FFFFFFFF" },
     });
 
-    const coverImage = article.coverImage
+    const cover = article.coverImage
       ? await coverToDataUrl(article.coverImage)
       : null;
 
@@ -73,7 +78,8 @@ export async function GET(
       title: article.title,
       summary: article.summary || null,
       content: article.content,
-      coverImage,
+      coverImage: cover?.dataUrl ?? null,
+      coverRatio: cover?.ratio ?? null,
       qrDataUrl,
       sectionName: article.section?.name ?? null,
       publishedAt: article.publishedAt ?? null,

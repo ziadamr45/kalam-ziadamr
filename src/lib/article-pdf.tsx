@@ -64,12 +64,11 @@ function eastern(n: number | string): string {
 }
 
 /**
- * الرابط كما يُطبع في التذييل — عربي مقروء بسطر واحد مضمون:
- *  1) فك ترميز الـ slug العربي (%D9%85...) إلى حروفه الأصلية — الرابط
- *     المشفر سلسلة طويلة بلا مسافات لا يكسرها محرك الـ PDF فتفيض
- *     أفقيًا فوق رقم الصفحة، وهذا كان سبب التراكم المرصود.
- *  2) اقتصار الطول على حدّ آمن بعلامة حذف — الرابط الكامل موجود
- *     في رمز QR أعلى الوثيقة، فلا خسارة وظيفية بالاقتصار.
+ * الرابط كما يُطبع في التذييل — عربي مقروء كاملًا دون قص:
+ *  1) فك ترميز الـ slug العربي (%D9%85...) إلى حروفه الأصلية.
+ *  2) سقف أمان بعيد فقط (120 حرفًا) للأسماء المرضية الاستثنائية —
+ *     الرابط العادي يظهر كاملًا، والتوازي يتم عبر السطرين داخل خلية
+ *     مرنة منفصلة تمامًا عن رقم الصفحة (كسر الأسطر عند الشرطات سليم).
  */
 function printableUrl(url: string): string {
   let clean = url;
@@ -79,7 +78,7 @@ function printableUrl(url: string): string {
     /* تسلسلات ترميز ناقصة — نُبقي الرابط كما ورد بدل الانهيار */
   }
   clean = clean.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  return clean.length > 58 ? `${clean.slice(0, 57)}…` : clean;
+  return clean.length > 120 ? `${clean.slice(0, 119)}…` : clean;
 }
 
 export type ArticlePdfInput = {
@@ -87,6 +86,7 @@ export type ArticlePdfInput = {
   summary: string | null;
   content: string; // المتن المجرد — مصدر الطباعة النقي
   coverImage: string | null; // data URI جاهز (JPEG) أو null
+  coverRatio: number | null; // العرض÷الارتفاع الحقيقي للغلاف — لاحتواء كامل بلا قص
   qrDataUrl: string | null; // رمز QR لرابط المقال الحي
   sectionName: string | null;
   publishedAt: Date | null;
@@ -293,8 +293,10 @@ function ArticlePdf(input: ArticlePdfInput) {
           <View style={styles.goldRule} />
         </View>
 
-        {/* ===== صورة الغلاف — بأبعاد متناسقة دون الاستحواذ على الصفحة ===== */}
-        {input.coverImage && <Image src={input.coverImage} style={styles.cover} />}
+        {/* ===== صورة الغلاف — احتواء كامل بالنسبة التناسبية الحقيقية =====
+            الأبعاد محسوبة من نسبة الصورة الفعلية (coverRatio من sharp):
+            لا اقتطاع طوليًا ولا عرضيًا، ولا تشويه — تقع كاملة في الصفحة */}
+        {input.coverImage && <Image src={input.coverImage} style={coverStyle(input.coverRatio)} />}
 
         {/* ===== عنوان المقال ===== */}
         <Text style={styles.title}>{input.title}</Text>
@@ -323,6 +325,25 @@ function ArticlePdf(input: ArticlePdfInput) {
 
 /* ==================== الأنماط الطباعية ==================== */
 
+/** أبعاد الغلاف المحتوية — أكبر مقاس يحترم النسبة الحقيقية داخل
+    عرض المحتوى (503pt) وسقف ارتفاعي مريح (300pt) بلا أي قص أو مط */
+function coverStyle(ratio: number | null): {
+  width: number | string;
+  height: number | string;
+  objectFit: "contain";
+  borderRadius: number;
+  marginTop: number;
+} {
+  const CONTENT_W = 503; // A4 (595.28) − هوامش جانبية (2×46)
+  const MAX_H = 300;
+  if (ratio && ratio > 0) {
+    const h = Math.min(MAX_H, CONTENT_W / ratio);
+    return { width: h * ratio, height: h, objectFit: "contain", borderRadius: 6, marginTop: 16 };
+  }
+  /* احتياط بلا نسبة معروفة — احتواء كامل داخل إطار ثابت */
+  return { width: "100%", height: 195, objectFit: "contain", borderRadius: 6, marginTop: 16 };
+}
+
 const styles = StyleSheet.create({
   page: {
     /* هوامش A4 مكتبية بمساحة أمان سفلية واسعة (~28mm) — أسطر المتن
@@ -350,15 +371,16 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   footRight: { fontFamily: "Tajawal", fontSize: 8, color: GOLD, fontWeight: 700 },
-  /* الرابط: خلية مرنة تتقلص دائمًا بين الجارين — النص المطبوع
-     مقصوصٌ مسبقًا في printableUrl فلا التفاف ولا فيضان مطلقًا */
+  /* الرابط: خلية مرنة تتقلص دائمًا بين الجارين — النص الكامل المفكوك
+     يلتف عند الشرطات إلى سطرين كحد أقصى دون أن يلمس رقم الصفحة أبدًا */
   footCenter: {
     fontFamily: "Tajawal",
-    fontSize: 6.8,
+    fontSize: 7,
     color: STEEL,
     flex: 1,
     marginHorizontal: 10,
     textAlign: "center",
+    lineHeight: 1.5,
   },
   footPage: { fontFamily: "Tajawal", fontSize: 8, color: DARK, fontWeight: 700 },
 
@@ -392,13 +414,6 @@ const styles = StyleSheet.create({
   },
 
   /* ---------- الغلاف والعنوان ---------- */
-  cover: {
-    width: "100%",
-    height: 195,
-    objectFit: "cover",
-    borderRadius: 6,
-    marginTop: 16,
-  },
   title: {
     fontFamily: "Amiri",
     fontSize: 23,
@@ -420,9 +435,10 @@ const styles = StyleSheet.create({
     borderBottomColor: FAINT,
   },
 
-  /* ---------- المتن ---------- */
+  /* ---------- المتن — سطر 2.2 مريح للعربية المحركة ومحاذاة يمين
+      صريحة (لا justify قسري يُمطّ المسافات ويشوه التشكيل) ---------- */
   body: { marginTop: 6 },
-  p: { fontSize: 12.5, lineHeight: 1.8, textAlign: "right", marginTop: 9, color: INK },
+  p: { fontSize: 12.5, lineHeight: 2.2, textAlign: "right", marginTop: 9, color: INK },
 
   h2Box: { marginTop: 16, marginBottom: 2 },
   h2: { fontFamily: "Tajawal", fontSize: 15.5, fontWeight: 700, color: DARK, textAlign: "right" },
@@ -438,12 +454,14 @@ const styles = StyleSheet.create({
     borderRightColor: GOLD,
     borderRadius: 3,
   },
-  quoteText: { fontSize: 12.5, lineHeight: 1.8, color: INK, textAlign: "right" },
+  quoteText: { fontSize: 12.5, lineHeight: 2.1, color: INK, textAlign: "right" },
 
   listBox: { marginTop: 8, paddingHorizontal: 4 },
-  listRow: { flexDirection: "row", gap: 7, marginBottom: 4 },
-  bullet: { fontFamily: "Tajawal", fontSize: 11, color: GOLD, fontWeight: 700, width: 16, textAlign: "right" },
-  listText: { flex: 1, fontSize: 12, lineHeight: 1.75, textAlign: "right" },
+  /* RTL حقيقي: الرقم/الرمزة في أقصى يمين الصفحة والنص يسارها —
+     row-reverse يضع أول عنصر (الرمز) على اليمين كما تُقرأ القوائم العربية */
+  listRow: { flexDirection: "row-reverse", gap: 7, marginBottom: 4 },
+  bullet: { fontFamily: "Tajawal", fontSize: 11, color: GOLD, fontWeight: 700, width: 18, textAlign: "center" },
+  listText: { flex: 1, fontSize: 12, lineHeight: 2.05, textAlign: "right" },
 
   hr: { height: 0.8, backgroundColor: FAINT, marginVertical: 14 },
 
@@ -458,7 +476,7 @@ const styles = StyleSheet.create({
     borderTopColor: "#D9E5C3",
     borderBottomColor: "#D9E5C3",
   },
-  quranText: { fontSize: 13.5, lineHeight: 1.95, color: "#3F6212", textAlign: "center" },
+  quranText: { fontSize: 13.5, lineHeight: 2.1, color: "#3F6212", textAlign: "center" },
   quranRef: { fontFamily: "Tajawal", fontSize: 8, color: OLIVE, textAlign: "center", marginTop: 5 },
 
   hadithBox: {
@@ -470,7 +488,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 2.2,
     borderRightColor: "#64748B",
   },
-  hadithText: { fontSize: 12.5, lineHeight: 1.85, color: "#334155", textAlign: "right" },
+  hadithText: { fontSize: 12.5, lineHeight: 2.05, color: "#334155", textAlign: "right" },
   hadithRef: { fontFamily: "Tajawal", fontSize: 8, color: STEEL, textAlign: "right", marginTop: 5 },
 
   noteBox: {

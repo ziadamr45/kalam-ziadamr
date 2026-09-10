@@ -17,6 +17,15 @@ const SIZES: SizePreset[] = [
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kalam-ziadamr.vercel.app";
 
+/** سقف كلمات الاقتباس — سعة البطاقة البصرية المريحة (قرار تصميمي مثبت) */
+const MAX_QUOTE_WORDS = 25;
+const MIN_QUOTE_CHARS = 12;
+
+/** عدّ كلمات النص بعد تطبيعه — المرجع الموحد لكل البوابات */
+function countWords(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 /**
  * تصدير فائق النقاء — pixelRatio 3 (كريستالي لشاشات Retina).
  * حصانة iOS: حد ذاكرة كانفاس ≈ 16.7 مليون بكسل، لذا يُخفَّض النسبة
@@ -98,6 +107,12 @@ function drawQuoteCard(
   ctx.scale(ratio, ratio);
   ctx.direction = "rtl";
   ctx.textAlign = "center";
+
+  /* القاعدة الصلبة الأساسية — أرضية داكنة صلبة قبل أي رسم أو صورة:
+     تمنع أي عيوب شفافية في الـ PNG المصدّر عند المعالجة المتكررة
+     أو عند غلاف بصيغة PNG شفافة */
+  ctx.fillStyle = "#09090b";
+  ctx.fillRect(0, 0, W, H);
 
   const minWH = Math.min(W, H);
   const m = Math.round(minWH * 0.045); // هامش الإطار الداخلي (روح m-5)
@@ -396,11 +411,30 @@ export function QuoteGenerator({
   const [size, setSize] = useState<SizePreset>(SIZES[1]);
   const [rendering, setRendering] = useState(false);
   const [mounted, setMounted] = useState(false);
+  /* حالات التغذية الراجعة التنفيذية — المؤشر الملموس أن الإجراء يعمل */
+  const [isExporting, setIsExporting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  /* تلميح التحديد الطويل — يظهر فوريًا على الشريحة وعند نقر زر الشريط */
+  const [selectionHint, setSelectionHint] = useState("");
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* نافذة البديل الذكي: رسالة خطأ داخلية عند تجاوز اقتراح/إدخال للسقف */
+  const [pickerHint, setPickerHint] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chipRef = useRef<HTMLDivElement | null>(null);
   const chipGraceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const showHint = useCallback((msg: string) => {
+    setSelectionHint(msg);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setSelectionHint(""), 2800);
+  }, []);
+
   useEffect(() => setMounted(true), []);
+
+  /* حالة التحديد الحالي بالنسبة للسقف — مرجع موحد للشريحة والزر */
+  const selectedWords = countWords(selectedText.trim());
+  const selectionOverLimit =
+    selectedText.trim().length >= MIN_QUOTE_CHARS && selectedWords > MAX_QUOTE_WORDS;
 
   /* التقاط تحديد النص داخل جسم المقال */
   useEffect(() => {
@@ -423,7 +457,7 @@ export function QuoteGenerator({
         return;
       }
       const text = sel.toString().trim().replace(/\s+/g, " ");
-      if (text.length < 12 || text.length > 400) {
+      if (text.length < MIN_QUOTE_CHARS || text.length > 5000) {
         if (chipGraceRef.current) clearTimeout(chipGraceRef.current);
         chipGraceRef.current = setTimeout(() => setChipPos(null), 450);
         return;
@@ -529,58 +563,106 @@ export function QuoteGenerator({
     } catch {}
   }, [articleId, session?.user?.id]);
 
-  const download = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = `quote-kalam-${articleSlug}-${size.key}.png`;
-    a.click();
-    trackShareBySlug(articleSlug, "quote-download", selectedText.length);
-    void trackImpact();
-  }, [articleSlug, size.key, selectedText.length, trackImpact]);
+  /** التحميل بتغذية راجعة كاملة — مؤشر دوران + تعطيل مزدوج حتى اكتمال التصدير */
+  const handleDownload = useCallback(async () => {
+    if (isExporting || isSharing) return;
+    try {
+      setIsExporting(true);
+      /* إتاحة إطار للرسم قبل العمل الثقيل على الخيط الرئيسي —
+         كي يلمس القارئ المؤشر فعلًا قبل بدء التصدير */
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = `quote-kalam-${articleSlug}-${size.key}.png`;
+      a.click();
+      trackShareBySlug(articleSlug, "quote-download", selectedText.length);
+      void trackImpact();
+    } finally {
+      setIsExporting(false);
+    }
+  }, [articleSlug, isExporting, isSharing, selectedText.length, size.key, trackImpact]);
 
   const shareNative = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), "image/png"),
-    );
-    trackShareBySlug(articleSlug, "quote-share", selectedText.length);
-    void trackImpact();
-    if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], "quote.png", { type: "image/png" })] })) {
-      try {
-        await navigator.share({
-          files: [new File([blob], "quote.png", { type: "image/png" })],
-          text: selectedText,
-          title: articleTitle,
-        });
-        return;
-      } catch {}
-    }
-    // fallback: نسخ النص
+    if (isSharing || isExporting) return;
     try {
-      await navigator.clipboard.writeText(`«${selectedText}» — كلام له لازمة`);
-      alert("تم نسخ الاقتباس.. الصقه حيث تريد.");
-    } catch {}
-  }, [articleSlug, articleTitle, selectedText, trackImpact]);
+      setIsSharing(true);
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/png"),
+      );
+      trackShareBySlug(articleSlug, "quote-share", selectedText.length);
+      void trackImpact();
+      if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], "quote.png", { type: "image/png" })] })) {
+        try {
+          await navigator.share({
+            files: [new File([blob], "quote.png", { type: "image/png" })],
+            text: selectedText,
+            title: articleTitle,
+          });
+          return;
+        } catch {
+          /* المستخدم ألغى المشاركة — نسقط إلى النسخ */
+        }
+      }
+      // fallback: نسخ النص
+      try {
+        await navigator.clipboard.writeText(`«${selectedText}» — كلام له لازمة`);
+        alert("تم نسخ الاقتباس.. الصقه حيث تريد.");
+      } catch {}
+    } finally {
+      setIsSharing(false);
+    }
+  }, [articleSlug, articleTitle, isExporting, isSharing, selectedText, trackImpact]);
 
   /**
-   * فتح المولد: بالتحديد المحفوظ إن وُجد — وإلا نافذة البديل الذكي.
-   * onMouseDown preventDefault يمنع الزر من سرق التحديد عند اللمس/النقر.
+   * تصفير الكانفاس والحالات عند الإغلاق — لا تسرب شفافية ولا تراكم طبقات
+   * عند إعادة الفتح، ولا زر عالق في حالة تحميل قديمة.
+   */
+  useEffect(() => {
+    if (open) return;
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    setIsExporting(false);
+    setIsSharing(false);
+  }, [open]);
+
+  /**
+   * فتح المولد — التوجيه الواعي بدل الاقتراحات القسرية:
+   *  - تحديد سليم ضمن السقف → البطاقة فورًا.
+   *  - تحديد طويل → الزر يبقى غير نشط مع تلميح فوري يُرشد لتقليص التحديد،
+   *    ولا تُفتح نافذة الاقتراحات رغمًا عن القارئ أبدًا.
+   *  - لا تحديد → نافذة البديل الذكي (إرادة صريحة من القارئ).
    */
   const requestOpen = useCallback(() => {
-    if (selectedText.trim().length >= 12) {
+    const text = selectedText.trim();
+    const overLimit = text.length >= MIN_QUOTE_CHARS && countWords(text) > MAX_QUOTE_WORDS;
+    if (overLimit) {
+      showHint(`النص طويل.. اختر عبارة مركزة (الحد الأقصى ${MAX_QUOTE_WORDS} كلمة)`);
+      return;
+    }
+    if (text.length >= MIN_QUOTE_CHARS) {
       setOpen(true);
     } else {
+      setPickerHint("");
       setManualQuote("");
       setPickerOpen(true);
     }
-  }, [selectedText]);
+  }, [selectedText, showHint]);
 
   const adoptQuote = useCallback((text: string) => {
     const clean = text.trim().replace(/\s+/g, " ");
-    if (clean.length < 12) return;
+    if (clean.length < MIN_QUOTE_CHARS) return;
+    if (countWords(clean) > MAX_QUOTE_WORDS) {
+      setPickerHint(`هذه العبارة تتجاوز سعة البطاقة — اختر عبارة مركزة (الحد الأقصى ${MAX_QUOTE_WORDS} كلمة)`);
+      return;
+    }
+    setPickerHint("");
     setSelectedText(clean);
     setVariant("normal");
     setPickerOpen(false);
@@ -604,50 +686,82 @@ export function QuoteGenerator({
         <span className="sm:hidden">اقتباسها</span>
       </button>
 
-      {/* الشريحة العائمة عند التحديد */}
+      {/* الشريحة العائمة عند التحديد — زر البطاقة يبقى مرئيًا معطلًا مع
+          تلميح فوري عند تجاوز السقف، بلا تحويل قسري للاقتراحات */}
       {chipPos && mounted && !open && (
         <div
           ref={chipRef}
-          className="quote-chip no-print fixed z-50 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full border p-1 shadow-lift"
+          className="quote-chip no-print fixed z-50 flex -translate-x-1/2 -translate-y-full flex-col items-center gap-1 rounded-2xl border p-1 shadow-lift"
           style={{ left: chipPos.x, top: chipPos.y, background: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              requestOpen();
-            }}
-            onClick={requestOpen}
-            className="whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-bold transition-transform hover:scale-105"
-            style={{ background: "var(--accent)", color: "#fff" }}
-          >
-            اقتباس كبطاقة
-          </button>
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              copySelection();
-            }}
-            onClick={copySelection}
-            className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
-            style={{ color: copied ? "var(--accent-strong)" : "var(--ink)" }}
-          >
-            {copied ? "نُسخ ✓" : "نسخ مع المصدر"}
-          </button>
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              shareSelection();
-            }}
-            onClick={shareSelection}
-            className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
-            style={{ color: "var(--ink)" }}
-          >
-            مشاركة
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                if (selectionOverLimit) return;
+                requestOpen();
+              }}
+              onClick={() => {
+                if (!selectionOverLimit) requestOpen();
+              }}
+              disabled={selectionOverLimit}
+              aria-disabled={selectionOverLimit}
+              title={selectionOverLimit ? `النص طويل.. اختر عبارة مركزة (الحد الأقصى ${MAX_QUOTE_WORDS} كلمة)` : "حوّل التحديد إلى بطاقة مشاركة"}
+              className={`whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-bold transition-all ${
+                selectionOverLimit ? "cursor-not-allowed opacity-45" : "hover:scale-105"
+              }`}
+              style={selectionOverLimit ? { background: "var(--border)", color: "var(--ink-muted)" } : { background: "var(--accent)", color: "#fff" }}
+            >
+              {selectionOverLimit ? `النص طويل (${selectedWords}/${MAX_QUOTE_WORDS} كلمة)` : "اقتباس كبطاقة"}
+            </button>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                copySelection();
+              }}
+              onClick={copySelection}
+              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+              style={{ color: copied ? "var(--accent-strong)" : "var(--ink)" }}
+            >
+              {copied ? "نُسخ ✓" : "نسخ مع المصدر"}
+            </button>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                shareSelection();
+              }}
+              onClick={shareSelection}
+              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+              style={{ color: "var(--ink)" }}
+            >
+              مشاركة
+            </button>
+          </div>
+          {selectionOverLimit && (
+            <p className="max-w-[260px] px-2 pb-1 text-center text-[10px] font-semibold leading-4" style={{ color: "var(--ink-muted)" }}>
+              اختر عبارة مركزة — الحد الأقصى {MAX_QUOTE_WORDS} كلمة (حدّد من جديد لتقليص التحديد)
+            </p>
+          )}
         </div>
+      )}
+
+      {/* تلميح عائم مؤقت — يظهر عند نقر «اقتباسها» بتحديد طويل */}
+      {selectionHint && mounted && createPortal(
+        <div
+          role="status"
+          className="pointer-events-none fixed inset-x-0 bottom-24 z-[70] flex justify-center px-4 animate-fade-in"
+        >
+          <p
+            className="max-w-sm rounded-2xl border px-4 py-3 text-center text-xs font-bold leading-6 shadow-lift"
+            style={{ background: "var(--surface)", borderColor: "var(--accent)", color: "var(--accent-strong)" }}
+          >
+            {selectionHint}
+          </p>
+        </div>,
+        document.body,
       )}
 
       {/* المودال */}
@@ -722,20 +836,48 @@ export function QuoteGenerator({
 
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={download}
-                  disabled={rendering}
-                  className="rounded-xl px-4 py-3 text-sm font-bold shadow-soft transition-all hover:scale-[1.02] disabled:opacity-50"
+                  onClick={handleDownload}
+                  disabled={isExporting || isSharing || rendering}
+                  className={`rounded-xl px-4 py-3 text-sm font-bold shadow-soft transition-all duration-200 ${
+                    isExporting || isSharing || rendering
+                      ? "cursor-not-allowed scale-[0.98] opacity-60"
+                      : "hover:scale-[1.02]"
+                  }`}
                   style={{ background: "var(--accent)", color: "#fff" }}
                 >
-                  تحميل الصورة
+                  {isExporting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                        <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                      جارٍ تجهيز البطاقة...
+                    </span>
+                  ) : (
+                    "تحميل الصورة"
+                  )}
                 </button>
                 <button
                   onClick={shareNative}
-                  disabled={rendering}
-                  className="rounded-xl border px-4 py-3 text-sm font-bold transition-all hover:scale-[1.02] disabled:opacity-50"
+                  disabled={isSharing || isExporting || rendering}
+                  className={`rounded-xl border px-4 py-3 text-sm font-bold transition-all duration-200 ${
+                    isSharing || isExporting || rendering
+                      ? "cursor-not-allowed scale-[0.98] opacity-60"
+                      : "hover:scale-[1.02]"
+                  }`}
                   style={{ color: "var(--accent-strong)", borderColor: "var(--accent)" }}
                 >
-                  مشاركة
+                  {isSharing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                        <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                      جارٍ المشاركة...
+                    </span>
+                  ) : (
+                    "مشاركة"
+                  )}
                 </button>
               </div>
 
@@ -779,6 +921,17 @@ export function QuoteGenerator({
               <p className="mb-4 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
                 ظلّل أي جملة في المقال لالتقاطها تلقائيًا — أو اختر من الاقتباسات الجوهرية أدناه، أو اكتبها بنفسك.
               </p>
+
+              {/* رسالة السقف — لما يتجاوز اقتراح أو إدخال يدوي 25 كلمة */}
+              {pickerHint && (
+                <p
+                  className="mb-3 rounded-xl border px-3 py-2 text-center text-[11px] font-bold leading-5"
+                  style={{ borderColor: "var(--accent)", color: "var(--accent-strong)", background: "var(--accent-soft)" }}
+                  role="alert"
+                >
+                  {pickerHint}
+                </p>
+              )}
 
               {/* الاقتباسات المنتقاة تلقائيًا من المقال */}
               {suggestedQuotes.length > 0 && (

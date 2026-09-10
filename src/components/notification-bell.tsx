@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { pushSupported, subscribeToPush, resyncExistingSubscription } from "@/lib/push-client";
 
 /**
@@ -184,32 +185,39 @@ export function NotificationDetailModal({
 
   const typeMeta = typeIconMeta(item.type);
   const meta = item.metadata ?? null;
+  const title = item.title ?? "إشعار";
+  const message = item.message ?? "";
 
-  return (
+  /* ============ Portal إلى document.body — الإصلاح الجذري للتوسيط ============
+     كان المودال يُرندر داخل الهيدر (backdrop-blur) وداخل الدرج (transform) —
+     أي سلف بهذه الخصائص يجعل عنصر fixed يتموضع نسبةً إليه لا نسبةً للشاشة،
+     فيلتصق بأعلى الصفحة ويُقص على التابلت والكمبيوتر. النقل عبر Portal
+     يعتقه من كل سلاسل الأسلاف، والتوسيط مطلق مع تمرير داخلي آمن. */
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6"
       style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={item.title}
+      aria-label={title}
     >
-      {/* توسيط مرن كامل على كل المقاسات + سقف ارتفاع 85vh مع تمرير داخلي
-          آمن — لا قصّ للنص على التابلت والكمبيوتر ولا التصاق قسري بالأعلى */}
+      {/* لوحة متمركزة حرفيًا (top/left 1/2 + translate) ببنية عمودية صارمة:
+          رأس وتذييل ثابتان (shrink-0) والمتن يتمرر وحده (flex-1) داخل سقف 80vh */}
       <div
-        className="max-h-[85vh] w-[92vw] animate-fade-in overflow-y-auto overscroll-contain rounded-2xl border shadow-lift sm:max-w-lg md:max-w-xl"
+        className="fixed top-1/2 left-1/2 flex max-h-[80vh] w-[90vw] -translate-x-1/2 -translate-y-1/2 animate-fade-in flex-col overflow-hidden rounded-2xl border shadow-lift sm:max-w-md md:max-w-lg lg:max-w-xl"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* رأس البطاقة — النوع والبادج وزر الإغلاق (ثابت أعلى اللوحة أثناء التمرير) */}
+        {/* رأس ثابت — النوع والبادج وزر الإغلاق */}
         <div
-          className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b px-4 py-3"
-          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+          className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3"
+          style={{ borderColor: "var(--border)" }}
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             <TypeIcon type={item.type} size={28} />
             <span
-              className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+              className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold"
               style={{ background: `${typeMeta.color}18`, color: typeMeta.color }}
             >
               {typeMeta.label}
@@ -226,24 +234,23 @@ export function NotificationDetailModal({
           <button
             onClick={onClose}
             aria-label="إغلاق التفاصيل"
-            className="rounded-full p-1.5 text-lg leading-none transition-colors hover:bg-[var(--accent-soft)]"
+            className="shrink-0 rounded-full p-1.5 text-lg leading-none transition-colors hover:bg-[var(--accent-soft)]"
             style={{ color: "var(--ink-muted)" }}
           >
             ✕
           </button>
         </div>
 
-        {/* المتن — العنوان والنص الكامل والتوقيت الدقيق (بلا سقف مستقل —
-            التمرير على مستوى اللوحة كاملة كي لا يُقصّ أي جزء من النص) */}
-        <div className="px-4 py-4">
+        {/* المتن المتمرر — العنوان والنص الكامل والتوقيت والسياق (flex-1 داخل سقف 80vh) */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           <h3 className="text-base font-extrabold leading-8" style={{ color: "var(--ink)" }}>
-            {item.title}
+            {title}
           </h3>
           <p
-            className="mt-2 whitespace-pre-wrap text-sm leading-8"
+            className="mt-2 whitespace-pre-line break-words text-sm leading-8"
             style={{ color: "var(--ink-muted)" }}
           >
-            {item.message}
+            {message}
           </p>
 
           {/* تفاصيل سياقية إضافية (أجهزة/مواقع لإشعارات الأمان) */}
@@ -280,10 +287,10 @@ export function NotificationDetailModal({
           </div>
         </div>
 
-        {/* التذييل — الانتقال للرابط والإخفاء (ثابت أسفل اللوحة أثناء التمرير) */}
+        {/* تذييل ثابت — الانتقال للرابط والإخفاء */}
         <div
-          className="sticky bottom-0 z-10 flex items-center justify-between gap-2 border-t px-4 py-3"
-          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+          className="flex shrink-0 items-center justify-between gap-2 border-t px-4 py-3"
+          style={{ borderColor: "var(--border)" }}
         >
           {item.link ? (
             <Link
@@ -311,7 +318,8 @@ export function NotificationDetailModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -406,18 +414,21 @@ function useNotifications() {
               } catch {
                 /* التخزين محجوب — نكمل بلا حارس */
               }
-              if (seenId === data.latest.id) return;
+              const latestId = data.latest.id ?? "";
+              if (!latestId || seenId === latestId) return;
               try {
-                localStorage.setItem(SEEN_KEY, data.latest.id);
+                localStorage.setItem(SEEN_KEY, latestId);
               } catch {
                 /* صامت */
               }
+              /* تحصين الشكل: أي حقل ناقص من قناة SSE لا يُسقط الواجهة أبدًا
+                 (درس انهيار e.message.length في الإنتاج) */
               setToast({
-                id: data.latest.id,
-                type: data.latest.type,
-                title: data.latest.title,
-                message: data.latest.message,
-                link: data.latest.link,
+                id: latestId,
+                type: data.latest.type ?? "system",
+                title: data.latest.title ?? "إشعار جديد",
+                message: data.latest.message ?? "",
+                link: data.latest.link ?? null,
                 isRead: false,
                 readAt: null,
                 createdAt: new Date().toISOString(),
@@ -601,11 +612,11 @@ function NotificationList({
                 <span className="flex items-center gap-1.5">
                   {!n.isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />}
                   <span className="text-xs font-bold leading-6" style={{ color: "var(--ink)" }}>
-                    {n.title}
+                    {n.title ?? "إشعار"}
                   </span>
                 </span>
                 <span className="mt-0.5 block truncate text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                  {n.message}
+                  {n.message ?? ""}
                 </span>
                 <span className="mt-1 block text-[10px]" style={{ color: "var(--ink-muted)" }}>
                   {timeAgo(n.createdAt)}
@@ -655,7 +666,9 @@ export function NotificationToasts() {
       {stack.length > 0 && (
         <div className="pointer-events-none fixed bottom-4 left-4 z-[90] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
           {stack.map((t) => {
-            const body = t.message.length > 90 ? `${t.message.slice(0, 90)}…` : t.message;
+            /* تحصين مزدوج: نص التوست صلب دائمًا — أي شكل ناقص لا يُسقط الصفحة */
+            const rawMsg = t.message ?? "";
+            const body = rawMsg.length > 90 ? `${rawMsg.slice(0, 90)}…` : rawMsg;
             const card = (
               <span className="flex items-start gap-2.5">
                 <TypeIcon type={t.type} size={26} />
