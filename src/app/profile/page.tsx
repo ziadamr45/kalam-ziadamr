@@ -8,6 +8,7 @@ import { Footer } from "@/components/footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
+import { DevicesPanel } from "@/components/devices-panel";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
 import { parsePrivileges, PRIVILEGE_LABELS, roleLabelAr } from "@/lib/vip";
@@ -473,6 +474,14 @@ export default async function ProfilePage() {
           <p className="mt-6 text-center text-[11px]" style={{ color: "var(--ink-muted)" }}>
             كل تعليق يمرّ بفلترة أخلاقية من ثلاث مستويات — {approvedCount > 0 ? `و${approvedCount} من تعليقاتك هنا منشورة` : "المراجعة تحمي مساحة الحوار للجميع"}.
           </p>
+        </section>
+
+        {/* ==================== الأجهزة المتصلة — إدارة جلسات الحساب وأمانها ==================== */}
+        <section
+          className="mx-auto mt-10 max-w-3xl rounded-2xl border p-5 shadow-soft sm:p-6"
+          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        >
+          <DevicesPanel />
         </section>
 
         {/* منطقة حذف الحساب — وعد سياسة الخصوصية مُطبّق حرفيًا */}

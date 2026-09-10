@@ -54,17 +54,26 @@ export async function GET() {
         }
       };
 
-      const tick = async (): Promise<void> => {
+      const tick = async (isFirst = false): Promise<void> => {
         try {
           const [unread, latest] = await Promise.all([
-            prisma.notification.count({ where: { userId, isRead: false } }),
+            prisma.notification.count({ where: { userId, isRead: false, dismissedAt: null } }),
             prisma.notification.findFirst({
-              where: { userId },
+              where: { userId, dismissedAt: null },
               orderBy: { createdAt: "desc" },
               select: { id: true, title: true, message: true, link: true, type: true },
             }),
           ]);
+          /* النبضة الأولى (عند فتح الصفحة أو إعادة الاتصال) تؤسس خط الأساس صامتة:
+             تُحدّث عداد الجرس فقط ولا تُطلق أي توست — منع تكرار الإشعارات
+             القديمة عند كل ريفريش. التوست للحدث الحي الواقع أثناء التصفح حصرًا. */
           const changed = unread !== lastUnread || (latest && latest.id !== lastId);
+          if (isFirst) {
+            lastUnread = unread;
+            lastId = latest?.id ?? null;
+            send({ unread, isNewItem: false });
+            return;
+          }
           if (changed) {
             const isNewItem = Boolean(latest && latest.id !== lastId && unread > lastUnread);
             lastUnread = unread;
@@ -78,8 +87,8 @@ export async function GET() {
         }
       };
 
-      await tick();
-      interval = setInterval(tick, TICK_MS);
+      await tick(true);
+      interval = setInterval(() => void tick(), TICK_MS);
       timeout = setTimeout(stop, LIFETIME_MS);
     },
     cancel() {

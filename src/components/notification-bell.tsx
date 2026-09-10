@@ -10,8 +10,13 @@ import { pushSupported, subscribeToPush, resyncExistingSubscription } from "@/li
  * - نافذة منسدلة بتبويبين: «الكل» و«غير المقروءة» مع تعليم الكل كمقروء.
  * - مؤشرات أيقونية ملونة بحسب طبيعة الحدث (نجمة الأثر، فقاعة النقاش،
  *   درع الأمان، ماسة التوثيق، بوق النشر).
- * - توست لحظي (NotificationToasts) يظهر أسفل الشاشة عند وصول إشعار جديد
- *   أثناء التصفح — يُنقر فيفتح رابط الحدث.
+ * - توست لحظي (NotificationToasts) للحدث الحي الواقع أثناء التصفح فقط —
+ *   لا إعادة إطلاق للإشعارات القديمة عند أي ريفريش (خط أساس صامت + حارس
+ *   last_seen_notification_id في localStorage).
+ * - زر إخفاء (X) على كل إشعار: حذف تفاؤلي فوري من الواجهة + dismissedAt
+ *   في قاعدة البيانات (يخرج من القائمة والعداد نهائيًا مع بقاء التوثيق).
+ * - نقر أي إشعار يفتح نافذة التفاصيل الكاملة: النص كاملًا دون اقتطاع +
+ *   بادج النوع + التوقيت الدقيق + زر الانتقال للرابط + تعليم تلقائي كمقروء.
  */
 
 export type NotificationItem = {
@@ -23,9 +28,12 @@ export type NotificationItem = {
   isRead: boolean;
   readAt: string | null;
   createdAt: string;
+  metadata?: { device?: string; location?: string; ip?: string | null; when?: string } | null;
 };
 
 type PushState = "unknown" | "unsupported" | "denied" | "off" | "on";
+
+const SEEN_KEY = "last_seen_notification_id";
 
 const rtf = new Intl.RelativeTimeFormat("ar", { numeric: "auto" });
 
@@ -37,6 +45,20 @@ function timeAgo(iso: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return rtf.format(-hours, "hour");
   return rtf.format(-Math.floor(hours / 24), "day");
+}
+
+/** التوقيت الدقيق الكامل — لبطاقة تفاصيل الإشعار */
+const exactFmt = new Intl.DateTimeFormat("ar-EG", {
+  dateStyle: "full",
+  timeStyle: "short",
+  timeZone: "Africa/Cairo",
+});
+function exactTime(iso: string): string {
+  try {
+    return exactFmt.format(new Date(iso));
+  } catch {
+    return iso;
+  }
 }
 
 /* ===================== أيقونات ملونة بحسب طبيعة الحدث ===================== */
@@ -136,6 +158,160 @@ function UnreadBadge({ count }: { count: number }) {
   );
 }
 
+/* ===================== نافذة تفاصيل الإشعار — النص الكامل بلا اقتطاع ===================== */
+
+export function NotificationDetailModal({
+  item,
+  onClose,
+  onDismiss,
+}: {
+  item: NotificationItem;
+  onClose: () => void;
+  onDismiss?: (item: NotificationItem) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  const typeMeta = typeIconMeta(item.type);
+  const meta = item.metadata ?? null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center"
+      style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={item.title}
+    >
+      <div
+        className="w-full max-w-md animate-fade-in overflow-hidden rounded-2xl border shadow-lift"
+        style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* رأس البطاقة — النوع والبادج وزر الإغلاق */}
+        <div
+          className="flex items-center justify-between gap-2 border-b px-4 py-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <span className="flex items-center gap-2">
+            <TypeIcon type={item.type} size={28} />
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+              style={{ background: `${typeMeta.color}18`, color: typeMeta.color }}
+            >
+              {typeMeta.label}
+            </span>
+            {!item.isRead && (
+              <span
+                className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+                style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+              >
+                جديد
+              </span>
+            )}
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="إغلاق التفاصيل"
+            className="rounded-full p-1.5 text-lg leading-none transition-colors hover:bg-[var(--accent-soft)]"
+            style={{ color: "var(--ink-muted)" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* المتن — العنوان والنص الكامل والتوقيت الدقيق */}
+        <div className="max-h-[60vh] overflow-y-auto overscroll-contain px-4 py-4">
+          <h3 className="text-base font-extrabold leading-8" style={{ color: "var(--ink)" }}>
+            {item.title}
+          </h3>
+          <p
+            className="mt-2 whitespace-pre-wrap text-sm leading-8"
+            style={{ color: "var(--ink-muted)" }}
+          >
+            {item.message}
+          </p>
+
+          {/* تفاصيل سياقية إضافية (أجهزة/مواقع لإشعارات الأمان) */}
+          {meta && (meta.device || meta.location || meta.ip || meta.when) && (
+            <div
+              className="mt-4 space-y-1.5 rounded-xl p-3 text-[11px] leading-6"
+              style={{ background: "var(--bg-soft)", color: "var(--ink-muted)" }}
+            >
+              {meta.device && (
+                <div>
+                  <b style={{ color: "var(--ink)" }}>الجهاز:</b> {meta.device}
+                </div>
+              )}
+              {meta.location && (
+                <div>
+                  <b style={{ color: "var(--ink)" }}>الموقع التقريبي:</b> {meta.location}
+                </div>
+              )}
+              {meta.ip && (
+                <div>
+                  <b style={{ color: "var(--ink)" }}>عنوان الشبكة:</b> {meta.ip}
+                </div>
+              )}
+              {meta.when && (
+                <div>
+                  <b style={{ color: "var(--ink)" }}>وقت الحدث:</b> {meta.when}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+            {exactTime(item.createdAt)}
+          </div>
+        </div>
+
+        {/* التذييل — الانتقال للرابط والإخفاء */}
+        <div
+          className="flex items-center justify-between gap-2 border-t px-4 py-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          {item.link ? (
+            <Link
+              href={item.link}
+              onClick={onClose}
+              className="rounded-xl px-4 py-2 text-xs font-bold transition-transform active:scale-[0.98]"
+              style={{ background: "var(--accent)", color: "#fff" }}
+            >
+              الانتقال إلى الحدث
+            </Link>
+          ) : (
+            <span />
+          )}
+          {onDismiss && (
+            <button
+              onClick={() => {
+                onDismiss(item);
+                onClose();
+              }}
+              className="text-xs font-bold underline underline-offset-4 transition-opacity hover:opacity-70"
+              style={{ color: "var(--ink-muted)" }}
+            >
+              إخفاء هذا الإشعار نهائيًا
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ===================== طبقة البيانات — SSE لحظي + دوري احتياطي ===================== */
 
 function useNotifications() {
@@ -145,6 +321,7 @@ function useNotifications() {
   const [pushState, setPushState] = useState<PushState>("unknown");
   const [enabling, setEnabling] = useState(false);
   const [toast, setToast] = useState<NotificationItem | null>(null);
+  const [detail, setDetail] = useState<NotificationItem | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     try {
@@ -197,7 +374,10 @@ function useNotifications() {
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
 
-    /* القناة اللحظية SSE — تحديث العداد والتوست بلا إعادة تحميل */
+    /* القناة اللحظية SSE — تحديث العداد والتوست بلا إعادة تحميل.
+       النبضة الأولى من الخادم تحمل isNewItem:false دائمًا (خط أساس صامت)،
+       وحارس localStorage يمنع أي إعادة إطلاق لإشعار شُوهد من قبل —
+       فلا توست عند الرفريش مهما تكرر، بل للحدث الحي الجديد حصرًا. */
     let es: EventSource | null = null;
     let reconnect: ReturnType<typeof setTimeout> | null = null;
     let disposed = false;
@@ -216,6 +396,19 @@ function useNotifications() {
             if (typeof data.unread === "number") setUnread(data.unread);
             if (data.isNewItem && data.latest) {
               load();
+              /* حارس التكرار النهائي: إشعار شُوهد سابقًا لا يُعرض توستًا مطلقًا */
+              let seenId: string | null = null;
+              try {
+                seenId = localStorage.getItem(SEEN_KEY);
+              } catch {
+                /* التخزين محجوب — نكمل بلا حارس */
+              }
+              if (seenId === data.latest.id) return;
+              try {
+                localStorage.setItem(SEEN_KEY, data.latest.id);
+              } catch {
+                /* صامت */
+              }
               setToast({
                 id: data.latest.id,
                 type: data.latest.type,
@@ -283,9 +476,40 @@ function useNotifications() {
     }).catch(() => {});
   }, []);
 
+  /** الإخفاء النهائي — حذف تفاؤلي فوري من القائمة + dismissedAt في قاعدة البيانات */
+  const dismiss = useCallback(async (item: NotificationItem): Promise<void> => {
+    if (!item.isRead) setUnread((u) => Math.max(0, u - 1));
+    setItems((prev) => prev.filter((n) => n.id !== item.id));
+    setDetail((d) => (d?.id === item.id ? null : d));
+    setToast((t) => (t?.id === item.id ? null : t));
+    try {
+      localStorage.setItem(SEEN_KEY, item.id);
+    } catch {
+      /* صامت */
+    }
+    await fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, action: "dismiss" }),
+    }).catch(() => {});
+  }, []);
+
+  /** فتح التفاصيل — تعليم تلقائي كمقروء لحظة الفتح مع تحديث العداد */
+  const openDetail = useCallback(
+    (item: NotificationItem): void => {
+      setDetail(item);
+      if (!item.isRead) void markOne(item.id);
+    },
+    [markOne],
+  );
+
   const dismissToast = useCallback((): void => setToast(null), []);
 
-  return { items, unread, authed, pushState, enabling, toast, load, enablePush, markAll, markOne, dismissToast };
+  return {
+    items, unread, authed, pushState, enabling, toast, detail,
+    load, enablePush, markAll, markOne, dismiss, openDetail, dismissToast,
+    closeDetail: () => setDetail(null),
+  };
 }
 
 function PushEnableRow({
@@ -346,12 +570,12 @@ function PushEnableRow({
 
 function NotificationList({
   items,
-  onMarkOne,
-  onNavigate,
+  onOpen,
+  onDismiss,
 }: {
   items: NotificationItem[];
-  onMarkOne: (id: string) => void;
-  onNavigate?: () => void;
+  onOpen: (item: NotificationItem) => void;
+  onDismiss: (item: NotificationItem) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -361,64 +585,54 @@ function NotificationList({
     );
   }
   return (
-    <ul className="space-y-1">
-      {items.map((n) => {
-        const body = n.message.length > 110 ? `${n.message.slice(0, 110)}…` : n.message;
-        const inner = (
-          <span className="flex items-start gap-2.5">
-            <TypeIcon type={n.type} />
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5">
-                {!n.isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />}
-                <span className="text-xs font-bold leading-6" style={{ color: "var(--ink)" }}>
-                  {n.title}
+    <ul>
+      {items.map((n) => (
+        <li key={n.id} className="relative">
+          <button
+            onClick={() => onOpen(n)}
+            className="block w-full rounded-xl px-3 py-2.5 pl-8 text-right transition-colors hover:bg-[var(--accent-soft)]"
+          >
+            <span className="flex items-start gap-2.5">
+              <TypeIcon type={n.type} />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5">
+                  {!n.isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />}
+                  <span className="text-xs font-bold leading-6" style={{ color: "var(--ink)" }}>
+                    {n.title}
+                  </span>
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                  {n.message}
+                </span>
+                <span className="mt-1 block text-[10px]" style={{ color: "var(--ink-muted)" }}>
+                  {timeAgo(n.createdAt)}
                 </span>
               </span>
-              <span className="mt-0.5 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                {body}
-              </span>
-              <span className="mt-1 block text-[10px]" style={{ color: "var(--ink-muted)" }}>
-                {timeAgo(n.createdAt)}
-              </span>
             </span>
-          </span>
-        );
-        const cls = "block rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--accent-soft)]";
-        return (
-          <li key={n.id}>
-            {n.link ? (
-              <Link
-                href={n.link}
-                onClick={() => {
-                  if (!n.isRead) onMarkOne(n.id);
-                  onNavigate?.();
-                }}
-                className={cls}
-              >
-                {inner}
-              </Link>
-            ) : (
-              <button
-                onClick={() => {
-                  if (!n.isRead) onMarkOne(n.id);
-                  onNavigate?.();
-                }}
-                className={`${cls} w-full text-right`}
-              >
-                {inner}
-              </button>
-            )}
-          </li>
-        );
-      })}
+          </button>
+          {/* زر الإخفاء النهائي — لا يفتح التفاصيل أبدًا (إيقاف التتابع) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDismiss(n);
+            }}
+            aria-label={`إخفاء إشعار: ${n.title}`}
+            title="إخفاء نهائي"
+            className="absolute left-1.5 top-2 rounded-full p-1.5 text-[11px] leading-none transition-colors hover:bg-[var(--accent-soft)]"
+            style={{ color: "var(--ink-muted)" }}
+          >
+            ✕
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }
 
-/* ===================== التوست اللحظي — وصول إشعار أثناء التصفح ===================== */
+/* ===================== التوست اللحظي — للحدث الحي الجديد حصرًا ===================== */
 
 export function NotificationToasts() {
-  const { toast, dismissToast, markOne } = useNotifications();
+  const { toast, dismissToast, markOne, dismiss, openDetail, detail, closeDetail } = useNotifications();
   const [stack, setStack] = useState<NotificationItem[]>([]);
   const seen = useRef<Set<string>>(new Set());
 
@@ -432,68 +646,80 @@ export function NotificationToasts() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  if (stack.length === 0) return null;
+  if (stack.length === 0 && !detail) return null;
   return (
-    <div className="pointer-events-none fixed bottom-4 left-4 z-[90] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
-      {stack.map((t) => {
-        const body = t.message.length > 90 ? `${t.message.slice(0, 90)}…` : t.message;
-        const card = (
-          <span className="flex items-start gap-2.5">
-            <TypeIcon type={t.type} size={26} />
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-bold leading-5" style={{ color: "var(--ink)" }}>
-                {t.title}
+    <>
+      {stack.length > 0 && (
+        <div className="pointer-events-none fixed bottom-4 left-4 z-[90] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
+          {stack.map((t) => {
+            const body = t.message.length > 90 ? `${t.message.slice(0, 90)}…` : t.message;
+            const card = (
+              <span className="flex items-start gap-2.5">
+                <TypeIcon type={t.type} size={26} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-bold leading-5" style={{ color: "var(--ink)" }}>
+                    {t.title}
+                  </span>
+                  <span className="block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                    {body}
+                  </span>
+                </span>
               </span>
-              <span className="block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                {body}
-              </span>
-            </span>
-          </span>
-        );
-        const cls = "pointer-events-auto block rounded-2xl border p-3 shadow-lift animate-fade-in transition-transform hover:-translate-y-0.5";
-        return (
-          <div
-            key={t.id}
-            className={cls}
-            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-            role="status"
+            );
+            return (
+              <div
+                key={t.id}
+                className="pointer-events-auto relative block rounded-2xl border p-3 pl-9 shadow-lift animate-fade-in transition-transform hover:-translate-y-0.5"
+                style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+                role="status"
+              >
+                <button
+                  className="block w-full text-right"
+                  onClick={() => {
+                    /* النقر يفتح التفاصيل الكاملة — والرسالة تعلّم كمقروء تلقائيًا */
+                    openDetail(t);
+                    setStack((prev) => prev.filter((x) => x.id !== t.id));
+                  }}
+                >
+                  {card}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void dismiss(t);
+                    setStack((prev) => prev.filter((x) => x.id !== t.id));
+                  }}
+                  aria-label={`إخفاء إشعار: ${t.title}`}
+                  title="إخفاء نهائي"
+                  className="absolute left-1.5 top-1.5 rounded-full p-1.5 text-[11px] leading-none transition-colors hover:bg-[var(--accent-soft)]"
+                  style={{ color: "var(--ink-muted)" }}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+          <button
+            onClick={dismissToast}
+            className="pointer-events-auto self-start text-[10px] font-bold"
+            style={{ color: "var(--ink-muted)" }}
+            aria-label="إخفاء التنبيهات"
           >
-            {t.link ? (
-              <Link
-                href={t.link}
-                onClick={() => {
-                  markOne(t.id);
-                  setStack((prev) => prev.filter((x) => x.id !== t.id));
-                }}
-              >
-                {card}
-              </Link>
-            ) : (
-              <button
-                className="w-full text-right"
-                onClick={() => setStack((prev) => prev.filter((x) => x.id !== t.id))}
-              >
-                {card}
-              </button>
-            )}
-          </div>
-        );
-      })}
-      <button
-        onClick={dismissToast}
-        className="pointer-events-auto self-start text-[10px] font-bold"
-        style={{ color: "var(--ink-muted)" }}
-        aria-label="إخفاء التنبيهات"
-      >
-        إخفاء
-      </button>
-    </div>
+            إخفاء
+          </button>
+        </div>
+      )}
+      {detail && <NotificationDetailModal item={detail} onClose={closeDetail} onDismiss={dismiss} />}
+    </>
   );
 }
 
-/** جرس الإشعارات في الهيدر — للحاسوب والتابلت فقط (يُخفى على الهواتف عبر CSS) */
+/** جرس الإشعارات في الهيدر — نسخة الحاسوب والتابلت فقط (تُخفى على الهاتف عبر CSS) */
 export function NotificationBell() {
-  const { items, unread, authed, pushState, enabling, enablePush, markAll, markOne } = useNotifications();
+  const {
+    items, unread, authed, pushState, enabling, enablePush,
+    markAll, dismiss, openDetail, detail, closeDetail,
+  } = useNotifications();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"all" | "unread">("all");
   const ref = useRef<HTMLDivElement>(null);
@@ -581,20 +807,25 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-80 overflow-y-auto overscroll-contain">
-            <NotificationList items={shown} onMarkOne={markOne} onNavigate={() => setOpen(false)} />
+            <NotificationList items={shown} onOpen={openDetail} onDismiss={dismiss} />
           </div>
           <div className="mt-1 border-t pt-2" style={{ borderColor: "var(--border)" }}>
             <PushEnableRow authed={authed} pushState={pushState} enabling={enabling} onEnable={enablePush} />
           </div>
         </div>
       )}
+
+      {detail && <NotificationDetailModal item={detail} onClose={closeDetail} onDismiss={dismiss} />}
     </div>
   );
 }
 
 /** بند الإشعارات البارز داخل درج الموبايل — الحصرية الهاتفية للجرس */
 export function DrawerNotifications() {
-  const { items, unread, authed, pushState, enabling, enablePush, markAll, markOne } = useNotifications();
+  const {
+    items, unread, authed, pushState, enabling, enablePush,
+    markAll, dismiss, openDetail, detail, closeDetail,
+  } = useNotifications();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"all" | "unread">("all");
 
@@ -665,13 +896,15 @@ export function DrawerNotifications() {
             )}
           </div>
           <div className="max-h-72 overflow-y-auto overscroll-contain">
-            <NotificationList items={shown} onMarkOne={markOne} />
+            <NotificationList items={shown} onOpen={openDetail} onDismiss={dismiss} />
           </div>
           <div className="mt-1 border-t pt-2" style={{ borderColor: "var(--border)" }}>
             <PushEnableRow authed={authed} pushState={pushState} enabling={enabling} onEnable={enablePush} />
           </div>
         </div>
       )}
+
+      {detail && <NotificationDetailModal item={detail} onClose={closeDetail} onDismiss={dismiss} />}
     </div>
   );
 }

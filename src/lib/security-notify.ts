@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { dispatchNotification } from "@/lib/notifications/dispatcher";
+import { logEvent } from "@/lib/audit";
 
 /**
  * محرك أمن الحسابات السيادي — يلتقط كل دخول Google ويقارنه بالنشاط المعتاد:
@@ -116,8 +117,17 @@ export async function resolveGeo(
 
 /* ===================== بصمة الجهاز ===================== */
 
-export function deviceFingerprint(ua: string | null | undefined): string {
-  return createHash("sha256").update((ua ?? "unknown-ua").trim()).digest("hex");
+/**
+ * بصمة الجهاز الفريدة — تجزئة SHA-256 مشتقة من (userId + User-Agent)
+ * وفق المواصفة السيادية: كل حساب يملك سجل أجهزته المستقل، وبصمة لا
+ * تتقاطع بين الحسابات حتى لو تطابق المتصفح.
+ * تُستخدم موحدة في: جدول UserDevice، سجل LoginLog، وادعاء dvh في جلسة JWT
+ * (حذف سجل الجهاز من صفحة الملف = إبطال جلسته فورًا).
+ */
+export function deviceFingerprint(userId: string, ua: string | null | undefined): string {
+  return createHash("sha256")
+    .update(`${userId}-${(ua ?? "unknown-ua").trim()}`)
+    .digest("hex");
 }
 
 /* ===================== البريد الأمني (Resend REST مباشرة — بلا تبعيات) ===================== */
@@ -180,7 +190,7 @@ export async function captureLoginSecurity(input: {
 }): Promise<void> {
   try {
     const ua = parseUserAgent(input.userAgent);
-    const hash = deviceFingerprint(input.userAgent);
+    const hash = deviceFingerprint(input.userId, input.userAgent);
 
     /* إزالة الازدواج: إن سُجّل نفس الحساب من نفس البصمة خلال آخر 5 دقائق فلا نسخة جديدة */
     const recentCut = new Date(Date.now() - 5 * 60 * 1000);
@@ -190,16 +200,40 @@ export async function captureLoginSecurity(input: {
     });
     if (duplicate) return;
 
-    /* مقارنة النشاط المعتاد: هل هذه البصمة ظهرت من قبل لهذا الحساب؟ */
-    const known = await prisma.loginLog.findFirst({
-      where: { userId: input.userId, deviceHash: hash },
+    /* مصدر الحقيقة للجدة: جدول UserDevice الموثوق — هل هذه البصمة
+       مسجلة سابقًا لهذا الحساب؟ (السجل القديم LoginLog تاريخ فقط) */
+    const knownDevice = await prisma.userDevice.findUnique({
+      where: { userId_deviceHash: { userId: input.userId, deviceHash: hash } },
       select: { id: true },
-      orderBy: { createdAt: "desc" },
     });
-    const isNewDevice = !known;
+    const isNewDevice = !knownDevice;
 
     /* الموقع التقريبي — فوري من الترويسات، وخدمة خارجية كاحتياط فقط */
     const geo = isNewDevice ? await resolveGeo(input.ip, input.geoHeaders) : {};
+    const locationLabel0 = [geo.city, geo.country].filter(Boolean).join("، ") || null;
+
+    /* توثيق الجهاز في سجل الأجهزة الموثوق:
+       جهاز جديد يُنشأ الآن، ومعتاد يُحدَّث آخر نشاطه وآخر عنوان له */
+    await prisma.userDevice.upsert({
+      where: { userId_deviceHash: { userId: input.userId, deviceHash: hash } },
+      create: {
+        userId: input.userId,
+        deviceHash: hash,
+        browser: ua.browser,
+        os: ua.os,
+        deviceType: ua.deviceType,
+        lastIp: input.ip,
+        location: locationLabel0,
+        lastActiveAt: new Date(),
+      },
+      update: {
+        browser: ua.browser,
+        os: ua.os,
+        deviceType: ua.deviceType,
+        lastIp: input.ip,
+        lastActiveAt: new Date(),
+      },
+    });
 
     const row = await prisma.loginLog.create({
       data: {
@@ -230,6 +264,23 @@ export async function captureLoginSecurity(input: {
       timeZone: "Africa/Cairo",
     }).format(row.createdAt);
     const title = "إشعار أمان: تسجيل دخول جديد لحسابك";
+
+    /* سجل التدقيق السيادي — SECURITY_NEW_DEVICE_LOGIN (يكتب ويحتسب بلا فشل) */
+    await logEvent({
+      type: "SECURITY_NEW_DEVICE_LOGIN",
+      actorType: "USER",
+      actorId: input.userId,
+      actorLabel: input.email ?? null,
+      message: `دخول من جهاز جديد: ${deviceLabel} — ${locationLabel}`,
+      meta: {
+        deviceHash: hash,
+        ip: input.ip ?? null,
+        deviceType: ua.deviceType,
+        browser: ua.browser,
+        os: ua.os,
+        location: locationLabel,
+      },
+    }).catch(() => {});
     const message = `رصدنا دخولًا من جهاز جديد: ${deviceLabel} — من ${locationLabel} — ${whenLabel}. إن لم تكن أنت، فأمّن حساب Google الخاص بك فورًا.`;
 
     /* مصفوفة الإرسال: دخول من جهاز جديد = بريد إلكتروني فوري إلزامي + بث ويب + جرس.

@@ -6,7 +6,7 @@ import type { Adapter } from "next-auth/adapters";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { logEvent } from "@/lib/audit";
-import { captureLoginSecurity } from "@/lib/security-notify";
+import { captureLoginSecurity, deviceFingerprint } from "@/lib/security-notify";
 import { ensureOwnerSovereign } from "@/lib/vip";
 
 /**
@@ -190,9 +190,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return true;
       }
     },
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       try {
-        if (user?.id) token.uid = user.id;
+        if (user?.id) {
+          token.uid = user.id;
+          /* بصمة الجهاز تُختم في الجلسة عند الولادة حصرًا (سياق طلب حقيقي) —
+             لاحقًا تُقارن بسجل UserDevice في كل طلب: حذف الجهاز من
+             صفحة الملف يعني موت الجلسة فورًا (إبطال عن بُعد) */
+          try {
+            const h = await headers();
+            token.dvh = deviceFingerprint(String(user.id), h.get("user-agent"));
+          } catch {
+            /* خارج سياق طلب — الجلسة تُستكمل بلا بصمة (فحص الإبطال يتخطاها) */
+          }
+        }
         /* إذا ضاع الـ uid من الكوكي لأي سبب نستعيده من الحساب المربوط */
         if (!token.uid && token.email) {
           // لا استعلام هنا — يُستكمل في session (استعلام أرخص مرة واحدة)
@@ -205,6 +216,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       try {
         if (session.user && token.uid) {
+          /* بوابة إبطال الجلسة عن بُعد: جلسة تحمل بصمة جهاز (dvh) لا
+             تجد سجلها في UserDevice = جهاز أُخرج من صفحة الملف —
+             تُجرد الجلسة من هويتها فورًا فتتصرف كلها المنصة كزائر،
+             وعنصر SessionRevocationWatcher ينهي الكوكي من جهة المتصفح */
+          if (typeof token.dvh === "string" && token.dvh) {
+            const deviceAlive = await prisma.userDevice.findUnique({
+              where: {
+                userId_deviceHash: { userId: String(token.uid), deviceHash: token.dvh },
+              },
+              select: { id: true },
+            });
+            if (!deviceAlive) {
+              session.user.id = "";
+              session.user.name = null;
+              session.user.image = null;
+              (session as { deviceRevoked?: boolean }).deviceRevoked = true;
+              return session;
+            }
+          }
+
           session.user.id = String(token.uid);
           /* الهوية المعروضة حيًا من قاعدة البيانات:
              الاسم المخصص والصورة الشخصية أولًا ثم بيانات Google الأصلية —

@@ -22,6 +22,7 @@ export type AuditEventType =
   | "USER_VERIFIED"
   | "NOTIFICATION_DISPATCHED_VIP"
   | "COMMENT_SELF_PINNED"
+  | "SECURITY_NEW_DEVICE_LOGIN"
   | `IMPACT_${string}`;
 
 export async function logEvent(input: {

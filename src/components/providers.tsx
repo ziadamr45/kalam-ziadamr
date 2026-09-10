@@ -75,6 +75,39 @@ function ServiceWorkerRegistrar() {
   return null;
 }
 
+/* ===================== حارس إبطال الجلسة عن بُعد ===================== */
+
+/**
+ * عند إبطال جهاز من صفحة الملف (حذف سجله من UserDevice) تفقد الجلسة
+ * هويتها خادميًا فورًا — هذا الحارس يلاحظ الإشارة deviceRevoked في
+ * جلسة المتصفح وينهي الكوكي نظيفًا من جهة العميل أيضًا.
+ */
+function SessionRevocationWatcher() {
+  useEffect(() => {
+    let cancelled = false;
+    const check = async (): Promise<void> => {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { deviceRevoked?: boolean } | null;
+        if (!cancelled && data?.deviceRevoked) {
+          await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
+          window.location.href = "/";
+        }
+      } catch {
+        /* شبكة متقطعة — تُعاد المحاولة في الدورة التالية */
+      }
+    };
+    void check();
+    const timer = setInterval(check, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+  return null;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
@@ -86,6 +119,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <AuthGateOverlay />
         {/* التوست اللحظي للإشعارات الواردة أثناء التصفح (SSE) */}
         <NotificationToasts />
+        {/* حارس إبطال الجلسة عن بُعد — ينهي كوكي الجهاز المُبطَل من صفحة الملف */}
+        <SessionRevocationWatcher />
         <ServiceWorkerRegistrar />
       </ThemeProvider>
     </SessionProvider>
