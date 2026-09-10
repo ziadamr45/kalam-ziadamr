@@ -93,7 +93,10 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${arabicName}`,
-        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+        /* كاش قصير بلا stale-while-revalidate — تحديثات محرك التصدير
+           تصل للقارئين خلال دقائق ولا تبقى نسخ PDF قديمة أسبوعًا كاملًا
+           (السبب الموثق لرؤية مستخدمين نسخة مفككة الحروف بعد الإصلاح) */
+        "Cache-Control": "public, max-age=300, s-maxage=21600",
       },
     });
   } catch (err) {

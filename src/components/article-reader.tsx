@@ -458,9 +458,11 @@ export function ArticleReader({
 
             {/* تحميل المقال PDF — الوثيقة التحريرية الرسمية الصالحة للطباعة:
                 ترويسة سيادية + غلاف متناسق + رمز QR + تذييل بأرقام الصفحات،
-                مولدة خادميًا خاليةً من أي عناصر واجهة تفاعلية */}
+                مولدة خادميًا خاليةً من أي عناصر واجهة تفاعلية.
+                ?v= كسر كاش فوري — أي جهاز حمّل نسخة قديمة (حتى من كاش CDN)
+                يحصل على النسخة المحدثة من أول نقرة بعد النشر */}
             <a
-              href={`/api/articles/${encodeURIComponent(article.slug)}/pdf`}
+              href={`/api/articles/${encodeURIComponent(article.slug)}/pdf?v=r3`}
               download
               className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}

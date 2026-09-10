@@ -17,12 +17,17 @@ const nextConfig = {
   poweredByHeader: false,
   eslint: { ignoreDuringBuilds: true },
   /* استثناء محرك PDF التحريري من تجميع webpack — يحتاج تحميل وحداته
-     ESM الأصلية وقت التشغيل (نفس ضبط الريبو الإداري المثبت) */
-  serverExternalPackages: ["@react-pdf/renderer"],
-  /* ضم خطوط القالب التحريري (Tajawal + Amiri) وpdfkit إلى حزمة
+     ESM الأصلية وقت التشغيل (نفس ضبط الريبو الإداري المثبت)، وfontkit
+     لأن حاقن جداول الخطوط يرقّعه وقت التشغيل فيجب أن يبقى خارج الحزمة */
+  serverExternalPackages: ["@react-pdf/renderer", "fontkit"],
+  /* ضم خطوط القالب التحريري (Tajawal + Amiri) وpdfkit وfontkit إلى حزمة
      الـ serverless لمسار تصدير المقالات */
   outputFileTracingIncludes: {
-    "/api/articles/[slug]/pdf": ["./src/assets/fonts/**", "./node_modules/pdfkit/**"],
+    "/api/articles/[slug]/pdf": [
+      "./src/assets/fonts/**",
+      "./node_modules/pdfkit/**",
+      "./node_modules/fontkit/**",
+    ],
   },
   /* تطهير حزم الإنتاج من رسائل التصحيح — console.* تُستأصل من bundles
      العميل تلقائيًا ما عدا console.error لرسائل الحارس */

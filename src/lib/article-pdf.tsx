@@ -11,6 +11,7 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import { parseBlocks, parseInline, type Block } from "@/lib/content-blocks";
+import { installPdfFontEnhancer } from "@/lib/pdf-font-tables";
 import { formatArabicDate } from "@/lib/utils";
 
 /**
@@ -30,8 +31,11 @@ import { formatArabicDate } from "@/lib/utils";
 const FONTS_DIR = path.join(process.cwd(), "src", "assets", "fonts");
 
 let fontsRegistered = false;
-function ensureFonts() {
+async function ensureFonts() {
   if (fontsRegistered) return;
+  /* 1) حقن الجداول الناقصة (cmap/OS2/post/name) في subsets الخطوط —
+     بلاها تُسقط عوارض الهواتف حروفاً وأرقاماً عشوائياً من الوثيقة */
+  await installPdfFontEnhancer();
   Font.register({
     family: "Tajawal",
     fonts: [
@@ -46,6 +50,10 @@ function ensureFonts() {
       { src: path.join(FONTS_DIR, "Amiri-Bold.ttf"), fontWeight: 700 },
     ],
   });
+  /* 2) إبطال كسر الكلمات العربية نهائيًا — لا مقطع صوتي يتشطر على
+     سطرين («أصلاً» لا تنقسم أبدًا إلى «أ» و«صلاً»)؛ الكلمة الواحدة
+     كتلة غير قابلة للتجزيء ويلفّ السطر بين الكلمات فقط */
+  Font.registerHyphenationCallback((word) => [word]);
   fontsRegistered = true;
 }
 
@@ -155,12 +163,10 @@ function BlockNode({ block }: { block: Block }) {
       return (
         <View style={styles.listBox} wrap={false}>
           {block.items.map((it, i) => (
-            <View key={i} style={styles.listRow} wrap={false}>
-              <Text style={styles.bullet}>•</Text>
-              <Text style={styles.listText}>
-                <Inline raw={it} />
-              </Text>
-            </View>
+            <Text key={i} style={styles.listItem} wrap={false}>
+              <Text style={styles.listMark}>{"•  "}</Text>
+              <Inline raw={it} />
+            </Text>
           ))}
         </View>
       );
@@ -168,12 +174,10 @@ function BlockNode({ block }: { block: Block }) {
       return (
         <View style={styles.listBox} wrap={false}>
           {block.items.map((it, i) => (
-            <View key={i} style={styles.listRow} wrap={false}>
-              <Text style={styles.bullet}>{eastern((block.start ?? 1) + i)}.</Text>
-              <Text style={styles.listText}>
-                <Inline raw={it} />
-              </Text>
-            </View>
+            <Text key={i} style={styles.listItem} wrap={false}>
+              <Text style={styles.listMark}>{eastern((block.start ?? 1) + i)}.  </Text>
+              <Inline raw={it} />
+            </Text>
           ))}
         </View>
       );
@@ -267,7 +271,11 @@ function ArticlePdf(input: ArticlePdfInput) {
           <Text
             style={styles.footPage}
             render={({ pageNumber, totalPages }) =>
-              `صفحة ${eastern(pageNumber)} من ${eastern(totalPages)}`
+              /* حارس صريح: لا «من undefined» ولا «من .» مهما كان
+                 توقيت حساب الإجمالي داخل المحرك */
+              totalPages && totalPages > 0
+                ? `صفحة ${eastern(pageNumber)} من ${eastern(totalPages)}`
+                : `صفحة ${eastern(pageNumber)}`
             }
           />
         </View>
@@ -355,6 +363,9 @@ const styles = StyleSheet.create({
     fontFamily: "Amiri",
     fontSize: 12.5,
     color: INK,
+    /* اتجاه الفقرة العربي الصريح — محرك BiDi يرتب المقاطع المختلطة
+       (عربي + لاتيني/أرقام) بترتيب القراءة الصحيح ولا يبعثر الكلمات */
+    direction: "rtl",
   },
 
   /* ---------- التذييل الثابت (سطر واحد ثابت الارتفاع) ---------- */
@@ -370,9 +381,10 @@ const styles = StyleSheet.create({
     borderTopColor: FAINT,
     paddingTop: 8,
   },
-  footRight: { fontFamily: "Tajawal", fontSize: 8, color: GOLD, fontWeight: 700 },
+  footRight: { fontFamily: "Tajawal", fontSize: 8, color: GOLD, fontWeight: 700, direction: "rtl", textAlign: "right" },
   /* الرابط: خلية مرنة تتقلص دائمًا بين الجارين — النص الكامل المفكوك
-     يلتف عند الشرطات إلى سطرين كحد أقصى دون أن يلمس رقم الصفحة أبدًا */
+     يلتف عند الشرطات إلى سطرين كحد أقصى دون أن يلمس رقم الصفحة أبدًا.
+     الاتجاه LTR صريح — الروابط تُقرأ لاتينيًا حتى داخل وثيقة عربية */
   footCenter: {
     fontFamily: "Tajawal",
     fontSize: 7,
@@ -380,9 +392,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 10,
     textAlign: "center",
+    direction: "ltr",
     lineHeight: 1.5,
   },
-  footPage: { fontFamily: "Tajawal", fontSize: 8, color: DARK, fontWeight: 700 },
+  footPage: { fontFamily: "Tajawal", fontSize: 8, color: DARK, fontWeight: 700, direction: "rtl", textAlign: "left" },
 
   /* ---------- الترويسة الرسمية ---------- */
   masthead: { marginBottom: 18 },
@@ -393,9 +406,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   brandCol: { flex: 1, paddingTop: 4 },
-  brand: { fontFamily: "Tajawal", fontSize: 21, fontWeight: 700, color: DARK },
-  brandSub: { fontFamily: "Tajawal", fontSize: 8.5, color: STEEL, marginTop: 3 },
-  metaLine: { fontFamily: "Tajawal", fontSize: 9, color: INK, marginTop: 10, lineHeight: 1.6 },
+  brand: { fontFamily: "Tajawal", fontSize: 21, fontWeight: 700, color: DARK, direction: "rtl", textAlign: "right" },
+  brandSub: { fontFamily: "Tajawal", fontSize: 8.5, color: STEEL, marginTop: 3, direction: "rtl", textAlign: "right" },
+  metaLine: { fontFamily: "Tajawal", fontSize: 9, color: INK, marginTop: 10, lineHeight: 1.6, direction: "rtl", textAlign: "right" },
   qrCol: { alignItems: "center", width: 92 },
   qrImg: { width: 64, height: 64 },
   qrCaption: {
@@ -403,6 +416,7 @@ const styles = StyleSheet.create({
     fontSize: 6.2,
     color: STEEL,
     textAlign: "center",
+    direction: "rtl",
     marginTop: 4,
     lineHeight: 1.5,
   },
@@ -421,6 +435,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.55,
     color: INK,
     textAlign: "right",
+    direction: "rtl",
     marginTop: 18,
   },
   summary: {
@@ -429,6 +444,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.85,
     color: STEEL,
     textAlign: "right",
+    direction: "rtl",
     marginTop: 8,
     paddingBottom: 10,
     borderBottomWidth: 0.7,
@@ -438,12 +454,12 @@ const styles = StyleSheet.create({
   /* ---------- المتن — سطر 2.2 مريح للعربية المحركة ومحاذاة يمين
       صريحة (لا justify قسري يُمطّ المسافات ويشوه التشكيل) ---------- */
   body: { marginTop: 6 },
-  p: { fontSize: 12.5, lineHeight: 2.2, textAlign: "right", marginTop: 9, color: INK },
+  p: { fontSize: 12.5, lineHeight: 2.2, textAlign: "right", direction: "rtl", marginTop: 9, color: INK },
 
   h2Box: { marginTop: 16, marginBottom: 2 },
-  h2: { fontFamily: "Tajawal", fontSize: 15.5, fontWeight: 700, color: DARK, textAlign: "right" },
+  h2: { fontFamily: "Tajawal", fontSize: 15.5, fontWeight: 700, color: DARK, textAlign: "right", direction: "rtl" },
   h3Box: { marginTop: 12, marginBottom: 2 },
-  h3: { fontFamily: "Tajawal", fontSize: 13, fontWeight: 700, color: INK, textAlign: "right" },
+  h3: { fontFamily: "Tajawal", fontSize: 13, fontWeight: 700, color: INK, textAlign: "right", direction: "rtl" },
 
   quoteBox: {
     marginVertical: 10,
@@ -454,14 +470,20 @@ const styles = StyleSheet.create({
     borderRightColor: GOLD,
     borderRadius: 3,
   },
-  quoteText: { fontSize: 12.5, lineHeight: 2.1, color: INK, textAlign: "right" },
+  quoteText: { fontSize: 12.5, lineHeight: 2.1, color: INK, textAlign: "right", direction: "rtl" },
 
   listBox: { marginTop: 8, paddingHorizontal: 4 },
-  /* RTL حقيقي: الرقم/الرمزة في أقصى يمين الصفحة والنص يسارها —
-     row-reverse يضع أول عنصر (الرمز) على اليمين كما تُقرأ القوائم العربية */
-  listRow: { flexDirection: "row-reverse", gap: 7, marginBottom: 4 },
-  bullet: { fontFamily: "Tajawal", fontSize: 11, color: GOLD, fontWeight: 700, width: 18, textAlign: "center" },
-  listText: { flex: 1, fontSize: 12, lineHeight: 2.05, textAlign: "right" },
+  /* فقرة واحدة لكل بند: الرمز/الرقم مدمج في أول الجملة كنص داخلي —
+     يلتصق ببداية السطر يمينًا مهما التف النص، ولا حاوية flex
+     تُفصل الرقم عن نصه في سطر مستقل ولا يفيض خارج الهوامش */
+  listItem: {
+    fontSize: 12,
+    lineHeight: 2.05,
+    textAlign: "right",
+    direction: "rtl",
+    marginBottom: 4,
+  },
+  listMark: { fontFamily: "Tajawal", fontSize: 11, color: GOLD, fontWeight: 700 },
 
   hr: { height: 0.8, backgroundColor: FAINT, marginVertical: 14 },
 
@@ -476,8 +498,8 @@ const styles = StyleSheet.create({
     borderTopColor: "#D9E5C3",
     borderBottomColor: "#D9E5C3",
   },
-  quranText: { fontSize: 13.5, lineHeight: 2.1, color: "#3F6212", textAlign: "center" },
-  quranRef: { fontFamily: "Tajawal", fontSize: 8, color: OLIVE, textAlign: "center", marginTop: 5 },
+  quranText: { fontSize: 13.5, lineHeight: 2.1, color: "#3F6212", textAlign: "center", direction: "rtl" },
+  quranRef: { fontFamily: "Tajawal", fontSize: 8, color: OLIVE, textAlign: "center", direction: "rtl", marginTop: 5 },
 
   hadithBox: {
     marginVertical: 10,
@@ -488,8 +510,8 @@ const styles = StyleSheet.create({
     borderRightWidth: 2.2,
     borderRightColor: "#64748B",
   },
-  hadithText: { fontSize: 12.5, lineHeight: 2.05, color: "#334155", textAlign: "right" },
-  hadithRef: { fontFamily: "Tajawal", fontSize: 8, color: STEEL, textAlign: "right", marginTop: 5 },
+  hadithText: { fontSize: 12.5, lineHeight: 2.05, color: "#334155", textAlign: "right", direction: "rtl" },
+  hadithRef: { fontFamily: "Tajawal", fontSize: 8, color: STEEL, textAlign: "right", direction: "rtl", marginTop: 5 },
 
   noteBox: {
     marginVertical: 9,
@@ -499,8 +521,8 @@ const styles = StyleSheet.create({
     border: 0.7,
     borderColor: "#FDE68A",
   },
-  noteLabel: { fontFamily: "Tajawal", fontSize: 8.5, fontWeight: 700, color: GOLD, marginBottom: 3 },
-  noteText: { fontSize: 11, lineHeight: 1.75, textAlign: "right", color: "#713F12" },
+  noteLabel: { fontFamily: "Tajawal", fontSize: 8.5, fontWeight: 700, color: GOLD, marginBottom: 3, direction: "rtl", textAlign: "right" },
+  noteText: { fontSize: 11, lineHeight: 1.75, textAlign: "right", direction: "rtl", color: "#713F12" },
 
   questionBox: {
     marginVertical: 10,
@@ -511,8 +533,8 @@ const styles = StyleSheet.create({
     border: 0.8,
     borderColor: GOLD,
   },
-  questionLabel: { fontFamily: "Tajawal", fontSize: 8.5, fontWeight: 700, color: GOLD, marginBottom: 3 },
-  questionText: { fontSize: 12, lineHeight: 1.8, textAlign: "right", color: INK },
+  questionLabel: { fontFamily: "Tajawal", fontSize: 8.5, fontWeight: 700, color: GOLD, marginBottom: 3, direction: "rtl", textAlign: "right" },
+  questionText: { fontSize: 12, lineHeight: 1.8, textAlign: "right", direction: "rtl", color: INK },
 
   tableBox: {
     marginVertical: 10,
@@ -532,25 +554,27 @@ const styles = StyleSheet.create({
     borderRightWidth: 0.5,
     borderRightColor: FAINT,
     textAlign: "right",
+    direction: "rtl",
   },
   tableHeadCell: { fontWeight: 700, color: DARK, backgroundColor: "#F8FAFC" },
 
   /* ---------- خاتمة الوثيقة ---------- */
   docEnd: { marginTop: 26 },
   endRule: { height: 1.2, backgroundColor: GOLD, borderRadius: 1, marginBottom: 10 },
-  endText: { fontFamily: "Tajawal", fontSize: 8.5, lineHeight: 1.85, color: STEEL, textAlign: "right" },
+  endText: { fontFamily: "Tajawal", fontSize: 8.5, lineHeight: 1.85, color: STEEL, textAlign: "right", direction: "rtl" },
   endBrand: {
     fontFamily: "Tajawal",
     fontSize: 10,
     fontWeight: 700,
     color: DARK,
     textAlign: "center",
+    direction: "rtl",
     marginTop: 12,
   },
 });
 
 /** توليد ملف PDF جاهز للطباعة والحفظ المكتبي */
 export async function renderArticlePdf(input: ArticlePdfInput): Promise<Buffer> {
-  ensureFonts();
+  await ensureFonts();
   return renderToBuffer(<ArticlePdf {...input} />);
 }

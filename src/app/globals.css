@@ -800,4 +800,42 @@ body.immersion .page-chrome {
     text-decoration: none !important;
     color: inherit !important;
   }
+  /* ===== محصّن عربي للطباعة من المتصفح (طلب صريح) =====
+     1) لا justify إطلاقًا في الطباعة — تمدد المسافات قسريًا يُتمزق
+        الإيقاع العربي؛ محاذاة يمين صرفة مع اتجاه RTL صريح.
+     2) تباعد أحرف صفري (letter-spacing يكسر اتصال الحروف العربية
+        ويفتّت الكلمات في بعض المحركات).
+     3) أولوية خط عربي مدمج (نوع أميري المتصل ثم نسخ نوتو) على كل
+        عنصر — لا خط افتراضي غير مدمج في الورق.
+     4) تحسين الرندرة: optimizeLegibility + تنعيم الحواف. */
+  body {
+    font-family: var(--font-body), var(--font-naskh), var(--font-ui), sans-serif !important;
+  }
+
+  p, div, span, li, h1, h2, h3, h4, blockquote, td, th, figcaption {
+    direction: rtl !important;
+    text-align: right !important;
+    text-align-last: right !important;
+    text-rendering: optimizeLegibility !important;
+    -webkit-font-smoothing: antialiased !important;
+    word-spacing: normal !important;
+    letter-spacing: 0 !important;
+    line-break: strict;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    hyphens: none !important;
+  }
+
+  /* استثناءات مقصودة داخل الورق العربي */
+  .print-footer-url,
+  code, kbd, samp, pre {
+    direction: ltr !important;
+    text-align: center !important;
+    text-align-last: auto !important;
+    unicode-bidi: embed;
+  }
+
+  pre, code, kbd, samp {
+    text-align: right !important;
+  }
 }
