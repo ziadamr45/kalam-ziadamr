@@ -281,7 +281,8 @@ export default async function ArticlePage({
               والإجمالي يضيفهما محرك المتصفح عبر عدّادات @page الأصلية */}
           <div className="print-only print-footer" aria-hidden>
             <span>منصة كلام له لازمة — فكر بلا ضجيج</span>
-            <span className="print-footer-url">{articleFullUrl.replace(/^https?:\/\//, "")}</span>
+            {/* الرابط المعروض عربي مقروء مفكوك الترميز — QR يحمل النسخة المرمّزة */}
+            <span className="print-footer-url">{`${siteUrl.replace(/^https?:\/\//, "")}/article/${article.slug}`}</span>
             <span className="print-footer-brand">ziadamr.me</span>
           </div>
         </article>
