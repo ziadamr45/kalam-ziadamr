@@ -8,6 +8,7 @@ import { BackToTop } from "@/components/back-to-top";
 import ContinueReadingBadge from "@/components/continue-reading-badge";
 import { ArticleCard } from "@/components/article-card";
 import { ArticleReader } from "@/components/article-reader";
+import { PrintMasthead } from "@/components/print-masthead";
 import { CommentsSection } from "@/components/comments-section";
 import { DiscussCompanion } from "@/components/discuss-companion";
 import { ImpactReadTracker } from "@/components/impact-read-tracker";
@@ -120,6 +121,10 @@ export default async function ArticlePage({
     inLanguage: "ar",
   };
 
+  /* رابط المقال الحي — يُغذّي رمز QR المتجهي في ترويسة الطباعة والتذييل الثابت */
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://kalam-ziadamr.vercel.app").replace(/\/$/, "");
+  const articleFullUrl = `${siteUrl}/article/${encodeURIComponent(article.slug)}`;
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -129,7 +134,12 @@ export default async function ArticlePage({
       <ContinueReadingBadge slug={article.slug} articleId={article.id} />
 
       <main className="flex-1">
-        <article className="mx-auto max-w-3xl px-4 pt-28 pb-28 sm:px-6">
+        {/* قالب الطباعة الأصيل — كل ما يخرج على الورق محصور هنا، ويُرسم
+            بمحرك المتصفح نفسه (HarfBuzz) فالنص مطابق للشاشة حرفيًا */}
+        <article id="printable-article" className="mx-auto max-w-3xl px-4 pt-28 pb-28 sm:px-6">
+          {/* ترويسة الطباعة الرسمية — QR متجهي نقي يرسمه المتصفح (للطباعة حصريًا) */}
+          <PrintMasthead url={articleFullUrl} />
+
           {/* تصنيف القسم */}
           {article.section && (
             <div className="page-chrome mb-6 text-center">
@@ -267,13 +277,11 @@ export default async function ArticlePage({
 
           {/* تذييل الطباعة الثابت — يتكرر أسفل كل ورقة عند الطباعة من المتصفح:
               هوية المنصة يمينًا + رابط المقال العربي المقروء (بلا ترميز ٪)
-              وسطًا بسطر واحد مقصوص + النطاق الرسمي يسارًا — منفصل تمامًا
-              عن رقم الصفحة الذي يضيفه المتصفح من تلقاء نفسه خارج الهوامش */}
+              وسطًا بسطر واحد مقصوص + النطاق الرسمي يسارًا — ورقم الصفحة
+              والإجمالي يضيفهما محرك المتصفح عبر عدّادات @page الأصلية */}
           <div className="print-only print-footer" aria-hidden>
             <span>منصة كلام له لازمة — فكر بلا ضجيج</span>
-            <span className="print-footer-url">
-              {`${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://kalam-ziadamr.vercel.app").replace(/^https?:\/\//, "").replace(/\/$/, "")}/article/${article.slug}`}
-            </span>
+            <span className="print-footer-url">{articleFullUrl.replace(/^https?:\/\//, "")}</span>
             <span className="print-footer-brand">ziadamr.me</span>
           </div>
         </article>

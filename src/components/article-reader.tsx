@@ -456,21 +456,20 @@ export function ArticleReader({
               )}
             </div>
 
-            {/* تحميل المقال PDF — الوثيقة التحريرية الرسمية الصالحة للطباعة:
-                ترويسة سيادية + غلاف متناسق + رمز QR + تذييل بأرقام الصفحات،
-                مولدة خادميًا خاليةً من أي عناصر واجهة تفاعلية.
-                ?v= كسر كاش فوري — أي جهاز حمّل نسخة قديمة (حتى من كاش CDN)
-                يحصل على النسخة المحدثة من أول نقرة بعد النشر */}
-            <a
-              href={`/api/articles/${encodeURIComponent(article.slug)}/pdf?v=r3`}
-              download
-              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
+            {/* طباعة / حفظ PDF — الطباعة الأصيلة للمتصفح (window.print):
+                محرك Blink/WebKit يشكّل العربية بـ HarfBuzz فيخرج النص
+                مطابقًا للشاشة 100% — صفر تفكيك نصي وصفر مكتبة وسيطة.
+                «حفظ كـ PDF» متاح مباشرة من نافذة الطباعة على كل الأنظمة */}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}
-              title="نسخة ورقية رسمية منسقة للطباعة والحفظ المكتبي"
+              title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
             >
               <span className="sm:hidden">PDF</span>
-              <span className="hidden sm:inline">تحميل كـ PDF</span>
-            </a>
+              <span className="hidden sm:inline">طباعة / حفظ PDF</span>
+            </button>
 
             {/* مولد الاقتباسات */}
             <div className="flex min-h-11 items-center">
