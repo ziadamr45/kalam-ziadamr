@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest, after } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 /**
  * Middleware المنصة العامة — درع الحافة:
@@ -57,9 +58,72 @@ const PRIVATE_API_PREFIXES = [
   "/api/push/subscribe", "/api/comments/votes",
 ];
 
-export function middleware(request: NextRequest) {
+/**
+ * أسماء كوكيز الجلسة عبر البيئتين — للمسح الصارم الذي يكسر حلقة
+ * التحديث اللانهائية للجلسة المُبطلة/التالفة (Infinite Refresh Fix):
+ * لا يكفي Redirect — يجب موت الكوكي في نفس الاستجابة وإلا أعاده
+ * المتصفح في كل طلب فتعود الحلقة من جديد.
+ */
+const PURGE_COOKIE_NAMES = [
+  "next-auth.session-token",
+  "__Secure-next-auth.session-token",
+  "authjs.session-token",
+  "__Secure-authjs.session-token",
+];
+
+const useSecureCookies =
+  process.env.NEXTAUTH_URL?.startsWith("https://") ||
+  process.env.AUTH_URL?.startsWith("https://") ||
+  (process.env.VERCEL_ENV ?? process.env.NODE_ENV) === "production";
+
+/**
+ * كوكي جلسة موجود لكن تعذّر فكّه = جلسة تالفة/مُبطلة بلا هوية.
+ * يُمسح نهائيًا مع تحويل نظيف لبوابة الدخول — بدل تركه يظل
+ * يُرسل في كل طلب فتتصرف المنصة كأن فيه جلسة ثم تفقده،
+ * وهو جذر حلقة التحديث التي وصفها صاحب المنصة.
+ */
+async function guardCorruptedSession(request: NextRequest): Promise<NextResponse | null> {
+  const { pathname } = request.nextUrl;
+
+  /* آلية Auth.js تدير كوكيزها بنفسها — لا تدخل عليها */
+  if (pathname.startsWith("/api/auth") || pathname.startsWith("/auth/login")) return null;
+
+  const candidate = PURGE_COOKIE_NAMES.find((n) => request.cookies.has(n));
+  if (!candidate) return null;
+
+  const decoded = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    salt: candidate,
+    cookieName: candidate,
+    secureCookie: useSecureCookies,
+  }).catch(() => null);
+
+  if (decoded) return null; // جلسة سليمة — تُدار ببوابات الإبطال الأعمق
+
+  /* كوكي ميت التوقيع أو مرفوض — مسح صارم + تحويل بإشارة الإبطال */
+  const loginUrl = new URL("/auth/login?revoked=true", request.url);
+  const response = NextResponse.redirect(loginUrl);
+  for (const name of PURGE_COOKIE_NAMES) {
+    response.cookies.set(name, "", {
+      path: "/",
+      maxAge: 0,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: useSecureCookies,
+    });
+    response.cookies.delete(name);
+  }
+  return response;
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const lowerPath = pathname.toLowerCase();
+
+  /* درع الجلسة التالفة — مسح الكوكيز الصارم يكسر حلقة التحديث */
+  const sessionGuard = await guardCorruptedSession(request);
+  if (sessionGuard) return sessionGuard;
 
   /* حجب فوري لماسحات الاختراق — 403 بلا أي معالجة أو توثيق
      (مطابقة حرفية صارمة للمسار نفسه أو بادئته، صفر مطاعمة حتى

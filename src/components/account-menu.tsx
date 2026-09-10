@@ -125,7 +125,14 @@ export function AccountMenu() {
               قراءاتي المحفوظة
             </Link>
             <button
-              onClick={() => signOut({ redirectTo: "/" })}
+              onClick={async () => {
+                /* الخروج الطبيعي يمسح مؤشر الدخول أولًا — كي لا يعتبره
+                   حارس مراقبة الجلسة إبطالًا مفاجئًا ويطلق إنذارًا كاذبًا */
+                try {
+                  window.localStorage.removeItem("kalam_was_logged_in");
+                } catch {}
+                await signOut({ redirectTo: "/" });
+              }}
               className="mt-1 block w-full rounded-xl px-3 py-2 text-right transition-colors hover:bg-[var(--accent-soft)]"
               style={{ color: "#b4443c" }}
             >

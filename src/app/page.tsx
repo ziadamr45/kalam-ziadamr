@@ -69,8 +69,8 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* أحدث المقالات */}
-        <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6">
+        {/* أحدث المقالات — المرساة id مطلوبة لاختصار PWA «أحدث المقالات» */}
+        <section id="latest-articles" className="mx-auto max-w-5xl scroll-mt-24 px-4 pb-16 sm:px-6">
           <div className="mb-8 flex items-baseline justify-between">
             <h2 className="font-ui text-2xl font-bold" style={{ color: "var(--ink)" }}>
               أحدث ما له لازمة

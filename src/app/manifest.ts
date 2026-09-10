@@ -22,6 +22,31 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#FDFBF7",
     theme_color: "#F8F4EC",
     categories: ["news", "education", "lifestyle"],
+    /* اختصارات الضغط المطول على أيقونة التطبيق في الشاشة الرئيسية —
+       قائمة سريعة تفتح أعمق مسارات المنصة مباشرة (App Shortcuts) */
+    shortcuts: [
+      {
+        name: "أحدث المقالات",
+        short_name: "المقالات",
+        description: "تصفح أحدث المقالات الفكرية المنشورة",
+        url: "/#latest-articles",
+        icons: [{ src: "/icons/shortcut-articles.png", sizes: "96x96", type: "image/png" }],
+      },
+      {
+        name: "قراءاتي المحفوظة",
+        short_name: "المحفوظات",
+        description: "الوصول السريع إلى مكتبتك وقراءاتك المحفوظة",
+        url: "/saved",
+        icons: [{ src: "/icons/shortcut-saved.png", sizes: "96x96", type: "image/png" }],
+      },
+      {
+        name: "البحث الفكري",
+        short_name: "بحث",
+        description: "ابحث في المقالات والأفكار",
+        url: "/search",
+        icons: [{ src: "/icons/shortcut-search.png", sizes: "96x96", type: "image/png" }],
+      },
+    ],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

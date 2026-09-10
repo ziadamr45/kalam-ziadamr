@@ -21,6 +21,11 @@ export function AccountDangerZone() {
     try {
       const res = await fetch("/api/account/delete", { method: "DELETE" });
       if (res.ok) {
+        /* حذف الحساب = خروج نهائي طبيعي — يُمسح مؤشر الدخول أولًا
+           كي لا يعامله حارس مراقبة الجلسة كإبطال مفاجئ */
+        try {
+          window.localStorage.removeItem("kalam_was_logged_in");
+        } catch {}
         await signOut({ redirectTo: "/" });
         return;
       }
