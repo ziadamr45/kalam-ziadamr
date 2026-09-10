@@ -187,22 +187,24 @@ export function NotificationDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
       style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={item.title}
     >
+      {/* توسيط مرن كامل على كل المقاسات + سقف ارتفاع 85vh مع تمرير داخلي
+          آمن — لا قصّ للنص على التابلت والكمبيوتر ولا التصاق قسري بالأعلى */}
       <div
-        className="w-full max-w-md animate-fade-in overflow-hidden rounded-2xl border shadow-lift"
+        className="max-h-[85vh] w-[92vw] animate-fade-in overflow-y-auto overscroll-contain rounded-2xl border shadow-lift sm:max-w-lg md:max-w-xl"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* رأس البطاقة — النوع والبادج وزر الإغلاق */}
+        {/* رأس البطاقة — النوع والبادج وزر الإغلاق (ثابت أعلى اللوحة أثناء التمرير) */}
         <div
-          className="flex items-center justify-between gap-2 border-b px-4 py-3"
-          style={{ borderColor: "var(--border)" }}
+          className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b px-4 py-3"
+          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
         >
           <span className="flex items-center gap-2">
             <TypeIcon type={item.type} size={28} />
@@ -231,8 +233,9 @@ export function NotificationDetailModal({
           </button>
         </div>
 
-        {/* المتن — العنوان والنص الكامل والتوقيت الدقيق */}
-        <div className="max-h-[60vh] overflow-y-auto overscroll-contain px-4 py-4">
+        {/* المتن — العنوان والنص الكامل والتوقيت الدقيق (بلا سقف مستقل —
+            التمرير على مستوى اللوحة كاملة كي لا يُقصّ أي جزء من النص) */}
+        <div className="px-4 py-4">
           <h3 className="text-base font-extrabold leading-8" style={{ color: "var(--ink)" }}>
             {item.title}
           </h3>
@@ -277,10 +280,10 @@ export function NotificationDetailModal({
           </div>
         </div>
 
-        {/* التذييل — الانتقال للرابط والإخفاء */}
+        {/* التذييل — الانتقال للرابط والإخفاء (ثابت أسفل اللوحة أثناء التمرير) */}
         <div
-          className="flex items-center justify-between gap-2 border-t px-4 py-3"
-          style={{ borderColor: "var(--border)" }}
+          className="sticky bottom-0 z-10 flex items-center justify-between gap-2 border-t px-4 py-3"
+          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
         >
           {item.link ? (
             <Link
