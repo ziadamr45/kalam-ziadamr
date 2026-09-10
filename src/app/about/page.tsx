@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "عن المنصة",
@@ -77,7 +77,7 @@ export default function AboutPage() {
           </ol>
         </section>
       </main>
-      <Footer />
+      <SiteFooter />
     </>
   );
 }

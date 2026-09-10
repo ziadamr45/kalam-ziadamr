@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
+import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
 import { getLatestArticles, getActiveSections } from "@/lib/db-queries";
 import { getSiteConfig } from "@/lib/site-config";
@@ -194,7 +194,7 @@ export default async function HomePage() {
       </main>
       {/* كبسولة تفعيل الإشعارات الذكية — الرئيسية فقط، ممنوعة في المقالات */}
       <PushPromptCapsule />
-      <Footer />
+      <SiteFooter />
     </>
   );
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
+import { SiteFooter } from "@/components/site-footer";
 import { ReadingProgress } from "@/components/reading-progress";
 import { BackToTop } from "@/components/back-to-top";
 import ContinueReadingBadge from "@/components/continue-reading-badge";
@@ -313,7 +313,7 @@ export default async function ArticlePage({
           </section>
         )}
       </main>
-      <Footer />
+      <SiteFooter />
     </>
   );
 }

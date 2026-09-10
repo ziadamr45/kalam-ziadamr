@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
+import { SiteFooter } from "@/components/site-footer";
 import { ContactForm } from "@/components/contact-form";
 import { getSocialLinks } from "@/lib/site-config";
 import type { SocialLinkEntry } from "@/lib/site-config";
@@ -87,7 +87,7 @@ export default async function ContactPage() {
           </div>
         </section>
       </main>
-      <Footer />
+      <SiteFooter />
     </>
   );
 }

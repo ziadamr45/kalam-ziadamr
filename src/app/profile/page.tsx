@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
+import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
@@ -491,7 +491,7 @@ export default async function ProfilePage() {
       </main>
       {/* كبسولة تفعيل الإشعارات الذكية — صفحة الحساب من مواضع الظهور المشروعة */}
       <PushPromptCapsule />
-      <Footer />
+      <SiteFooter />
     </>
   );
 }

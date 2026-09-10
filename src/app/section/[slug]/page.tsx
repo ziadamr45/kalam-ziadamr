@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
+import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
 import { getArticlesBySection, getActiveSections } from "@/lib/db-queries";
 import { SECTION_MAP, SECTIONS } from "@/lib/sections";
@@ -99,7 +99,7 @@ export default async function SectionPage({
           )}
         </section>
       </main>
-      <Footer />
+      <SiteFooter />
     </>
   );
 }

@@ -43,15 +43,24 @@ const DEFAULT_SOCIALS: SocialEntry[] = SOCIAL_KEYS.map((key) => ({
   icon: SOCIAL_ICONS[key],
 }));
 
-export function Footer() {
+export function Footer({
+  initialSections,
+}: {
+  /* الأقسام الحية الواردة من الخادم (مجلوبة من Neon عبر مكوّن SiteFooter) —
+     تُرسم في HTML السيرفر نفسه فتراها الزواحف ونماذج الذكاء الاصطناعي
+     مطابقة لما يعتمده الأدمن دون انتظار JavaScript */
+  initialSections?: { slug: string; name: string }[];
+} = {}) {
   const [footerText, setFooterText] = useState(DEFAULT_FOOTER_TEXT);
   /* التكوين السيادي: نص حقوق النشر والروابط الرسمية — يحكمهما الأدمن لحظيًا */
   const [copyright, setCopyright] = useState(DEFAULT_COPYRIGHT);
   const [socials, setSocials] = useState<SocialEntry[]>(DEFAULT_SOCIALS);
-  /* الأقسام الحية — الثابتة مرسومة فورًا (بلا مشاكل hydration)،
-     وتُستبدل بعد التحميل بالأقسام الفعلية من قاعدة البيانات: ما يظهر
-     في التذييل يطابق دائمًا ما يعتمده الأدمن في لوحة التحكم */
-  const [sections, setSections] = useState<{ slug: string; name: string }[]>(SECTIONS);
+  /* الأقسام الحية — ما يمرره السيرفر يُرسم فورًا (بلا مشاكل hydration)،
+     والثابت شبكة أمان للمواضع التي لا يمرر فيها السيرفر شيئًا،
+     ويُستبدل بعد التحميل بالأقسام الفعلية من قاعدة البيانات */
+  const [sections, setSections] = useState<{ slug: string; name: string }[]>(
+    initialSections && initialSections.length > 0 ? initialSections : SECTIONS,
+  );
 
   /* جلب نص التذييل المُدار من لوحة التحكم — بعد الرسم الأول حتى لا نكسر الترطيب */
   useEffect(() => {
