@@ -762,12 +762,17 @@ body.immersion .page-chrome {
     margin: 6mm 0 8mm !important;
     overflow: hidden !important;
   }
+  /* الغلاف كاملًا بلا أي قصّ — الصورة تتناسب مكتفية بنسبة أبعادها
+     الأصلية (بورتريه 3:4 أو لاندسكيب) داخل سقف 150mm يضمن ظهورها
+     كاملةً مع الترويسة والعنوان في أول ورقة دون ابتلاع الصفحة */
   #printable-article .print-cover img {
-    width: 100% !important;
+    display: block !important;
+    width: auto !important;
     height: auto !important;
-    max-height: 105mm !important;
-    object-fit: cover !important;
-    object-position: center;
+    max-width: 100% !important;
+    max-height: 150mm !important;
+    margin-inline: auto !important;
+    object-fit: contain !important;
   }
 
   html,
