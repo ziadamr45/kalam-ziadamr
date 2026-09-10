@@ -48,8 +48,33 @@ export function ArticleReader({
     } catch {}
   }, [tashkeelAllowed]);
 
+  /* مرساة المتن — تُقاس منها نسبة موضع القارئ قبل التبديل وبعده */
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  /* ============ محرك تثبيت موضع القراءة عند تبديل التشكيل ============
+     النص المشكول أكبر خطًا وتباعدًا من المجرد — بغير التثبيت يقفز
+     القارئ لموضع آخر بعيدًا عن فقرته. المنهجية (Relative Scroll
+     Preservation):
+       1) قبل التبديل: رصد نسبة الموضع الحالي داخل المتن
+          (المسافة المقطوعة من أعلى المتن ÷ ارتفاعه الكلي).
+       2) تبديل الوضع وإعادة البناء.
+       3) بعد اكتمال الرسم (rAF مزدوج): إعادة التمرير لنفس النسبة
+          من الأبعاد الجديدة — انتقالًا فوريًا غير ملحوظ.
+     القارئ فوق بداية المتن أو بعد نهايته لا يحتاج تثبيتًا — ما فوقه
+     ثابت الأبعاد لا يتزحلق. */
   const toggleTashkeel = useCallback(() => {
     if (!tashkeelAllowed) return;
+
+    /* 1) النسبة المئوية لموضع الشاشة داخل المتن — قبل أي تغيير */
+    let progress: number | null = null;
+    const el = contentRef.current;
+    if (el && el.getBoundingClientRect().height > 0) {
+      const rect = el.getBoundingClientRect();
+      const raw = (window.scrollY - (rect.top + window.scrollY)) / rect.height;
+      if (raw > 0 && raw < 1) progress = raw;
+    }
+
+    /* 2) تبديل وضع التشكيل */
     setTashkeel((prev) => {
       const next = !prev;
       try {
@@ -57,6 +82,26 @@ export function ArticleReader({
       } catch {}
       return next;
     });
+
+    /* 3) إعادة التموضع بنفس النسبة النسبية فور اكتمال إعادة الرندرة —
+        الإطار الأول يثبّت الأبعاد الجديدة والثاني يضمن اكتمال الـ layout،
+        مع تجاوز scroll-behavior: smooth العامة انتقالًا فوريًا لا يُشتّت */
+    if (progress !== null) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el2 = contentRef.current;
+          if (!el2) return;
+          const newRect = el2.getBoundingClientRect();
+          const targetScrollY =
+            newRect.top + window.scrollY + newRect.height * progress!;
+          const rootStyle = document.documentElement.style;
+          const prevBehavior = rootStyle.scrollBehavior;
+          rootStyle.scrollBehavior = "auto"; /* إلغاء التمرير الناعم العام مؤقتًا */
+          window.scrollTo(0, targetScrollY);
+          rootStyle.scrollBehavior = prevBehavior;
+        });
+      });
+    }
   }, [tashkeelAllowed]);
 
   /* المختصر المفيد */
@@ -502,8 +547,10 @@ export function ArticleReader({
       )}
 
       {/* جسم المقال — العارض الموحد لمحرك التنسيق الموسع (كاريوكي آمن)
-          مسافة سفلية واسعة (pb-32) حتى لا تحجب الكبسولة العائمة السطور الأخيرة أبدًا */}
+          مسافة سفلية واسعة (pb-32) حتى لا تحجب الكبسولة العائمة السطور الأخيرة أبدًا
+          contentRef: مرساة محرك تثبيت موضع القراءة عند تبديل التشكيل */}
       <div
+        ref={contentRef}
         id="article-body"
         className={`article-body mt-10 pb-32 ${tashkeel ? "is-tashkeel" : ""}`}
         style={{ color: "var(--ink)" }}

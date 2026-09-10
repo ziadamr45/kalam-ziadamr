@@ -264,6 +264,18 @@ export default async function ArticlePage({
           <div className="print-only mt-12 border-t pt-4 text-center text-xs" style={{ borderColor: "var(--border)", color: "#555" }}>
             منصة كلام له لازمة · {article.title}
           </div>
+
+          {/* تذييل الطباعة الثابت — يتكرر أسفل كل ورقة عند الطباعة من المتصفح:
+              هوية المنصة يمينًا + رابط المقال العربي المقروء (بلا ترميز ٪)
+              وسطًا بسطر واحد مقصوص + النطاق الرسمي يسارًا — منفصل تمامًا
+              عن رقم الصفحة الذي يضيفه المتصفح من تلقاء نفسه خارج الهوامش */}
+          <div className="print-only print-footer" aria-hidden>
+            <span>منصة كلام له لازمة — فكر بلا ضجيج</span>
+            <span className="print-footer-url">
+              {`${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://kalam-ziadamr.vercel.app").replace(/^https?:\/\//, "").replace(/\/$/, "")}/article/${article.slug}`}
+            </span>
+            <span className="print-footer-brand">ziadamr.me</span>
+          </div>
         </article>
 
         {/* مقالات ذات صلة */}

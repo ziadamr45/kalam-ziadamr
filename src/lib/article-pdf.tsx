@@ -63,6 +63,25 @@ function eastern(n: number | string): string {
   return String(n).replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
 }
 
+/**
+ * الرابط كما يُطبع في التذييل — عربي مقروء بسطر واحد مضمون:
+ *  1) فك ترميز الـ slug العربي (%D9%85...) إلى حروفه الأصلية — الرابط
+ *     المشفر سلسلة طويلة بلا مسافات لا يكسرها محرك الـ PDF فتفيض
+ *     أفقيًا فوق رقم الصفحة، وهذا كان سبب التراكم المرصود.
+ *  2) اقتصار الطول على حدّ آمن بعلامة حذف — الرابط الكامل موجود
+ *     في رمز QR أعلى الوثيقة، فلا خسارة وظيفية بالاقتصار.
+ */
+function printableUrl(url: string): string {
+  let clean = url;
+  try {
+    clean = decodeURIComponent(url);
+  } catch {
+    /* تسلسلات ترميز ناقصة — نُبقي الرابط كما ورد بدل الانهيار */
+  }
+  clean = clean.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return clean.length > 58 ? `${clean.slice(0, 57)}…` : clean;
+}
+
 export type ArticlePdfInput = {
   title: string;
   summary: string | null;
@@ -238,10 +257,13 @@ function ArticlePdf(input: ArticlePdfInput) {
       language="ar"
     >
       <Page size="A4" style={styles.page}>
-        {/* ===== التذييل الثابت — أسفل كل صفحة مطبوعة ===== */}
+        {/* ===== التذييل الثابت — أسفل كل صفحة مطبوعة =====
+             ثلاث خلايا منفصلة تمامًا: هوية المنصة (يمين) — الرابط
+             المقروء المرن (وسط) — رقم الصفحة (يسار)؛ الخلية الوسطى
+             flex:1 بحدّ أقصى مضبوط فلا تفيض أبدًا على الجارين */}
         <View style={styles.footer} fixed>
           <Text style={styles.footRight}>منصة كلام له لازمة — فكر بلا ضجيج</Text>
-          <Text style={styles.footCenter}>{input.articleUrl}</Text>
+          <Text style={styles.footCenter}>{printableUrl(input.articleUrl)}</Text>
           <Text
             style={styles.footPage}
             render={({ pageNumber, totalPages }) =>
@@ -303,8 +325,10 @@ function ArticlePdf(input: ArticlePdfInput) {
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 48,
-    paddingBottom: 70,
+    /* هوامش A4 مكتبية بمساحة أمان سفلية واسعة (~28mm) — أسطر المتن
+       تنتهي فوق التذييل بهامش فاصل لا يُخترق مهما طال المقال */
+    paddingTop: 56,
+    paddingBottom: 80,
     paddingHorizontal: 46,
     backgroundColor: "#FFFFFF",
     fontFamily: "Amiri",
@@ -312,10 +336,10 @@ const styles = StyleSheet.create({
     color: INK,
   },
 
-  /* ---------- التذييل الثابت ---------- */
+  /* ---------- التذييل الثابت (سطر واحد ثابت الارتفاع) ---------- */
   footer: {
     position: "absolute",
-    bottom: 26,
+    bottom: 24,
     left: 46,
     right: 46,
     flexDirection: "row",
@@ -326,7 +350,16 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   footRight: { fontFamily: "Tajawal", fontSize: 8, color: GOLD, fontWeight: 700 },
-  footCenter: { fontFamily: "Tajawal", fontSize: 7, color: STEEL, maxWidth: 240, textAlign: "center" },
+  /* الرابط: خلية مرنة تتقلص دائمًا بين الجارين — النص المطبوع
+     مقصوصٌ مسبقًا في printableUrl فلا التفاف ولا فيضان مطلقًا */
+  footCenter: {
+    fontFamily: "Tajawal",
+    fontSize: 6.8,
+    color: STEEL,
+    flex: 1,
+    marginHorizontal: 10,
+    textAlign: "center",
+  },
   footPage: { fontFamily: "Tajawal", fontSize: 8, color: DARK, fontWeight: 700 },
 
   /* ---------- الترويسة الرسمية ---------- */

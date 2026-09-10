@@ -123,8 +123,12 @@ iframe {
 }
 
 .article-body.is-tashkeel {
-  font-size: clamp(1.2rem, 1.1rem + 0.5vw, 1.375rem);
-  line-height: 2.85;
+  /* تقليل فارق الارتفاع الإجمالي مع الوضع المجرد (ثبات موضع القراءة):
+     كان الخط 1.2–1.375rem بسطر 2.85 (فارق ~34% لكل سطر) — صار
+     الخط 1.14–1.3125rem بسطر 2.5 (فارق ~12% فقط)، مع بقاء الحركات
+     كاملة الوضوح دون أي تلاصق (2.5 هامش سخي لخط أميري المشكول) */
+  font-size: clamp(1.14rem, 1.05rem + 0.45vw, 1.3125rem);
+  line-height: 2.5;
 }
 
 /* هوامش مريحة للإبهام والعين على الهواتف — تنبسط على الشاشات الأكبر */
@@ -308,7 +312,7 @@ body.immersion .page-chrome {
 }
 
 .is-tashkeel .quran-text {
-  line-height: 2.75;
+  line-height: 2.6;
 }
 
 .quran-bracket {
@@ -352,7 +356,7 @@ body.immersion .page-chrome {
 }
 
 .is-tashkeel .hadith-text {
-  line-height: 2.45;
+  line-height: 2.3;
 }
 
 .hadith-bracket {
@@ -685,7 +689,12 @@ body.immersion .page-chrome {
 .print-only { display: none !important; }
 
 @media print {
-  @page { margin: 18mm 16mm; }
+  /* هوامش A4 بمساحة أمان سفلية 25mm للتذييل الثابت — لا تصادم
+     بين أسطر المتن والتذييل مهما طال المقال */
+  @page {
+    size: A4;
+    margin: 20mm 15mm 25mm 15mm;
+  }
 
   html, body {
     background: #ffffff !important;
@@ -714,6 +723,49 @@ body.immersion .page-chrome {
     max-width: none !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  /* حماية الصفحة الأخيرة: سطر التوقيع الختامي لا يجلس فوق التذييل الثابت */
+  article {
+    padding-bottom: 16mm !important;
+  }
+
+  /* التذييل الثابت أسفل كل صفحة مطبوعة — هوية يمينًا، رابط المقال
+     وسطًا مقصوصًا بسطر واحد، وهوية النطاق يسارًا — لا يلامس المتن
+     لأن هامش @page السفلي (25mm) أوسع من ارتفاعه (15mm) */
+  .print-only.print-footer {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 15mm;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px solid #e5e7eb;
+    margin: 0 !important;
+    padding: 0 2mm;
+    font-size: 8pt;
+    color: #6b7280;
+    direction: rtl;
+  }
+
+  /* رابط المقال في التذييل: عربي مقروء (بلا ترميز ٪) بسطر واحد مقصوص */
+  .print-footer .print-footer-url {
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: ltr;
+    text-align: center;
+    font-size: 7pt;
+    color: #9ca3af;
+  }
+
+  .print-footer .print-footer-brand {
+    flex-shrink: 0;
+    font-weight: 600;
   }
 
   body {
