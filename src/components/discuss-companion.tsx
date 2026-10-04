@@ -132,6 +132,10 @@ export function DiscussCompanion({
   const [error, setError] = useState("");
   const [exhausted, setExhausted] = useState(false);
   const [impactNote, setImpactNote] = useState("");
+  /* تفاعلات الرسائل: نسخ ردود المحاور + تعديل رسائل المستخدم (تُحسب من الحصة) */
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
   const { data: session, status } = useSession();
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -139,10 +143,11 @@ export function DiscussCompanion({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const openRef = useRef(false);
 
-  /* استعادة الحوار من الجلسة الحالية (الخادم يبقى الحَكَم في الحصة) */
+  /* استعادة الحوار الدائم للمقال (localStorage) — عودة القارئ تجد رسائله القديمة
+     كما تركتها في نفس المقال، والخادم يبقى الحَكَم في الحصة المتبقية */
   const restoreSession = useCallback(() => {
     try {
-      const raw = sessionStorage.getItem(HISTORY_KEY(articleId));
+      const raw = localStorage.getItem(HISTORY_KEY(articleId));
       if (raw) {
         const saved = JSON.parse(raw) as { messages: ChatMessage[]; remaining: number };
         if (Array.isArray(saved.messages)) setMessages(saved.messages.slice(-40));
@@ -154,7 +159,7 @@ export function DiscussCompanion({
   const persistSession = useCallback(
     (msgs: ChatMessage[], rem: number | null) => {
       try {
-        sessionStorage.setItem(
+        localStorage.setItem(
           HISTORY_KEY(articleId),
           JSON.stringify({ messages: msgs.slice(-40), remaining: rem }),
         );
@@ -251,13 +256,53 @@ export function DiscussCompanion({
     };
   }, [open, closeDrawer]);
 
+  /* نص صافٍ للنسخ — بلا رموز الماركداون التي تعرضها الفقاعة */
+  const plainOf = (t: string) =>
+    t
+      .replace(/^#{1,3}\s+/gm, "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/^\s*[-*•]\s+/gm, "• ")
+      .trim();
+
+  const copyMessage = async (idx: number) => {
+    const m = messages[idx];
+    if (!m) return;
+    try {
+      await navigator.clipboard.writeText(plainOf(m.text));
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx((c) => (c === idx ? null : c)), 1600);
+    } catch {}
+  };
+
+  /* تعديل رسالة سابقة: النص يُحمّل في الحقل، والإرسال يقصّ الحوار إلى ما قبلها —
+     تُرسل كرسالة جديدة تُخصم من الحصة وتُحدَّث قواعد البيانات لدى الخادم */
+  const startEdit = (idx: number) => {
+    const m = messages[idx];
+    if (!m || sending) return;
+    setActiveIdx(null);
+    setEditing(idx);
+    setInput(m.text);
+    setError("");
+    setTimeout(() => inputRef.current?.focus(), 60);
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setInput("");
+  };
+
   const send = async () => {
     const text = input.trim();
     if (!text || sending || exhausted) return;
 
     setError("");
     setInput("");
-    const nextMessages: ChatMessage[] = [...messages, { role: "user", text }];
+    const editIndex = editing;
+    setEditing(null);
+    setActiveIdx(null);
+    /* التعديل: يُقصّ الحوار إلى ما قبل الرسالة المعدّلة ثم تُرسل الجديدة */
+    const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
+    const nextMessages: ChatMessage[] = [...baseMessages, { role: "user", text }];
     setMessages(nextMessages);
     setSending(true);
 
@@ -272,7 +317,7 @@ export function DiscussCompanion({
           articleId,
           message: text,
           fp: getVisitorFingerprint(),
-          history: messages.map((m) => ({
+          history: baseMessages.map((m) => ({
             role: m.role === "model" ? "model" : "user",
             text: m.text,
           })),
@@ -290,14 +335,15 @@ export function DiscussCompanion({
         if (data.exhausted) {
           setExhausted(true);
           setRemaining(0);
-          persistSession(nextMessages, 0);
+          persistSession(baseMessages, 0);
           setError("");
         } else {
           setError(data.error || "تعذر إرسال الرسالة — أعد المحاولة");
-          /* إرجاع رسالة المستخدم لإعادة الإرسال */
-          setMessages(messages);
-          setInput(text);
         }
+        /* إرجاع الرسالة لإعادة الإرسال مع المحافظة على وضع التعديل إن كان فعالًا */
+        setMessages(baseMessages);
+        setInput(text);
+        if (editIndex !== null) setEditing(editIndex);
         return;
       }
 
@@ -331,8 +377,9 @@ export function DiscussCompanion({
       }
     } catch {
       setError("انقطع الاتصال — أعد المحاولة");
-      setMessages(messages);
+      setMessages(baseMessages);
       setInput(text);
+      if (editIndex !== null) setEditing(editIndex);
     } finally {
       setSending(false);
     }
@@ -514,17 +561,72 @@ export function DiscussCompanion({
 
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 ${
-                    m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
-                  }`}
-                  style={
-                    m.role === "user"
-                      ? { background: "var(--accent)", color: "#fff" }
-                      : { background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }
-                  }
-                >
-                  {m.role === "model" ? <MiniMarkdown text={m.text} /> : m.text}
+                <div className="max-w-[85%]">
+                  <div
+                    onClick={() => setActiveIdx(activeIdx === i ? null : i)}
+                    className={`cursor-pointer rounded-2xl px-4 py-3 text-sm leading-7 ${
+                      m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
+                    }`}
+                    style={
+                      m.role === "user"
+                        ? { background: "var(--accent)", color: "#fff" }
+                        : { background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }
+                    }
+                    title="اضغط لإظهار الإجراءات"
+                  >
+                    {m.role === "model" ? <MiniMarkdown text={m.text} /> : m.text}
+                  </div>
+                  {activeIdx === i && !sending && (
+                    <div
+                      className={`mt-1 flex items-center gap-3 text-[11px] font-bold ${
+                        m.role === "user" ? "justify-end" : ""
+                      }`}
+                    >
+                      {m.role === "model" ? (
+                        <button
+                          type="button"
+                          onClick={() => copyMessage(i)}
+                          className="flex items-center gap-1 transition-colors hover:opacity-80"
+                          style={{ color: copiedIdx === i ? "var(--accent-strong)" : "var(--ink-muted)" }}
+                        >
+                          {copiedIdx === i ? (
+                            <>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                              نُسخ الرد
+                            </>
+                          ) : (
+                            <>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <rect x="9" y="9" width="13" height="13" rx="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                              نسخ الرد
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(i)}
+                          className="flex items-center gap-1 transition-colors hover:opacity-80"
+                          style={{ color: "var(--ink-muted)" }}
+                          title="عدّل رسالتك — يُقصّ الحوار بعد هذه الرسالة وتُحسب من رصيدك كرسالة جديدة"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                          </svg>
+                          تعديل
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {editing === i && (
+                    <p className="mt-1 text-[10px] font-semibold leading-4" style={{ color: "#D97706" }}>
+                      وضع التعديل — أرسل النص الجديد وسيُحذف ما بعد هذه الرسالة
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -563,6 +665,25 @@ export function DiscussCompanion({
 
           {/* حقل الكتابة */}
           <div className="border-t p-3" style={{ borderColor: "var(--border)" }}>
+            {editing !== null && (
+              <div
+                className="mb-2 flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold"
+                style={{
+                  borderColor: "rgba(245,158,11,0.4)",
+                  background: "rgba(245,158,11,0.08)",
+                  color: "#D97706",
+                }}
+              >
+                <span>أنت تعدّل رسالة سابقة — إرسالها يحذف ما بعدها وتُحسب من رصيدك كرسالة جديدة</span>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="shrink-0 font-bold underline underline-offset-2"
+                >
+                  إلغاء
+                </button>
+              </div>
+            )}
             <div className="flex items-end gap-2">
               <textarea
                 ref={inputRef}
@@ -576,7 +697,11 @@ export function DiscussCompanion({
                 disabled={exhausted || sending}
                 maxLength={1200}
                 placeholder={
-                  exhausted ? "انتهت حصة النقاش لهذا المقال" : "اسأل أو ناقش بهدوء واحترام.."
+                  exhausted
+                    ? "انتهت حصة النقاش لهذا المقال"
+                    : editing !== null
+                      ? "عدّل رسالتك ثم أرسل.."
+                      : "اسأل أو ناقش بهدوء واحترام.."
                 }
                 className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)] disabled:opacity-50"
                 style={{ borderColor: "var(--border)", color: "var(--ink)" }}

@@ -33,10 +33,10 @@ function countWords(text: string): number {
  * تلقائيًا للمقاسات الطويلة (ستوري) بدل أن تفرغ البطاقة صمتًا.
  */
 function pixelRatioFor(w: number, h: number): number {
-  const MAX_AREA = 16_400_000;
+  const MAX_AREA = 8_000_000; // سقف مُحكم — فشل ما تبقى يصححه سُلّم drawQuoteCard البكسلي
   /* سقف أبعاد iOS الصامت: أي بُعد يتجاوز 4096 يترك كانفاس Safari شفافًا
      رغم نجاح كل أوامر الرسم — لذا يُقيَّد أطول ضلع أيضًا لا المساحة وحدها */
-  const MAX_SIDE = 4096;
+  const MAX_SIDE = 3200;
   return Math.min(3, Math.sqrt(MAX_AREA / (w * h)), MAX_SIDE / Math.max(w, h));
 }
 
@@ -133,28 +133,27 @@ async function loadCardFonts(fonts: CardFonts): Promise<void> {
   } catch {}
 }
 
+type CardOpts = {
+  quote: string;
+  preset: SizePreset;
+  variant: CardVariant;
+  articleTitle: string;
+  cover: HTMLImageElement | null;
+  qr: HTMLImageElement | null;
+  fonts: CardFonts;
+};
+
 /**
  * محرك البطاقة السينمائية — يرسم في إحداثيات منطقية W×H ويضخّم ×3:
  * غلاف المقال ممتد كاملًا + ضبابية عازلة + تراكب دافئ عميق + vignette شعاعي
  * + إطار ذهبي داخلي بأركان مخطوطية هادئة + اقتباس أبيض ناصع بخط أميري
  * + تذييل بهوية المنصة ورمز QR موجّه للمقال.
+ * simpleMode: وضع الملاذ للأجهزة المرهقة — بلا ضبابية للغلاف ولا ظل للنص.
  */
-function drawQuoteCard(
-  canvas: HTMLCanvasElement,
-  opts: {
-    quote: string;
-    preset: SizePreset;
-    variant: CardVariant;
-    articleTitle: string;
-    cover: HTMLImageElement | null;
-    qr: HTMLImageElement | null;
-    fonts: CardFonts;
-  },
-) {
+function renderCardAt(canvas: HTMLCanvasElement, opts: CardOpts, ratio: number, simpleMode: boolean) {
   const { quote, preset, variant, articleTitle, cover, qr, fonts } = opts;
   const W = preset.w;
   const H = preset.h;
-  const ratio = pixelRatioFor(W, H);
   canvas.width = Math.round(W * ratio);
   canvas.height = Math.round(H * ratio);
   const ctx = canvas.getContext("2d");
@@ -179,12 +178,13 @@ function drawQuoteCard(
   if (cover) {
     try {
       ctx.save();
+      const useFilter = supportsFilter && !simpleMode;
       const scale =
         Math.max(W / cover.naturalWidth, H / cover.naturalHeight) *
-        (supportsFilter ? 1.14 : 1.03); // أوفرسكان يخفي تفتت حواف الضبابية
+        (useFilter ? 1.14 : 1.03); // أوفرسكان يخفي تفتت حواف الضبابية
       const dw = cover.naturalWidth * scale;
       const dh = cover.naturalHeight * scale;
-      if (supportsFilter) {
+      if (useFilter) {
         ctx.filter = "blur(14px) saturate(1.1) brightness(0.88)";
       }
       ctx.drawImage(cover, (W - dw) / 2, (H - dh) / 2, dw, dh);
@@ -378,9 +378,11 @@ function drawQuoteCard(
       : variant === "hadith"
         ? `700 ${Math.round(fontSize * 0.92)}px ${fonts.hadith}`
         : `700 ${fontSize}px ${fonts.normal}`;
-  ctx.shadowColor = "rgba(0,0,0,0.6)"; // ظل رقيق يرفع النص فوق الصورة
-  ctx.shadowBlur = Math.round(fontSize * 0.22);
-  ctx.shadowOffsetY = 2;
+  if (!simpleMode) {
+    ctx.shadowColor = "rgba(0,0,0,0.6)"; // ظل رقيق يرفع النص فوق الصورة
+    ctx.shadowBlur = Math.round(fontSize * 0.22);
+    ctx.shadowOffsetY = 2;
+  }
   lines.forEach((line, i) => {
     ctx.fillText(line, W / 2, startY + i * lineH);
   });
@@ -459,6 +461,60 @@ function roundRect(
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+/**
+ * قائد الرسم — حصانة كاملة أمام فشل التخصيص الصامت للكانفاس:
+ * أجهزة iOS/أندرويد فوق سقف ذاكرتها تُرجع كانفاس شفافًا رغم نجاح كل أوامر الرسم.
+ * الدورة: رسم ← فحص بكسلي فعلي (5 نقاط) ← إن كان فارغًا انزل بنسبة الرسم وأعد
+ * بوضع مبسّط ← ملاذ أخير مضمون بمقاس مصغّر — الأرضية الصلبة تبقى مضمونة دائمًا.
+ */
+function drawQuoteCard(canvas: HTMLCanvasElement, opts: CardOpts) {
+  /* تفريغ فوري للمخزن الخلفي السابق — Safari لا يحرره إلا بإعادة التهيئة،
+     وتراكمه عبر إعادة الرسم المتكرر هو ما يُفشل التخصيص لاحقًا */
+  canvas.width = 1;
+  canvas.height = 1;
+
+  const isBlank = (): boolean => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return true;
+    const pts: [number, number][] = [
+      [2, 2],
+      [canvas.width / 2, canvas.height / 2],
+      [canvas.width - 3, canvas.height - 3],
+      [canvas.width / 2, canvas.height * 0.08],
+      [canvas.width * 0.12, canvas.height * 0.88],
+    ];
+    try {
+      for (const [x, y] of pts) {
+        if (ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data[3] > 0) return false;
+      }
+    } catch {
+      return true;
+    }
+    return true;
+  };
+
+  let ratio = pixelRatioFor(opts.preset.w, opts.preset.h);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    renderCardAt(canvas, opts, ratio, attempt > 0);
+    if (!isBlank()) return;
+    ratio = Math.max(1, ratio * 0.7);
+    canvas.width = 1;
+    canvas.height = 1;
+  }
+
+  /* الملاذ الأخير — بطاقة صلبة بمقاس مصغّر مضمون التخصيص على أي جهاز */
+  canvas.width = 1;
+  canvas.height = 1;
+  renderCardAt(canvas, opts, 1, true);
+  if (isBlank()) {
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
 }
 
 export function QuoteGenerator({
@@ -672,8 +728,13 @@ export function QuoteGenerator({
       await new Promise((r) => requestAnimationFrame(() => r(null)));
       const canvas = canvasRef.current;
       if (!canvas) return;
+      const dataUrl = canvas.toDataURL("image/png");
+      if (!dataUrl || dataUrl.length < 2000) {
+        showHint("تعذر توليد الصورة على هذا الجهاز — أعد المحاولة أو اختر مقاسًا آخر");
+        return;
+      }
       const a = document.createElement("a");
-      a.href = canvas.toDataURL("image/png");
+      a.href = dataUrl;
       a.download = `quote-kalam-${articleSlug}-${size.key}.png`;
       a.click();
       trackShareBySlug(articleSlug, "quote-download", selectedText.length);
@@ -681,7 +742,7 @@ export function QuoteGenerator({
     } finally {
       setIsExporting(false);
     }
-  }, [articleSlug, isExporting, isSharing, selectedText.length, size.key, trackImpact]);
+  }, [articleSlug, isExporting, isSharing, selectedText.length, size.key, showHint, trackImpact]);
 
   const shareNative = useCallback(async () => {
     if (isSharing || isExporting) return;
@@ -693,6 +754,7 @@ export function QuoteGenerator({
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob((b) => resolve(b), "image/png"),
       );
+      if (!blob) showHint("تعذر تجهيز الصورة — نُسخ نص الاقتباس بدلًا منها");
       trackShareBySlug(articleSlug, "quote-share", selectedText.length);
       void trackImpact();
       if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], "quote.png", { type: "image/png" })] })) {
@@ -715,7 +777,7 @@ export function QuoteGenerator({
     } finally {
       setIsSharing(false);
     }
-  }, [articleSlug, articleTitle, isExporting, isSharing, selectedText, trackImpact]);
+  }, [articleSlug, articleTitle, isExporting, isSharing, selectedText, showHint, trackImpact]);
 
   /**
    * تصفير الكانفاس والحالات عند الإغلاق — لا تسرب شفافية ولا تراكم طبقات
@@ -916,7 +978,7 @@ export function QuoteGenerator({
                 <canvas
                   ref={canvasRef}
                   className="max-h-[46vh] w-auto max-w-full rounded-xl shadow-lift"
-                  style={{ aspectRatio: `${size.w} / ${size.h}` }}
+                  style={{ aspectRatio: `${size.w} / ${size.h}`, background: "#0b0a08" }}
                 />
                 {rendering && (
                   <div
