@@ -1,11 +1,11 @@
 /**
- * قاعدة ضبط التنوين الصارمة:
+ * قاعدة ضبط التنوين الصارمة — طبقة اللغة الحاكمة في المنصة العامة:
  * يُوضع التنوين دائمًا على الحرف الذي يسبق ألف التنوين — لا على الألف نفسها.
  *   ✅ عالمًا  شكرًا  مرحبًا
  *   ❌ عالماً  شكراً  مرحباً
  *
- * المُصحِّح ينقل علامة التنوين (فتح ً / ضم ٌ / كسر ٍ) من فوق الألف
- * إلى الحرف السابق لها في كل موضع — أمانًا كاملًا للغة في كل كلمة تُنشر.
+ * تُطبَّق حتميًا على كل رد يخرج من محاور الذكاء الاصطناعي إلى القارئ —
+ * فالالتزام النحوي لا يُترك للنموذج وحده حتى لو أحسن قواعده في الغالب.
  */
 
 const TANWEEN_CLASS = "\u064B\u064C\u064D"; // ً ٌ ٍ
@@ -18,11 +18,4 @@ const WRONG_NUNATION = new RegExp(`(${ALEF})([${TANWEEN_CLASS}])`, "g");
 export function fixNunation(text: string): string {
   if (!text) return text;
   return text.replace(WRONG_NUNATION, (_m, alef: string, tanween: string) => tanween + alef);
-}
-
-/** كم موضعًا خاطئًا في النص؟ (لتقرير التصحيح في المحرر) */
-export function countNunationIssues(text: string): number {
-  if (!text) return 0;
-  const matches = text.match(new RegExp(`${ALEF}[${TANWEEN_CLASS}]`, "g"));
-  return matches ? matches.length : 0;
 }

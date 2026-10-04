@@ -552,11 +552,18 @@ export function QuoteGenerator({
       setSelectedText(text);
       if (chipGraceRef.current) clearTimeout(chipGraceRef.current);
       setChipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
+      /* تنبيه صريح فوري عند تجاوز سقف الاقتباس — لا رفض صامت أبدًا:
+         لحظة ما يُكتشف التحديد الطويل يظهر توست واضح يخبر القارئ أنه عدّى الحد */
+      if (countWords(text) > MAX_QUOTE_WORDS) {
+        showHint(
+          `عدّيت الحد الأقصى للاقتباس — حدّدت ${countWords(text)} كلمة والبطاقة تتسع لـ${MAX_QUOTE_WORDS} كلمة. قلّص تحديدك إلى عبارة مركزة`,
+        );
+      }
     };
 
     document.addEventListener("selectionchange", onSelectionChange);
     return () => document.removeEventListener("selectionchange", onSelectionChange);
-  }, [containerSelector]);
+  }, [containerSelector, showHint]);
 
   /* نسخ التحديد مع المصدر — «…النص… — منصة كلام له لازمة» + رابط المقال */
   const [copied, setCopied] = useState(false);
@@ -735,7 +742,9 @@ export function QuoteGenerator({
     const text = selectedText.trim();
     const overLimit = text.length >= MIN_QUOTE_CHARS && countWords(text) > MAX_QUOTE_WORDS;
     if (overLimit) {
-      showHint(`النص طويل.. اختر عبارة مركزة (الحد الأقصى ${MAX_QUOTE_WORDS} كلمة)`);
+      showHint(
+        `عدّيت الحد الأقصى للاقتباس — حدّدت ${countWords(text)} كلمة والبطاقة تتسع لـ${MAX_QUOTE_WORDS} كلمة. قلّص تحديدك إلى عبارة مركزة`,
+      );
       return;
     }
     if (text.length >= MIN_QUOTE_CHARS) {
@@ -751,7 +760,9 @@ export function QuoteGenerator({
     const clean = text.trim().replace(/\s+/g, " ");
     if (clean.length < MIN_QUOTE_CHARS) return;
     if (countWords(clean) > MAX_QUOTE_WORDS) {
-      setPickerHint(`هذه العبارة تتجاوز سعة البطاقة — اختر عبارة مركزة (الحد الأقصى ${MAX_QUOTE_WORDS} كلمة)`);
+      setPickerHint(
+        `هذه العبارة تتجاوز سعة البطاقة — حدّدت ${countWords(clean)} كلمة والحد الأقصى ${MAX_QUOTE_WORDS} كلمة. اختر عبارة أقصر`,
+      );
       return;
     }
     setPickerHint("");
@@ -799,13 +810,13 @@ export function QuoteGenerator({
               }}
               disabled={selectionOverLimit}
               aria-disabled={selectionOverLimit}
-              title={selectionOverLimit ? `النص طويل.. اختر عبارة مركزة (الحد الأقصى ${MAX_QUOTE_WORDS} كلمة)` : "حوّل التحديد إلى بطاقة مشاركة"}
+              title={selectionOverLimit ? `عدّيت الحد الأقصى للاقتباس (${MAX_QUOTE_WORDS} كلمة) — حدّد عبارة أقصر` : "حوّل التحديد إلى بطاقة مشاركة"}
               className={`whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-bold transition-all ${
                 selectionOverLimit ? "cursor-not-allowed opacity-45" : "hover:scale-105"
               }`}
               style={selectionOverLimit ? { background: "var(--border)", color: "var(--ink-muted)" } : { background: "var(--accent)", color: "#fff" }}
             >
-              {selectionOverLimit ? `النص طويل (${selectedWords}/${MAX_QUOTE_WORDS} كلمة)` : "اقتباس كبطاقة"}
+              {selectionOverLimit ? `تجاوزت الحد (${selectedWords}/${MAX_QUOTE_WORDS} كلمة)` : "اقتباس كبطاقة"}
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -847,7 +858,7 @@ export function QuoteGenerator({
           </div>
           {selectionOverLimit && (
             <p className="max-w-[260px] px-2 pb-1 text-center text-[10px] font-semibold leading-4" style={{ color: "var(--ink-muted)" }}>
-              اختر عبارة مركزة — الحد الأقصى {MAX_QUOTE_WORDS} كلمة (حدّد من جديد لتقليص التحديد)
+              عدّيت الحد الأقصى ({selectedWords}/{MAX_QUOTE_WORDS} كلمة) — حدّد من جديد عبارة أقصر
             </p>
           )}
         </div>

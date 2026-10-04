@@ -14,6 +14,94 @@ import { getVisitorFingerprint } from "@/lib/fingerprint";
 
 type ChatMessage = { role: "user" | "model"; text: string };
 
+/**
+ * عارض ماركداون مصغّر لردود المحاور — بلا أي تبعية خارجية:
+ * عناوين «##»، نقاط «-»، قوائم مرقمة، وبارز **..** —
+ * لأن المحاور صار يُوجّه بتنسيق ردوده، والفقاعات تعرضه للقارئ كما قُصد.
+ */
+function MiniMarkdown({ text }: { text: string }) {
+  const nodes: React.ReactNode[] = [];
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  let bullets: string[] = [];
+  let ordered = false;
+
+  const inline = (s: string, k: string): React.ReactNode[] =>
+    s
+      .split(/(\*\*[^*]+\*\*)/g)
+      .filter((p) => p !== "")
+      .map((p, i) =>
+        p.startsWith("**") && p.endsWith("**") ? (
+          <strong key={`${k}-${i}`} className="font-bold">{p.slice(2, -2)}</strong>
+        ) : (
+          <span key={`${k}-${i}`}>{p}</span>
+        ),
+      );
+
+  const flushList = () => {
+    if (bullets.length === 0) return;
+    const items = bullets.map((b, i) => (
+      <li key={i} className="leading-7">{inline(b, `li${nodes.length}-${i}`)}</li>
+    ));
+    const Tag = ordered ? "ol" : "ul";
+    nodes.push(
+      <Tag key={`list-${nodes.length}`} className={`space-y-1 ps-5 ${ordered ? "list-decimal" : "list-disc"}`}>
+        {items}
+      </Tag>,
+    );
+    bullets = [];
+  };
+
+  let para: string[] = [];
+  const flushPara = () => {
+    if (para.length === 0) return;
+    const content = para.map((l, i) => (
+      <span key={i}>
+        {i > 0 && <br />}
+        {inline(l, `p${nodes.length}-${i}`)}
+      </span>
+    ));
+    nodes.push(
+      <p key={`p-${nodes.length}`} className="leading-7">{content}</p>,
+    );
+    para = [];
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const heading = line.match(/^(#{1,3})\s+(.*)$/);
+    const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
+    const numItem = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (heading) {
+      flushList();
+      flushPara();
+      nodes.push(
+        <p
+          key={`h-${nodes.length}`}
+          className="mt-1 border-b pb-1 text-[13px] font-bold"
+          style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
+        >
+          {inline(heading[2], `h${nodes.length}`)}
+        </p>,
+      );
+    } else if (bullet || numItem) {
+      flushPara();
+      const isNum = Boolean(numItem);
+      if (bullets.length > 0 && ordered !== isNum) flushList();
+      ordered = isNum;
+      bullets.push((bullet ?? numItem)![1]);
+    } else if (line.trim() === "") {
+      flushList();
+      flushPara();
+    } else {
+      para.push(line);
+    }
+  }
+  flushList();
+  flushPara();
+
+  return <div className="space-y-2">{nodes}</div>;
+}
+
 const HISTORY_KEY = (articleId: string) => `kalam_discuss_${articleId}`;
 
 export function DiscussCompanion({
@@ -427,8 +515,8 @@ export function DiscussCompanion({
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-7 ${
-                    m.role === "user" ? "rounded-tl-sm" : "rounded-tr-sm"
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 ${
+                    m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
                   }`}
                   style={
                     m.role === "user"
@@ -436,7 +524,7 @@ export function DiscussCompanion({
                       : { background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }
                   }
                 >
-                  {m.text}
+                  {m.role === "model" ? <MiniMarkdown text={m.text} /> : m.text}
                 </div>
               </div>
             ))}
