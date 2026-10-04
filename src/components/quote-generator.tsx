@@ -17,8 +17,9 @@ const SIZES: SizePreset[] = [
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kalam-ziadamr.vercel.app";
 
-/** سقف كلمات الاقتباس — سعة البطاقة البصرية المريحة (قرار تصميمي مثبت) */
-const MAX_QUOTE_WORDS = 25;
+/** سقف كلمات الاقتباس — رُفع ليستوعب الفقرات القصيرة كاملة؛ محرك التصغير
+    التلقائي يضمن أن أطول اقتباس مسموح يظل مستوعبًا بأصغر خط مقروء */
+const MAX_QUOTE_WORDS = 45;
 const MIN_QUOTE_CHARS = 12;
 
 /** عدّ كلمات النص بعد تطبيعه — المرجع الموحد لكل البوابات */
@@ -33,7 +34,10 @@ function countWords(text: string): number {
  */
 function pixelRatioFor(w: number, h: number): number {
   const MAX_AREA = 16_400_000;
-  return Math.min(3, Math.sqrt(MAX_AREA / (w * h)));
+  /* سقف أبعاد iOS الصامت: أي بُعد يتجاوز 4096 يترك كانفاس Safari شفافًا
+     رغم نجاح كل أوامر الرسم — لذا يُقيَّد أطول ضلع أيضًا لا المساحة وحدها */
+  const MAX_SIDE = 4096;
+  return Math.min(3, Math.sqrt(MAX_AREA / (w * h)), MAX_SIDE / Math.max(w, h));
 }
 
 /** تنظيف وسوم الماركداون — تُرسم كنص صافٍ لا كأخطاء ظاهرة */
@@ -80,6 +84,56 @@ async function loadQR(url: string): Promise<HTMLImageElement | null> {
 }
 
 /**
+ * أسماء عائلات الخطوط الفعلية — next/font يستبدل الأسماء التجارية بأسماء
+ * مولّدة مُهاشَرة (__Amiri_xxx) وكانفاس لا يفهم var() — لذا يُستخرج
+ * الاسم الحقيقي من المحسوبات لضمان مطابقة الوجه المحمّل حرفيًا،
+ * فلا يسقط الرسم إلى خط النظام الضعيف في التشكيل العربي.
+ */
+function familyOf(cssVar: string, fallback: string): string {
+  try {
+    const probe = document.createElement("span");
+    probe.style.fontFamily = `var(${cssVar})`;
+    probe.style.position = "absolute";
+    probe.style.opacity = "0";
+    probe.style.pointerEvents = "none";
+    document.body.appendChild(probe);
+    const fam = getComputedStyle(probe).fontFamily;
+    probe.remove();
+    return fam && fam !== "none" ? fam : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+type CardFonts = { normal: string; quran: string; hadith: string; ui: string };
+
+function resolveCardFonts(): CardFonts {
+  return {
+    normal: familyOf("--font-body", '"Amiri", serif'),
+    quran: familyOf("--font-quran", '"Amiri Quran", "Amiri", serif'),
+    hadith: familyOf("--font-naskh", '"Noto Naskh Arabic", "Amiri", serif'),
+    ui: familyOf("--font-ui", '"Readex Pro", "Amiri", sans-serif'),
+  };
+}
+
+/** تحميل الوجوه المطلوبة للبطاقة صراحةً — document.fonts.ready وحده لا يضمن
+    تحميل وجه لم يُستخدم بعد في الصفحة، وكانفاس لا يشغّل التحميل بنفسه؛
+    بلا هذا الانتظار يُرسم أول إطار بخط احتياطي مبعخ ثم لا يُعاد الرسم */
+async function loadCardFonts(fonts: CardFonts): Promise<void> {
+  try {
+    if (typeof document === "undefined" || !document.fonts?.load) return;
+    const first = (fam: string) => fam.split(",")[0].trim().replace(/['"]/g, "");
+    await Promise.allSettled([
+      document.fonts.load(`700 32px "${first(fonts.normal)}"`),
+      document.fonts.load(`400 32px "${first(fonts.quran)}"`),
+      document.fonts.load(`700 32px "${first(fonts.hadith)}"`),
+      document.fonts.load(`500 32px "${first(fonts.ui)}"`),
+      document.fonts.load(`700 32px "${first(fonts.ui)}"`),
+    ]);
+  } catch {}
+}
+
+/**
  * محرك البطاقة السينمائية — يرسم في إحداثيات منطقية W×H ويضخّم ×3:
  * غلاف المقال ممتد كاملًا + ضبابية عازلة + تراكب دافئ عميق + vignette شعاعي
  * + إطار ذهبي داخلي بأركان مخطوطية هادئة + اقتباس أبيض ناصع بخط أميري
@@ -94,9 +148,10 @@ function drawQuoteCard(
     articleTitle: string;
     cover: HTMLImageElement | null;
     qr: HTMLImageElement | null;
+    fonts: CardFonts;
   },
 ) {
-  const { quote, preset, variant, articleTitle, cover, qr } = opts;
+  const { quote, preset, variant, articleTitle, cover, qr, fonts } = opts;
   const W = preset.w;
   const H = preset.h;
   const ratio = pixelRatioFor(W, H);
@@ -231,20 +286,40 @@ function drawQuoteCard(
   const maxW = W - m * 2 - Math.round(W * 0.075);
   const lineHFactor = variant === "quran" ? 2.15 : variant === "hadith" ? 2.0 : 1.95;
   let fontSize = Math.round(minWH * (variant === "quran" ? 0.056 : 0.06));
-  const minFontSize = Math.round(minWH * 0.026);
+  const minFontSize = Math.round(minWH * 0.022); // أرضية أدنى لاستيعاب اقتباسات أطول بلا فيضان
   let lines: string[] = [];
 
   const wrap = (fs: number): string[] => {
     ctx.font =
       variant === "quran"
-        ? `400 ${fs}px "Amiri Quran", "Amiri", serif`
+        ? `400 ${fs}px ${fonts.quran}`
         : variant === "hadith"
-          ? `700 ${fs}px "Noto Naskh Arabic", "Amiri", serif`
-          : `700 ${fs}px "Amiri", serif`;
-    const words = quote.split(/\s+/);
+          ? `700 ${fs}px ${fonts.hadith}`
+          : `700 ${fs}px ${fonts.normal}`;
     const out: string[] = [];
+    /* كلمة أعرض من المساحة كلها (رابط طويل/مفرّدة) تُكسر حرفيًا بدل أن تفيض خارج البطاقة */
+    const pushHard = (word: string) => {
+      let chunk = "";
+      for (const ch of Array.from(word)) {
+        if (chunk && ctx.measureText(chunk + ch).width > maxW) {
+          out.push(chunk);
+          chunk = ch;
+        } else {
+          chunk += ch;
+        }
+      }
+      if (chunk) out.push(chunk);
+    };
     let line = "";
-    for (const word of words) {
+    for (const word of quote.split(/\s+/).filter(Boolean)) {
+      if (ctx.measureText(word).width > maxW) {
+        if (line) {
+          out.push(line);
+          line = "";
+        }
+        pushHard(word);
+        continue;
+      }
       const candidate = line ? `${line} ${word}` : word;
       if (ctx.measureText(candidate).width > maxW && line) {
         out.push(line);
@@ -281,8 +356,8 @@ function drawQuoteCard(
   const markFont = (scale: number) => {
     ctx.font =
       variant === "quran"
-        ? `400 ${Math.round(fontSize * scale)}px "Amiri Quran", "Amiri", serif`
-        : `700 ${Math.round(fontSize * scale)}px "Amiri", serif`;
+        ? `400 ${Math.round(fontSize * scale)}px ${fonts.quran}`
+        : `700 ${Math.round(fontSize * scale)}px ${fonts.normal}`;
   };
   ctx.textAlign = "center";
   ctx.fillStyle = goldGrad;
@@ -299,10 +374,10 @@ function drawQuoteCard(
   ctx.fillStyle = "#FFFFFF"; // أبيض ناصع
   ctx.font =
     variant === "quran"
-      ? `400 ${fontSize}px "Amiri Quran", "Amiri", serif`
+      ? `400 ${fontSize}px ${fonts.quran}`
       : variant === "hadith"
-        ? `700 ${Math.round(fontSize * 0.92)}px "Noto Naskh Arabic", "Amiri", serif`
-        : `700 ${fontSize}px "Amiri", serif`;
+        ? `700 ${Math.round(fontSize * 0.92)}px ${fonts.hadith}`
+        : `700 ${fontSize}px ${fonts.normal}`;
   ctx.shadowColor = "rgba(0,0,0,0.6)"; // ظل رقيق يرفع النص فوق الصورة
   ctx.shadowBlur = Math.round(fontSize * 0.22);
   ctx.shadowOffsetY = 2;
@@ -331,7 +406,7 @@ function drawQuoteCard(
   /* سطر ١: عنوان المقال — ذهبي هادئ (text-xs text-amber-200/80 font-medium) */
   if (articleTitle.trim() && footerMaxW > 180) {
     ctx.fillStyle = "rgba(253,230,138,0.82)";
-    ctx.font = `500 ${titleSize}px "Readex Pro", "Amiri", sans-serif`;
+    ctx.font = `500 ${titleSize}px ${fonts.ui}`;
     let title = articleTitle.trim();
     while (ctx.measureText(title).width > footerMaxW && title.length > 6) {
       title = title.slice(0, -3);
@@ -342,12 +417,12 @@ function drawQuoteCard(
 
   /* سطر ٢: اسم المنصة — أبيض بارز وواضح (text-base font-bold text-white) */
   ctx.fillStyle = "#FFFFFF";
-  ctx.font = `700 ${brandSize}px "Readex Pro", "Amiri", sans-serif`;
+  ctx.font = `700 ${brandSize}px ${fonts.ui}`;
   ctx.fillText("كلام له لازمة", textRight, brandBaseline);
 
   /* سطر ٣: اللسان المميز — رمادي مريح (text-[10px] text-zinc-400) بفاصل صريح يمنع الالتصاق */
   ctx.fillStyle = "rgba(161,161,170,0.95)";
-  ctx.font = `400 ${taglineSize}px "Readex Pro", "Amiri", sans-serif`;
+  ctx.font = `400 ${taglineSize}px ${fonts.ui}`;
   ctx.fillText("مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.", textRight, taglineBaseline);
 
   /* بلاطة QR — يسار الفوتر، وتحتها مباشرة «امسح للقراءة» بمسافة آمنة (mt-1.5) */
@@ -363,7 +438,7 @@ function drawQuoteCard(
     const inset = Math.round((tile - qrSize) / 2);
     ctx.drawImage(qr, tileX + inset, tileTop + inset, qrSize, qrSize);
     ctx.fillStyle = "rgba(161,161,170,0.9)"; // text-[9px] text-zinc-400
-    ctx.font = `500 ${captionSize}px "Readex Pro", "Amiri", sans-serif`;
+    ctx.font = `500 ${captionSize}px ${fonts.ui}`;
     ctx.textAlign = "center";
     ctx.fillText("امسح للقراءة", captionCx, captionBaseline);
   }
@@ -496,6 +571,19 @@ export function QuoteGenerator({
     } catch {}
   }, [selectedText, articleSlug]);
 
+  /* بحث جوجل عن التحديد مباشرة — البديل العملي لقائمة النظام المتحركة:
+     القائمة الأصلية للمتصفح/النظام لا يمكن إزالتها (طبقة النظام)، لكن لم نعد
+     نحتاجها — النسخ والمشاركة والبحث كلهم في الشريحة نفسها */
+  const searchSelection = useCallback(() => {
+    const text = stripMarkdown(selectedText);
+    if (!text) return;
+    window.open(
+      `https://www.google.com/search?q=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }, [selectedText]);
+
   /* مشاركة مباشرة عبر مشاركة النظام مع سقوط آمن إلى النسخ */
   const shareSelection = useCallback(async () => {
     const text = stripMarkdown(selectedText);
@@ -519,27 +607,31 @@ export function QuoteGenerator({
     let cancelled = false;
     setRendering(true);
     const render = async () => {
-      const cleanQuote = stripMarkdown(selectedText);
-      const [cover, qrImg] = await Promise.all([
-        loadCover(articleCover),
-        loadQR(`${SITE_URL}/article/${articleSlug}`),
-      ]);
-      if (cancelled || !canvasRef.current) return;
-      drawQuoteCard(canvasRef.current, {
-        quote: cleanQuote,
-        preset: size,
-        variant,
-        articleTitle: stripMarkdown(articleTitle),
-        cover,
-        qr: qrImg,
-      });
-      setRendering(false);
+      try {
+        const cleanQuote = stripMarkdown(selectedText);
+        const fonts = resolveCardFonts();
+        const [cover, qrImg] = await Promise.all([
+          loadCover(articleCover),
+          loadQR(`${SITE_URL}/article/${articleSlug}`),
+          loadCardFonts(fonts),
+        ]);
+        if (cancelled || !canvasRef.current) return;
+        drawQuoteCard(canvasRef.current, {
+          quote: cleanQuote,
+          preset: size,
+          variant,
+          articleTitle: stripMarkdown(articleTitle),
+          cover,
+          qr: qrImg,
+          fonts,
+        });
+      } catch {
+        /* فشل رسم غير متوقع لا يترك الأزرار عالقة في «جارٍ الإعداد» أبديًا */
+      } finally {
+        if (!cancelled) setRendering(false);
+      }
     };
-    if (document.fonts?.ready) {
-      document.fonts.ready.then(render).catch(render);
-    } else {
-      void render();
-    }
+    void render();
     return () => {
       cancelled = true;
     };
@@ -694,7 +786,7 @@ export function QuoteGenerator({
           className="quote-chip no-print fixed z-50 flex -translate-x-1/2 -translate-y-full flex-col items-center gap-1 rounded-2xl border p-1 shadow-lift"
           style={{ left: chipPos.x, top: chipPos.y, background: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <div className="flex items-center gap-1">
+          <div className="flex max-w-[94vw] flex-wrap items-center justify-center gap-1">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onTouchEnd={(e) => {
@@ -726,6 +818,19 @@ export function QuoteGenerator({
               style={{ color: copied ? "var(--accent-strong)" : "var(--ink)" }}
             >
               {copied ? "نُسخ ✓" : "نسخ مع المصدر"}
+            </button>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                searchSelection();
+              }}
+              onClick={searchSelection}
+              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+              style={{ color: "var(--ink)" }}
+              title="ابحث عن النص المحدد في جوجل"
+            >
+              بحث جوجل
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
