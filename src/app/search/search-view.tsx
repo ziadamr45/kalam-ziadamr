@@ -57,6 +57,18 @@ export default function SearchView() {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /* تذكّر الاستعلام عند فتح نتيجة — سجل البحث للقارئ المسجل حصرًا،
+     والخادم يرفع 401 للزائر فيتجاهله النداء بصمت */
+  const remember = (term: string) => {
+    if (term.trim().length < 2) return;
+    fetch("/api/search/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: term.trim() }),
+      keepalive: true,
+    }).catch(() => {});
+  };
+
   /* تركيز فوري على الحقل عند الوصول */
   useEffect(() => {
     inputRef.current?.focus();
@@ -152,6 +164,7 @@ export default function SearchView() {
                 <button
                   onClick={() => {
                     const term = q.trim();
+                    if (term.length >= 2) remember(term);
                     router.push(
                       term
                         ? `/article/${h.slug}?q=${encodeURIComponent(term)}`

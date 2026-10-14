@@ -169,6 +169,21 @@ model User {
   readingProgress   ReadingProgress[]
   notificationFeed  Notification[]
   devices           UserDevice[]
+  searchHistories   SearchHistory[]
+}
+
+/* سجل البحث — ذاكرة استعلامات القارئ المسجل فقط: كل استعلام سطرٌ واحد
+   يُرفع تاريخه عند تكراره، مع سقف عدد صارم يُقلَّم من الخادم */
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, query])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 /* حصة نقاش الذكاء الاصطناعي الدائمة — سجل استهلاك صارم لكل قارئ مسجل

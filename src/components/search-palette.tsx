@@ -22,6 +22,8 @@ type Hit = {
   snippet: string | null;
 };
 
+type HistoryItem = { query: string; at: string };
+
 /** يلفّ كل ظهور لكلمات البحث داخل النص بوسم تمييز ذهبي */
 function Highlight({ text, terms }: { text: string; terms: string[] }) {
   if (!text) return null;
@@ -54,8 +56,59 @@ export default function SearchPalette() {
   const [hits, setHits] = useState<Hit[]>([]);
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  /* سجل البحث — للقارئ المسجل حصرًا: يُجلب عند فتح النافذة،
+     والزائر غير المسجل تصله 401 فيبقى السجل فارغًا بلا أي أثر في الواجهة */
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch("/api/search/history")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled) setHistory((d?.history ?? []).slice(0, 10));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  /* تذكّر الاستعلام عند فتح نتيجة — نداء صامت fire-and-forget،
+     والخادم يتجاهل غير المسجلين فيرفع 401 بلا أي عطل */
+  const remember = useCallback((term: string) => {
+    if (term.trim().length < 2) return;
+    fetch("/api/search/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: term.trim() }),
+      keepalive: true,
+    })
+      .then(async (r) => {
+        if (!r.ok) return;
+        const qq = term.trim();
+        setHistory((prev) =>
+          [{ query: qq, at: new Date().toISOString() }, ...prev.filter((h) => h.query !== qq)].slice(0, 10),
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  const dropOne = useCallback((query: string) => {
+    setHistory((prev) => prev.filter((h) => h.query !== query));
+    fetch("/api/search/history", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    }).catch(() => {});
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    fetch("/api/search/history", { method: "DELETE" }).catch(() => {});
+  }, []);
 
   /* الاختصار العالمي Cmd+K / Ctrl+K */
   useEffect(() => {
@@ -108,13 +161,14 @@ export default function SearchPalette() {
       setOpen(false);
       const term = q.trim();
       setQ("");
+      if (term.length >= 2) remember(term);
       router.push(
         term
           ? `/article/${slug}?q=${encodeURIComponent(term)}`
           : `/article/${slug}`,
       );
     },
-    [router, q],
+    [router, q, remember],
   );
 
   const onKeyDown = useCallback(
@@ -200,9 +254,56 @@ export default function SearchPalette() {
             {/* النتائج */}
             <div ref={listRef} className="max-h-[55vh] overflow-y-auto p-2">
               {q.trim().length < 2 ? (
-                <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
-                  اكتب حرفين على الأقل ليبدأ البحث في كل مقالات المنصة..
-                </p>
+                history.length > 0 ? (
+                  /* سجل البحث — يظهر للمسجلين فقط في وضع الخمول (قبل الكتابة) */
+                  <div className="pb-1">
+                    <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
+                      <span className="text-[11px] font-bold" style={{ color: "var(--ink-muted)" }}>
+                        بحثك الأخير
+                      </span>
+                      <button
+                        onClick={clearHistory}
+                        className="rounded-full px-2 py-0.5 text-[11px] transition-colors hover:bg-[var(--accent-soft)]"
+                        style={{ color: "var(--accent-strong)" }}
+                      >
+                        مسح الكل
+                      </button>
+                    </div>
+                    {history.map((h) => (
+                      <div key={h.query} className="flex items-center rounded-xl transition-colors hover:bg-[var(--accent-soft)]">
+                        <button
+                          onClick={() => setQ(h.query)}
+                          className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-right"
+                          title={h.query}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: "var(--ink-muted)" }} aria-hidden>
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 7v5l3 2" />
+                          </svg>
+                          <span className="truncate text-sm" style={{ color: "var(--ink)" }}>
+                            {h.query}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => dropOne(h.query)}
+                          aria-label={`إزالة ${h.query} من السجل`}
+                          title="إزالة من السجل"
+                          className="ml-0.5 shrink-0 rounded-full p-1.5 transition-colors hover:bg-[var(--accent-soft)]"
+                          style={{ color: "var(--ink-muted)" }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                            <path d="M18 6 6 18" />
+                            <path d="m6 6 12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
+                    اكتب حرفين على الأقل ليبدأ البحث في كل مقالات المنصة..
+                  </p>
+                )
               ) : busy && hits.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm animate-pulse" style={{ color: "var(--ink-muted)" }}>
                   جارٍ البحث..
