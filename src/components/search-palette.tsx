@@ -106,10 +106,15 @@ export default function SearchPalette() {
   const go = useCallback(
     (slug: string) => {
       setOpen(false);
+      const term = q.trim();
       setQ("");
-      router.push(`/article/${slug}`);
+      router.push(
+        term
+          ? `/article/${slug}?q=${encodeURIComponent(term)}`
+          : `/article/${slug}`,
+      );
     },
-    [router],
+    [router, q],
   );
 
   const onKeyDown = useCallback(

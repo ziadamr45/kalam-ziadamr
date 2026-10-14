@@ -85,6 +85,32 @@ iframe {
   color: var(--accent-strong);
 }
 
+/* ============================================================
+   القفز البحثي — تظليل مطابقات كلمة البحث داخل المتن
+   (CSS Custom Highlight API: بلا أي جراحة DOM صديقة لـ React)
+   ============================================================ */
+::highlight(kalam-search-hit) {
+  background-color: var(--accent-soft, #f5ebd3);
+  color: var(--accent-strong, #84531b);
+  border-radius: 2px;
+}
+::highlight(kalam-search-hit-active) {
+  background-color: var(--accent-strong, #84531b);
+  color: #ffffff;
+  border-radius: 2px;
+}
+/* الملاذ الاحتياطي للمتصفحات القديمة بلا واجهة التظليل */
+mark[data-search-hit="1"] {
+  background-color: var(--accent-soft);
+  color: var(--accent-strong);
+  border-radius: 2px;
+}
+mark[data-search-hit="active"] {
+  background-color: var(--accent-strong);
+  color: #ffffff;
+  border-radius: 2px;
+}
+
 /* شريط تمرير مخصص رفيع وأنيق */
 * {
   scrollbar-width: thin;

@@ -150,7 +150,14 @@ export default function SearchView() {
             {hits.map((h) => (
               <li key={h.slug}>
                 <button
-                  onClick={() => router.push(`/article/${h.slug}`)}
+                  onClick={() => {
+                    const term = q.trim();
+                    router.push(
+                      term
+                        ? `/article/${h.slug}?q=${encodeURIComponent(term)}`
+                        : `/article/${h.slug}`,
+                    );
+                  }}
                   className="block w-full rounded-2xl border p-5 text-right transition-all hover:shadow-lift"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >

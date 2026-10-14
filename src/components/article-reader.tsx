@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
 import { ArticleBlocks } from "@/components/markdown-blocks";
+import SearchJump from "@/components/search-jump";
 import { trackView, trackComplete, trackDwell } from "@/lib/analytics";
 import {
   saveOfflineArticle,
@@ -560,6 +561,12 @@ export function ArticleReader({
       >
         <ArticleBlocks blocks={blocks} offsets={wordOffsets} />
       </div>
+
+      {/* القفز البحثي — عند الوصول من نتائج البحث (?q=) يُظلّل المطابقات
+          ويقفز لأولها مع كبسولة تنقل (Suspense لطرف useSearchParams) */}
+      <Suspense fallback={null}>
+        <SearchJump version={syncKey} />
+      </Suspense>
 
       <div id="article-end-marker" className="h-1" aria-hidden />
     </div>
