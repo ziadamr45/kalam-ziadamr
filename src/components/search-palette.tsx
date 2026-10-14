@@ -60,21 +60,34 @@ export default function SearchPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  /* سجل البحث — للقارئ المسجل حصرًا: يُجلب عند فتح النافذة،
-     والزائر غير المسجل تصله 401 فيبقى السجل فارغًا بلا أي أثر في الواجهة */
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
+  /* سجل البحث — للقارئ المسجل حصرًا:
+     • يُجلب مبكرًا مع أول تركيب للمكوّن (الهيدر) لا لحظة فتح النافذة —
+       فحين يفتحه القارئ يكون جاهزًا فورًا بلا انتظار شبكة أو خادم بارد
+     • عند كل فتح: تحديث خلفي هادئ فقط إن شخ الكاش (دقيقة) — بلا وميض ولا انتظار
+     • الزائر غير المسجل تصله 401 فيبقى السجل فارغًا بلا أي أثر في الواجهة */
+  const lastFetchRef = useRef(0);
+
+  const loadHistory = useCallback((force = false) => {
+    const now = Date.now();
+    if (!force && now - lastFetchRef.current < 60_000) return;
+    lastFetchRef.current = now;
     fetch("/api/search/history")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled) setHistory((d?.history ?? []).slice(0, 10));
+        if (d) setHistory((d.history ?? []).slice(0, 10));
       })
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+  }, []);
+
+  /* التحميل المبكر — قبل فتح النافذة بأشواط */
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  /* فحص هادئ عند الفتح — يلمس الشبكة فقط لو الكاش شاخ */
+  useEffect(() => {
+    if (open) loadHistory();
+  }, [open, loadHistory]);
 
   /* تذكّر الاستعلام عند فتح نتيجة — نداء صامت fire-and-forget،
      والخادم يتجاهل غير المسجلين فيرفع 401 بلا أي عطل */
