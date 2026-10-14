@@ -38,41 +38,47 @@ type TextSeg = {
   map: number[];
 };
 
-/** خريطة نصية للمتن كله: النص المُطبَّع + مواضع كل عقدة نصية فيه.
- *  فاصل «\n» يُزرع بين الكتل المختلفة كي لا تتم مطابقة عابرة لحدود الفقرات. */
-function buildTextMap(container: HTMLElement): { norm: string; segs: TextSeg[] } {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
-    acceptNode(n: Node) {
-      const t = n.textContent ?? "";
-      if (!t.trim()) return NodeFilter.FILTER_REJECT;
-      const p = n.parentElement;
-      if (!p || p.closest("script,style,code,data,mark")) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-  const segs: TextSeg[] = [];
+/** خريطة نصية للجذور كلها: النص المُطبَّع + مواضع كل عقدة نصية فيه.
+ *  فاصل «\n» يُزرع بين الكتل والجذور المختلفة كي لا تتم مطابقة عابرة لحدودها.
+ *  عقد المسافات البيضاء بين الكلمات المضمنة تُقبل — بدونها لا تطابق أبدًا
+ *  استعلام متعدد الكلمات (كل كلمة في span مستقل). */
+function buildTextMap(roots: HTMLElement[]): { norm: string; segs: TextSeg[] } {
   let norm = "";
+  const segs: TextSeg[] = [];
   let lastBlock: Element | null = null;
-  let current: Node | null;
-  while ((current = walker.nextNode())) {
-    const node = current as Text;
-    const raw = node.textContent ?? "";
-    const block =
-      node.parentElement?.closest(
-        "p,h1,h2,h3,h4,h5,blockquote,li,td,th,figcaption,aside",
-      ) ?? container;
-    if (lastBlock && block !== lastBlock) norm += "\n";
-    lastBlock = block;
-    const normStart = norm.length;
-    const map: number[] = new Array(raw.length).fill(-1);
-    for (let i = 0; i < raw.length; i++) {
-      const c = normalizeChar(raw[i]);
-      if (c) {
-        map[i] = norm.length - normStart;
-        norm += c;
-      }
+  for (const root of roots) {
+    if (norm) {
+      norm += "\n";
+      lastBlock = null;
     }
-    segs.push({ node, normStart, normLen: norm.length - normStart, map });
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n: Node) {
+        const p = n.parentElement;
+        if (!p || p.closest("script,style,code,data,mark")) return NodeFilter.FILTER_REJECT;
+        return (n.textContent ?? "").length ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    let current: Node | null;
+    while ((current = walker.nextNode())) {
+      const node = current as Text;
+      const raw = node.textContent ?? "";
+      const block =
+        node.parentElement?.closest(
+          "p,h1,h2,h3,h4,h5,blockquote,li,td,th,figcaption,aside",
+        ) ?? root;
+      if (lastBlock && block !== lastBlock) norm += "\n";
+      lastBlock = block;
+      const normStart = norm.length;
+      const map: number[] = new Array(raw.length).fill(-1);
+      for (let i = 0; i < raw.length; i++) {
+        const c = normalizeChar(raw[i]);
+        if (c) {
+          map[i] = norm.length - normStart;
+          norm += c;
+        }
+      }
+      segs.push({ node, normStart, normLen: norm.length - normStart, map });
+    }
   }
   return { norm, segs };
 }
@@ -184,49 +190,66 @@ export default function SearchJump({ version }: { version?: string }) {
   const [matches, setMatches] = useState<Range[] | null>(null);
   const [active, setActive] = useState(0);
   const containerRef = useRef<HTMLElement | null>(null);
+  /* ذاكرة المصطلح المطبَّق والموضع النشط — لكي يُعيد تبديل التشكيل البناء
+     في نفس المطابقة دون خطف القارئ من مكانه إلى أول قائمة */
+  const lastQRef = useRef<string | null>(null);
+  const activeIdxRef = useRef(0);
 
   const clearNow = useCallback(() => {
     clearAllHighlights(containerRef.current ?? document.getElementById("article-body"));
   }, []);
 
-  /* المحرك الأساسي: مسح المتن وتظليل المطابقات والقفز لأولها */
+  /* المحرك الأساسي: مسح المتن والعنوان وتظليل المطابقات والقفز لأولها */
   useEffect(() => {
     const term = q.trim();
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     setMatches(null);
-    setActive(0);
     clearNow();
 
     if (term.length >= 2) {
       timer = setTimeout(() => {
         if (cancelled) return;
-        const container = document.getElementById("article-body");
-        containerRef.current = container;
-        if (!container) return;
-        const { norm, segs } = buildTextMap(container);
+        const body = document.getElementById("article-body");
+        const title = document.querySelector("article h1");
+        const roots: HTMLElement[] = [];
+        if (body) roots.push(body);
+        if (title) roots.push(title as HTMLElement);
+        if (!roots.length) return;
+        containerRef.current = body;
+        const { norm, segs } = buildTextMap(roots);
         const needle = Array.from(term).map(normalizeChar).join("");
         const ranges = findRanges(norm, needle, segs);
         if (!ranges.length) return;
 
+        /* نفس المصطلح (تبديل تشكيل مثلًا): تثبيت الموضع بلا إعادة قفز */
+        const sameTerm = lastQRef.current === term;
+        const keep = sameTerm ? Math.min(activeIdxRef.current, ranges.length - 1) : 0;
+        lastQRef.current = term;
+        activeIdxRef.current = keep;
+
         const supportsHl =
           "highlights" in (CSS as unknown as Record<string, unknown>) &&
           "Highlight" in window;
-        if (supportsHl) applyHighlights(ranges, 0);
-        else applyMarkFallback(container, ranges, 0);
+        if (supportsHl) applyHighlights(ranges, keep);
+        else if (body) applyMarkFallback(body, ranges, keep);
 
         setMatches(ranges);
-        setActive(0);
+        setActive(keep);
 
-        /* القفزة: بعد استقرار الرسم (rAF مزدوج) ثم هامش زمني لتبادل الخطوط */
-        requestAnimationFrame(() => {
+        /* القفزة الأولى فقط: بعد استقرار الرسم (rAF مزدوج) ثم هامش زمني لتبادل الخطوط */
+        if (!sameTerm) {
           requestAnimationFrame(() => {
-            if (cancelled) return;
-            scrollToRange(ranges[0]);
+            requestAnimationFrame(() => {
+              if (cancelled) return;
+              scrollToRange(ranges[keep]);
+            });
           });
-        });
+        }
       }, 350);
+    } else {
+      lastQRef.current = null;
     }
 
     return () => {
@@ -255,6 +278,7 @@ export default function SearchJump({ version }: { version?: string }) {
     (i: number) => {
       if (!matches?.length) return;
       const next = ((i % matches.length) + matches.length) % matches.length;
+      activeIdxRef.current = next;
       setActive(next);
       const r = matches[next];
       if (r) requestAnimationFrame(() => scrollToRange(r));
