@@ -55,7 +55,7 @@ const SCANNER_PATTERNS = [
 const PRIVATE_API_PREFIXES = [
   "/api/profile", "/api/saves", "/api/notifications", "/api/progress",
   "/api/my-comments", "/api/impact/logs", "/api/onboarding",
-  "/api/push/subscribe", "/api/comments/votes",
+  "/api/push/subscribe", "/api/comments/votes", "/api/search/history",
 ];
 
 /**
