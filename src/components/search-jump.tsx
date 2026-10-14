@@ -214,8 +214,11 @@ export default function SearchJump({ version }: { version?: string }) {
         const body = document.getElementById("article-body");
         const title = document.querySelector("article h1");
         const roots: HTMLElement[] = [];
-        if (body) roots.push(body);
+        /* ترتيب القراءة البصري حرفيًا: العنوان أعلى الصفحة فيُمسح أولًا كي تكون
+           مطابقاته «الأولى» في العدّ، ثم المتن بترتيبه — فلا تخرج كبسولة
+           «٦ من ٦» وتقفز القارئ إلى أعلى الصفحة في آخر خطوة تنقل */
         if (title) roots.push(title as HTMLElement);
+        if (body) roots.push(body);
         if (!roots.length) return;
         containerRef.current = body;
         const { norm, segs } = buildTextMap(roots);
