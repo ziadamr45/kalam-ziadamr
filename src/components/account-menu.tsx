@@ -82,11 +82,14 @@ export function AccountMenu() {
             width={36}
             height={36}
             referrerPolicy="no-referrer"
-            className="block h-9 w-9 object-cover"
+            /* h-full/w-full بدل مقاس ثابت: على اللمس (موبايل/تابلت) يكبّر globals.css
+               الزر نفسه إلى 44px فكانت الصورة 36px تظهر مربعة داخل الدائرة —
+               بملء الزر تُقص دائمًا دائرة كاملة من أي مصدر (جوجل أو مرفوعة) وبأي مقاس */
+            className="block h-full w-full object-cover"
           />
         ) : (
           <span
-            className="flex h-9 w-9 items-center justify-center text-sm font-bold"
+            className="flex h-full w-full items-center justify-center text-sm font-bold"
             style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
           >
             {(u.name || "ق").trim().charAt(0)}
