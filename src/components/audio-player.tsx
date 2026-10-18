@@ -707,6 +707,17 @@ export function AudioPlayer({
                   </span>
                 </div>
 
+                {/* سرعة التشغيل — نفس دورة المشغل الكبير (١ ← ١.٢٥ ← ١.٥ ← ١)
+                    والحالة واحدة فالزران يبقيان متزامنين دائمًا */}
+                <button
+                  onClick={cycleRate}
+                  aria-label="سرعة التشغيل"
+                  title="سرعة التشغيل"
+                  className="font-ui flex h-8 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
+                >
+                  ×{easternDigits(rate)}
+                </button>
+
                 {/* زر الإغلاق — يوقف الصوت ويشيّل الكبسولة العائمة لمن انتهى منه */}
                 <button
                   onClick={() => {
