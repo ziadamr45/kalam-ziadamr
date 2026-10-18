@@ -83,6 +83,14 @@ export function AudioPlayer({
     [words],
   );
 
+  /* ==================== معايرة التوقيتات على المدة الفعلية ====================
+     دمج مقاطع MP3 يضيف حشوة ترميز صغيرة لكل مقطع فيصبح الملف الفعلي أطول
+     من مجموع مدد الـPCM المفترضة — ومع الوقت يسبق التظليل الصوت بتراكمي.
+     لحظة معرفة المدة الحقيقية من المتصفح تُمدَّد/تُضاغط كل الطوابع بنسبة
+     المدة الفعلية إلى آخر نهاية كلمة — تصحيح عالمي يحمي كل المقالات القديمة. */
+  const [calibrated, setCalibrated] = useState<WordTiming[] | null>(null);
+  const effWords = calibrated ?? wordList;
+
   /* ==================== كاش الصوت المحلي (IndexedDB) ==================== */
 
   const resolveSrc = useCallback(async (): Promise<string> => {
@@ -204,13 +212,13 @@ export function AudioPlayer({
   /** البحث الثنائي عن الكلمة المقروءة الآن */
   const activeWordIndex = useCallback(
     (t: number): number => {
-      if (!wordList) return -1;
+      if (!effWords) return -1;
       let lo = 0;
-      let hi = wordList.length - 1;
+      let hi = effWords.length - 1;
       let found = -1;
       while (lo <= hi) {
         const mid = (lo + hi) >> 1;
-        const w = wordList[mid];
+        const w = effWords[mid];
         if (t < w.s) hi = mid - 1;
         else if (t > w.e) lo = mid + 1;
         else {
@@ -218,10 +226,10 @@ export function AudioPlayer({
           break;
         }
       }
-      if (found === -1 && lo > 0 && lo <= wordList.length) found = lo - 1;
+      if (found === -1 && lo > 0 && lo <= effWords.length) found = lo - 1;
       return found;
     },
-    [wordList],
+    [effWords],
   );
 
   /* أحدث نسخ من الدوال للمزامنة — يستدعيهما تأثير تطهير syncKey أعلاه
@@ -245,18 +253,18 @@ export function AudioPlayer({
       for (const c of cues) map.set(c.id, c.t);
       return map;
     }
-    if (wordList) return map; // وضع الكلمات لا يحتاج توقيتات فقرات
+    if (effWords) return map; // وضع الكلمات لا يحتاج توقيتات فقرات
     let acc = 0;
     for (const b of blocks) {
       map.set(b.id, dur * (acc / totalWords));
       acc += b.words;
     }
     return map;
-  }, [cues, blocks, duration, durationSec, wordList]);
+  }, [cues, blocks, duration, durationSec, effWords]);
 
   const setActiveBlock = useCallback(
     (t: number) => {
-      if (wordList) return;
+      if (effWords) return;
       if (!playing && current === 0) return;
       const entries = [...timings.entries()].sort((a, b) => a[1] - b[1]);
       let activeId: string | null = null;
@@ -363,13 +371,13 @@ export function AudioPlayer({
     const t = audio.currentTime;
     setCurrent(t);
     updatePositionState(t);
-    if (wordList) {
+    if (effWords) {
       const idx = activeWordIndex(t);
       setActiveWord(idx);
     } else {
       setActiveBlock(t);
     }
-  }, [activeWordIndex, setActiveBlock, setActiveWord, updatePositionState, wordList]);
+  }, [activeWordIndex, effWords, setActiveBlock, setActiveWord, updatePositionState]);
 
   const seekFromBar = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -385,13 +393,13 @@ export function AudioPlayer({
   /* القفز بالنقر على أي كلمة داخل المقال — الفهرس المعروض يُترجم
      إلى فهرس الصوت عبر خريطة المواءمة (تجريد التشكيل) قبل القفز */
   useEffect(() => {
-    if (!wordList) return;
+    if (!effWords) return;
     const handler = (e: Event) => {
       const target = (e.target as HTMLElement | null)?.closest?.("[data-wi]") as HTMLElement | null;
       if (!target) return;
       const domIdx = Number(target.dataset.wi);
       const audioIdx = jumpMap ? (jumpMap[domIdx] ?? -1) : domIdx;
-      const word = audioIdx >= 0 ? wordList[audioIdx] : undefined;
+      const word = audioIdx >= 0 ? effWords[audioIdx] : undefined;
       const audio = audioRef.current;
       if (!word || !audio) return;
       if (!audio.src) {
@@ -408,7 +416,7 @@ export function AudioPlayer({
     const body = document.getElementById("article-body");
     body?.addEventListener("click", handler);
     return () => body?.removeEventListener("click", handler);
-  }, [jumpMap, resolveSrc, wordList]);
+  }, [effWords, jumpMap, resolveSrc]);
 
   /* تنظيف الإبراز عند التفكيك */
   useEffect(() => {
@@ -432,7 +440,14 @@ export function AudioPlayer({
         preload="metadata"
         onLoadedMetadata={(e) => {
           const d = e.currentTarget.duration;
-          if (isFinite(d) && d > 0) setDuration(d);
+          if (isFinite(d) && d > 0) {
+            setDuration(d);
+            if (wordList && wordList.length > 0) {
+              const lastEnd = wordList[wordList.length - 1].e;
+              const k = d / lastEnd;
+              setCalibrated(Math.abs(k - 1) > 0.015 ? wordList.map((w) => ({ w: w.w, s: w.s * k, e: w.e * k })) : null);
+            }
+          }
         }}
         onTimeUpdate={onTimeUpdate}
         onPlay={() => {
@@ -450,7 +465,7 @@ export function AudioPlayer({
         onError={() => setActiveWord(-1)}
       />
 
-      {wordList ? (
+      {effWords ? (
         <p className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
           <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} aria-hidden />
           قراءة متزامنة كلمة بكلمة — انقر أي كلمة ليبدأ الصوت منها
@@ -471,11 +486,13 @@ export function AudioPlayer({
           )}
         </button>
 
-        <button onClick={() => skip(10)} aria-label="إرجاع ١٠ ثوانٍ" className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]" style={{ color: "var(--ink-muted)" }} title="إرجاع ١٠ ثوانٍ">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "scaleX(-1)" }}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+        {/* إرجاع ١٠ ثوانٍ — سهم دائري رأسه لليمين (الرجوع عكس اتجاه التقدم في الـRTL) + الرقم في المركز */}
+        <button onClick={() => skip(-10)} aria-label="إرجاع ١٠ ثوانٍ إلى الخلف" className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]" style={{ color: "var(--ink-muted)" }} title="إرجاع ١٠ ثوانٍ إلى الخلف">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><g transform="scale(-1,1) translate(-24,0)"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></g><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
-        <button onClick={() => skip(-10)} aria-label="تقديم ١٠ ثوانٍ" className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]" style={{ color: "var(--ink-muted)" }} title="تقديم ١٠ ثوانٍ">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "scaleX(1)" }}><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>
+        {/* تقديم ١٠ ثوانٍ — سهم دائري رأسه لليسار (اتجاه التقدم في الـRTL) + الرقم في المركز */}
+        <button onClick={() => skip(10)} aria-label="تقديم ١٠ ثوانٍ إلى الأمام" className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]" style={{ color: "var(--ink-muted)" }} title="تقديم ١٠ ثوانٍ إلى الأمام">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
 
         {/* شريط التقدم RTL */}
