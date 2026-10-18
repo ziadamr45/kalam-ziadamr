@@ -669,8 +669,10 @@ export function AudioPlayer({
             <div className="flex justify-start pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
                 className={`pointer-events-auto flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-zinc-900 py-2 pl-2 pr-3.5 text-white shadow-2xl transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] dark:bg-white dark:text-zinc-900 sm:py-2.5 ${
-                  /* عند الإيقاف المؤقت يخفت المشغل ليكشف نص المقال خلفه — ويتوهج عند التحويم أو التشغيل */
-                  playing ? "opacity-100" : "opacity-35 hover:opacity-100"
+                  /* عند الإيقاف المؤقت يخفت المشغل ليكشف نص المقال خلفه — ويتوهج عند التحويم أو التشغيل.
+                     التوهج بالتحويم محصور بأجهزة المؤشر الحقيقي (hover:hover) — فالهواتف اللمسية
+                     تُبقي حالة hover معلقة بعد أي لمسة فكانت تلغي الخفتة تمامًا على الهاتف */
+                  playing ? "opacity-100" : "opacity-35 [@media(hover:hover)]:hover:opacity-100"
                 }`}
                 role="group"
                 aria-label="التحكم العائم في الصوت"
@@ -708,17 +710,20 @@ export function AudioPlayer({
                 </div>
 
                 {/* سرعة التشغيل — نفس دورة المشغل الكبير (١ ← ١.٢٥ ← ١.٥ ← ١)
-                    والحالة واحدة فالزران يبقيان متزامنين دائمًا */}
+                    والحالة واحدة فالزران يبقيان متزامنين دائمًا — no-touch-grow
+                    تمنع قاعدة اللمس من تضخيمه 44px فتبقى المسافات واحدة على كل الأجهزة */}
                 <button
                   onClick={cycleRate}
                   aria-label="سرعة التشغيل"
                   title="سرعة التشغيل"
-                  className="font-ui flex h-8 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
+                  className="font-ui no-touch-grow flex h-8 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
                 >
                   ×{easternDigits(rate)}
                 </button>
 
-                {/* زر الإغلاق — يوقف الصوت ويشيّل الكبسولة العائمة لمن انتهى منه */}
+                {/* زر الإغلاق — يوقف الصوت ويشيّل الكبسولة العائمة لمن انتهى منه —
+                    no-touch-grow تمنع تضخيمه على اللمس فتقلّ المسافة الزائدة حوله
+                    ويبقى شكله ومسافاته مطابقة للتابلت والكمبيوتر */}
                 <button
                   onClick={() => {
                     audioRef.current?.pause();
@@ -726,7 +731,7 @@ export function AudioPlayer({
                   }}
                   aria-label="إغلاق المشغل العائم وإيقاف الصوت"
                   title="إغلاق"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
+                  className="no-touch-grow flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                 </button>
