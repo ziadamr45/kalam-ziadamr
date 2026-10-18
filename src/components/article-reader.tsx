@@ -153,6 +153,11 @@ export function ArticleReader({
       const map = new Array<number>(from.length).fill(-1);
       let j = 0;
       let matched = 0;
+      /* سقف البحث الأمامي — بلا سقف كانت كلمة شائعة فقدت موضعها المتوقع
+         (تعديل النص بعد توليد الصوت) تُمسح بها كل المصفوفة حتى آخر تكرار
+         لها في نهاية المقال فيقفز مرساة المواءمة للنهاية ويعلق التحديد
+         هناك رغم أن الصوت في أول المقال */
+      const MAX_SKIP = 40;
       for (let i = 0; i < from.length; i++) {
         const a = from[i];
         if (!a) {
@@ -160,8 +165,8 @@ export function ArticleReader({
           continue;
         }
         let k = j;
-        while (k < to.length && to[k] !== a) k++;
-        if (k < to.length) {
+        while (k < to.length && k - j <= MAX_SKIP && to[k] !== a) k++;
+        if (k < to.length && k - j <= MAX_SKIP) {
           map[i] = k;
           j = k + 1;
           matched++;
@@ -183,8 +188,11 @@ export function ArticleReader({
     return { toDisplay, toAudio, displayIsTashkeel: useTash };
   }, [audioWords, article.content, article.contentWithTashkeel]);
 
-  /* عند العرض على نفس مصدر الصوت المواءمة هوية — ولا حاجة لأي تحويل */
-  const needsMap = audioMaps !== null && audioMaps.displayIsTashkeel !== tashkeel;
+  /* المواءمة تُستخدم دائمًا حين تتوفر كلمات الصوت — حتى على نفس مصدر التوليد؛
+     فالنص قد يكون عُدّل بعد التوليد فاختلفت العدّة، والهوية الخام (فهرس بفهرس)
+     تُراكم انحرافًا تدريجيًا يتأخر به التحديد عن الصوت — والمواءمة المحدودة
+     تعيد المحاذاة محليًا أينما اختلفت */
+  const needsMap = audioMaps !== null;
 
   /* الحفظ: منظومة مزدوجة مستقلة — مزامنة سحابية في الحساب + لقطة محلية على الجهاز،
      ولكلٍّ منفذُه الخاص وقائمته المفهومة (لا دمج عشوائي بين القناتين) */

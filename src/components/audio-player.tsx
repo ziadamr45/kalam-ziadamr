@@ -78,6 +78,18 @@ export function AudioPlayer({
   const cachedRef = useRef(false);
   const activeWordRef = useRef<number>(-1);
 
+  /* حفظ موضع الصوت — استئناف الجلسة بعد إعادة تحميل الصفحة */
+  const posKey = `kalam-audio-pos:${slug}`;
+  const lastSaveRef = useRef(0);
+  const savePos = useCallback(
+    (t: number, isPlaying: boolean) => {
+      try {
+        localStorage.setItem(posKey, JSON.stringify({ t, playing: isPlaying, rate, at: Date.now() }));
+      } catch {}
+    },
+    [posKey, rate],
+  );
+
   const wordList = useMemo(
     () => (words && words.length > 0 ? [...words].sort((a, b) => a.s - b.s) : null),
     [words],
@@ -371,13 +383,19 @@ export function AudioPlayer({
     const t = audio.currentTime;
     setCurrent(t);
     updatePositionState(t);
+    /* حفظ دوري خفيف (كل ثانيتين) — مصدر استئناف الجلسة بعد التحديث */
+    const now = Date.now();
+    if (now - lastSaveRef.current > 2000) {
+      lastSaveRef.current = now;
+      savePos(t, true);
+    }
     if (effWords) {
       const idx = activeWordIndex(t);
       setActiveWord(idx);
     } else {
       setActiveBlock(t);
     }
-  }, [activeWordIndex, effWords, setActiveBlock, setActiveWord, updatePositionState]);
+  }, [activeWordIndex, effWords, savePos, setActiveBlock, setActiveWord, updatePositionState]);
 
   const seekFromBar = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -389,6 +407,87 @@ export function AudioPlayer({
     },
     [duration],
   );
+
+  /* ==================== استئناف الجلسة الصوتية بعد إعادة التحميل ====================
+     موضع الصوت وحالته (تشغيل/إيقاف) والسرعة تُحفظ دوريًا محليًا، وعند العودة
+     للمقال خلال ساعة يُعاد الصوت لنفس الكلمة بالضبط مع إبرازها — وإن كان
+     التشغيل مستمرًا لحظة التحديث استُأنف تلقائيًا، وإن امتنع المتصفح
+     (سياسة التشغيل التلقائي) استأنفه أول تفاعل دون أن يفقد موضعه */
+  useEffect(() => {
+    let cancelled = false;
+    let resume: null | (() => void) = null;
+    (async () => {
+      let saved: { t: number; playing: boolean; rate?: number; at?: number } | null = null;
+      try {
+        const raw = localStorage.getItem(posKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed.t === "number" && parsed.t > 1 && Date.now() - (parsed.at ?? 0) < 60 * 60 * 1000) {
+            saved = parsed;
+          } else {
+            localStorage.removeItem(posKey);
+          }
+        }
+      } catch {}
+      if (!saved || cancelled) return;
+      const audio = audioRef.current;
+      if (!audio) return;
+      const url = await resolveSrc();
+      if (cancelled) return;
+      audio.src = url;
+      if (saved.rate && saved.rate !== 1) {
+        audio.playbackRate = saved.rate;
+        setRate(saved.rate);
+      }
+      const apply = () => {
+        if (cancelled) return;
+        try {
+          audio.currentTime = saved!.t;
+        } catch {}
+        setCurrent(saved!.t);
+        setActiveWordRef.current(activeWordIndexRef.current(saved!.t));
+        if (saved!.playing) {
+          audio.play().catch(() => {
+            /* سياسة التشغيل التلقائي — كبسولة جاهزة بالأمانة وأول لمسة يكمل */
+            setSessionActive(true);
+            resume = () => {
+              resume = null;
+              audio.play().catch(() => {});
+            };
+            window.addEventListener("pointerdown", resume, { once: true });
+            window.addEventListener("keydown", resume, { once: true });
+          });
+        }
+      };
+      if (audio.readyState >= 1) apply();
+      else audio.addEventListener("loadedmetadata", apply, { once: true });
+    })();
+    return () => {
+      cancelled = true;
+      if (resume) {
+        window.removeEventListener("pointerdown", resume);
+        window.removeEventListener("keydown", resume);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posKey, resolveSrc]);
+
+  /* لقطة أخيرة عند مغادرة الصفحة — التحديث أثناء التشغيل لا يفقد شيئًا */
+  useEffect(() => {
+    const onSave = () => {
+      const audio = audioRef.current;
+      if (!audio || !audio.src || audio.ended) return;
+      savePos(audio.currentTime, !audio.paused);
+    };
+    window.addEventListener("beforeunload", onSave);
+    return () => window.removeEventListener("beforeunload", onSave);
+  }, [savePos]);
+
+  /* حفظ فوري عند تغيير سرعة التشغيل أثناء الاستماع */
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio && audio.src && !audio.paused) savePos(audio.currentTime, true);
+  }, [rate, savePos]);
 
   /* القفز بالنقر على أي كلمة داخل المقال — الفهرس المعروض يُترجم
      إلى فهرس الصوت عبر خريطة المواءمة (تجريد التشكيل) قبل القفز */
@@ -453,12 +552,21 @@ export function AudioPlayer({
         onPlay={() => {
           setPlaying(true);
           setSessionActive(true);
+          lastSaveRef.current = 0; /* احفظ فورًا في أول تحديث زمني */
         }}
-        onPause={() => setPlaying(false)}
+        onPause={() => {
+          setPlaying(false);
+          const a = audioRef.current;
+          if (a && a.src && !a.ended) savePos(a.currentTime, false);
+        }}
         onEnded={() => {
           setPlaying(false);
           setSessionActive(false);
           setActiveWord(-1);
+          lastSaveRef.current = 0;
+          try {
+            localStorage.removeItem(posKey); /* جلسة منتهية — لا استئناف */
+          } catch {}
           document.querySelectorAll("#article-body .audio-active").forEach((el) => el.classList.remove("audio-active"));
           void cacheAudio(); /* تخزين محلي للزائر المتكرر — بلا استهلاك شبكة إضافي */
         }}
@@ -598,6 +706,19 @@ export function AudioPlayer({
                     />
                   </span>
                 </div>
+
+                {/* زر الإغلاق — يوقف الصوت ويشيّل الكبسولة العائمة لمن انتهى منه */}
+                <button
+                  onClick={() => {
+                    audioRef.current?.pause();
+                    setSessionActive(false);
+                  }}
+                  aria-label="إغلاق المشغل العائم وإيقاف الصوت"
+                  title="إغلاق"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
               </div>
             </div>
           </div>,
