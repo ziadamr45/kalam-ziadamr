@@ -62,6 +62,10 @@ export function AudioPlayer({
   const [follow, setFollow] = useState(true);
   /* جلسة صوتية نشطة (بدأ التشغيل ولم ينتهِ) — تحكم ظهور الكبسولة العائمة */
   const [sessionActive, setSessionActive] = useState(false);
+  /* موضع استئناف مُعاد من جلسة سابقة (0 = لا يوجد) — يُظهر زر «من البداية» فقط */
+  const [resumedFrom, setResumedFrom] = useState(0);
+  /* حارس سباق: ضغطة «من البداية» قبل اكتمال تحميل البيانات الوصفية تلغي تطبيق الموضع المحفوظ */
+  const clearedResumeRef = useRef(false);
 
   /* بث حالة الكبسولة للعناصر العائمة الأخرى — زر العودة للأعلى يرتفع فوقها تلقائيًا */
   useEffect(() => {
@@ -354,6 +358,25 @@ export function AudioPlayer({
     }
   }, [resolveSrc]);
 
+  /* «من البداية» — المخرج الواعي من الاستئناف: يمسح الموضع المحفوظ ويعيد
+     المؤشر إلى صفر المقال ويزيل أي تظليل — بلا تشغيل تلقائي، القرار للمستخدم */
+  const startFromBeginning = useCallback(async () => {
+    clearedResumeRef.current = true;
+    try {
+      localStorage.removeItem(posKey);
+    } catch {}
+    setResumedFrom(0);
+    document.querySelectorAll(".audio-word-active").forEach((n) => n.classList.remove("audio-word-active"));
+    document.querySelectorAll("#article-body .audio-active").forEach((el) => el.classList.remove("audio-active"));
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (!audio.src) audio.src = await resolveSrc();
+    try {
+      audio.currentTime = 0;
+    } catch {}
+    setCurrent(0);
+  }, [posKey, resolveSrc]);
+
   const skipRef = useRef<(delta: number) => void>(null);
 
   const skip = useCallback(
@@ -409,13 +432,13 @@ export function AudioPlayer({
   );
 
   /* ==================== استئناف الجلسة الصوتية بعد إعادة التحميل ====================
-     موضع الصوت وحالته (تشغيل/إيقاف) والسرعة تُحفظ دوريًا محليًا، وعند العودة
-     للمقال خلال ساعة يُعاد الصوت لنفس الكلمة بالضبط مع إبرازها — وإن كان
-     التشغيل مستمرًا لحظة التحديث استُأنف تلقائيًا، وإن امتنع المتصفح
-     (سياسة التشغيل التلقائي) استأنفه أول تفاعل دون أن يفقد موضعه */
+     موضع الصوت والسرعة يُحفظان دوريًا محليًا، وعند العودة للمقال خلال ساعة
+     يُعاد مؤشر شريط التقدم لنفس الكلمة بالضبط — استئناف صامت: بلا تشغيل
+     تلقائي ولا خطف لأول لمسة ولا سحب للشاشة إلى موضع الكلمة ولا تظليل مفروض،
+     فلا يبدأ الصوت إلا بضغطة واعية على زر التشغيل — وزر «من البداية» يمحو
+     الموضع المحفوظ لمن لا يريد الاستكمال */
   useEffect(() => {
     let cancelled = false;
-    let resume: null | (() => void) = null;
     (async () => {
       let saved: { t: number; playing: boolean; rate?: number; at?: number } | null = null;
       try {
@@ -440,34 +463,18 @@ export function AudioPlayer({
         setRate(saved.rate);
       }
       const apply = () => {
-        if (cancelled) return;
+        if (cancelled || clearedResumeRef.current) return;
         try {
           audio.currentTime = saved!.t;
         } catch {}
         setCurrent(saved!.t);
-        setActiveWordRef.current(activeWordIndexRef.current(saved!.t));
-        if (saved!.playing) {
-          audio.play().catch(() => {
-            /* سياسة التشغيل التلقائي — كبسولة جاهزة بالأمانة وأول لمسة يكمل */
-            setSessionActive(true);
-            resume = () => {
-              resume = null;
-              audio.play().catch(() => {});
-            };
-            window.addEventListener("pointerdown", resume, { once: true });
-            window.addEventListener("keydown", resume, { once: true });
-          });
-        }
+        setResumedFrom(saved!.t);
       };
       if (audio.readyState >= 1) apply();
       else audio.addEventListener("loadedmetadata", apply, { once: true });
     })();
     return () => {
       cancelled = true;
-      if (resume) {
-        window.removeEventListener("pointerdown", resume);
-        window.removeEventListener("keydown", resume);
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posKey, resolveSrc]);
@@ -563,6 +570,7 @@ export function AudioPlayer({
           setPlaying(false);
           setSessionActive(false);
           setActiveWord(-1);
+          setResumedFrom(0);
           lastSaveRef.current = 0;
           try {
             localStorage.removeItem(posKey); /* جلسة منتهية — لا استئناف */
@@ -602,6 +610,23 @@ export function AudioPlayer({
         <button onClick={() => skip(10)} aria-label="تقديم ١٠ ثوانٍ إلى الأمام" className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]" style={{ color: "var(--ink-muted)" }} title="تقديم ١٠ ثوانٍ إلى الأمام">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
+
+        {/* من البداية — يظهر فقط حين يوجد موضع استئناف محفوظ: يمحوه ويعيد المؤشر
+            إلى صفر المقال بلا تشغيل تلقائي — مخرج واعٍ لمن لا يريد الاستكمال */}
+        {resumedFrom > 0 && (
+          <button
+            onClick={() => void startFromBeginning()}
+            aria-label="مسح موضع الاستئناف والعودة إلى بداية الصوت"
+            className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]"
+            style={{ color: "var(--ink-muted)" }}
+            title="مسح موضع الاستئناف والعودة إلى بداية الصوت"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+          </button>
+        )}
 
         {/* شريط التقدم RTL */}
         <div className="flex-1">
