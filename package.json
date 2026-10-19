@@ -41,7 +41,8 @@
   },
   "overrides": {
     "deepmerge-ts": "^8.0.0",
-    "postcss": "8.5.23"
+    "postcss": "8.5.23",
+    "postcss-selector-parser": "7.1.6"
   },
   "allowScripts": {
     "prisma@6.19.3": true,
