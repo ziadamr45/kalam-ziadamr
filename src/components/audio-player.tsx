@@ -369,6 +369,8 @@ export function AudioPlayer({
     try {
       localStorage.removeItem(posKey);
     } catch {}
+    /* صدّ الحفظ الدوري ثانيتين — timeupdate قفزة الصفر لا يُعيد كتابة المفتاح المحموم */
+    lastSaveRef.current = Date.now();
     setResumedFrom(0);
     document.querySelectorAll(".audio-word-active").forEach((n) => n.classList.remove("audio-word-active"));
     document.querySelectorAll("#article-body .audio-active").forEach((el) => el.classList.remove("audio-active"));
