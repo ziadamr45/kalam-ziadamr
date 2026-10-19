@@ -66,6 +66,10 @@ export function AudioPlayer({
   const [resumedFrom, setResumedFrom] = useState(0);
   /* حارس سباق: ضغطة «من البداية» قبل اكتمال تحميل البيانات الوصفية تلغي تطبيق الموضع المحفوظ */
   const clearedResumeRef = useRef(false);
+  /* نافذة كتم التظليل حول لحظة الاستئناف فقط — ضبط currentTime على عنصر متوقف
+     يولّد timeupdate يمر على مسار التظليل فتُضاء الكلمة وتُسحب الشاشة، والاستئناف
+     الصامت لا يُبرز ولا يُسحب — قفزات المستخدم اليدوية بعدها تظلل طبيعيًا */
+  const silenceHighlightUntilRef = useRef(0);
 
   /* بث حالة الكبسولة للعناصر العائمة الأخرى — زر العودة للأعلى يرتفع فوقها تلقائيًا */
   useEffect(() => {
@@ -412,11 +416,13 @@ export function AudioPlayer({
       lastSaveRef.current = now;
       savePos(t, true);
     }
-    if (effWords) {
-      const idx = activeWordIndex(t);
-      setActiveWord(idx);
-    } else {
-      setActiveBlock(t);
+    if (Date.now() >= silenceHighlightUntilRef.current) {
+      if (effWords) {
+        const idx = activeWordIndex(t);
+        setActiveWord(idx);
+      } else {
+        setActiveBlock(t);
+      }
     }
   }, [activeWordIndex, effWords, savePos, setActiveBlock, setActiveWord, updatePositionState]);
 
@@ -464,6 +470,7 @@ export function AudioPlayer({
       }
       const apply = () => {
         if (cancelled || clearedResumeRef.current) return;
+        silenceHighlightUntilRef.current = Date.now() + 600;
         try {
           audio.currentTime = saved!.t;
         } catch {}
