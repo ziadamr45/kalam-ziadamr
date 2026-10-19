@@ -812,8 +812,8 @@ body.immersion .page-chrome {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    /* حماية الصفحة الأخيرة: التوقيع الختامي لا يجلس فوق التذييل الثابت */
-    padding-bottom: 16mm !important;
+    /* تنفّس ختامي لبطاقة الجماعة أسفل الوثيقة */
+    padding-bottom: 8mm !important;
   }
 
   /* ============================================================
@@ -993,42 +993,15 @@ body.immersion .page-chrome {
     text-align: right !important;
   }
 
-  /* ===== التذييل الثابت أسفل كل ورقة ===== */
-  .print-only.print-footer {
-    display: flex !important;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 15mm;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    border-top: 1px solid #e5e7eb;
-    margin: 0 !important;
-    padding: 0 2mm;
-    font-size: 8pt;
-    color: #6b7280;
-    direction: rtl;
-  }
-  .print-footer .print-footer-url {
-    max-width: 50%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    direction: ltr;
-    text-align: center !important;
-    text-align-last: auto !important;
-    font-size: 7pt;
-    color: #9ca3af;
-    unicode-bidi: embed;
-  }
-  .print-footer .print-footer-brand {
-    flex-shrink: 0;
-    font-weight: 600;
-  }
-
-  .print-only:not(.print-footer):not(.print-masthead) {
+  /* ===== لا تذييل مثبّت في الطباعة إطلاقًا — قرار معماري موثّق =====
+     position:fixed في محرك الطباعة يتكرر أسفل كل ورقة داخل منطقة المحتوى
+     نفسها فيغطي أسطر المتن الأخيرة (الشكوى الأصلية). جرّبت بلا نجاح:
+     الإزاحة السالبة (bottom سالب → يقفز إلى أعلى الورقة التالية)،
+     وتذييل الجدول tfoot (يتكرر في آخر ورقة فقط). القاعدة العالمية
+     لقوالب الطباعة الجادة: الهوية تُحمل في ترويسة الغلاف وبطاقة الجماعة
+     الختامية، والترقيم يترك لمحرك المتصفح (@bottom-left في فايرفوكس
+     وخيار «رؤوس وتذييلات» في كروم) — لا شيء يتدفق تحت شيء */
+  .print-only:not(.print-masthead) {
     display: block !important;
   }
 
@@ -1039,6 +1012,19 @@ body.immersion .page-chrome {
   svg {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  /* ===== مقاس المتن الورقي — قياس الكتب الأكاديمي =====
+     الشاشة فضفاضة (سطر 2.4) لتخفيف إجهاد العين الرقمية؛ الورق يتحمل
+     كثافة أعلى: 12pt بسطر 2.05 (والمشكول 12.5pt بسطر 2.2 حفاظًا على
+     هاوية الحركات) — إيقاع كتابي محكم يزيد مضمون الورقة دون إجهاد */
+  .article-body {
+    font-size: 12pt !important;
+    line-height: 2.05 !important;
+  }
+  .article-body.is-tashkeel {
+    font-size: 12.5pt !important;
+    line-height: 2.2 !important;
   }
 
   /* ===== إيقاع طباعي أكاديمي =====
@@ -1145,7 +1131,6 @@ body.immersion .page-chrome {
   }
 
   /* استثناءات اتجاهية داخل الورق العربي: الروابط والأكواد */
-  .print-footer-url,
   code,
   kbd,
   samp,
@@ -1162,10 +1147,12 @@ body.immersion .page-chrome {
     text-align-last: auto !important;
   }
 
-  /* ===== خاتمة الوثيقة المختومة — آخر سطور النسخة الورقية ===== */
+  /* ===== بطاقة الجماعة الختامية — توقيع نهاية الوثيقة كالكتب =====
+     تحمل الهوية والرابط الصحيح المشتق من النطاق الرسمي بدل
+     أي تحديد حاردكود — آخر ما يقرؤه القارئ في النسخة الورقية */
   .print-colophon {
-    margin-top: 14mm !important;
-    padding-top: 6mm !important;
+    margin-top: 16mm !important;
+    padding-top: 7mm !important;
     border-top: 1px solid var(--border) !important;
   }
   .print-colophon-ornament {
@@ -1190,5 +1177,15 @@ body.immersion .page-chrome {
     margin: 0 !important;
     text-align: center !important;
     text-align-last: center !important;
+  }
+  .print-colophon-url {
+    margin: 1.5mm 0 0 !important;
+    font-size: 7.5pt;
+    color: var(--ink-muted);
+    direction: ltr !important;
+    unicode-bidi: embed;
+    text-align: center !important;
+    text-align-last: center !important;
+    overflow-wrap: anywhere;
   }
 }

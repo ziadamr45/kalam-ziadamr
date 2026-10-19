@@ -305,22 +305,14 @@ export default async function ArticlePage({
               </p>
             </section>
           )}
-          {/* خاتمة الوثيقة الورقية المختومة — تظهر في نسخة الـ PDF حصريًا */}
+          {/* بطاقة الجماعة الختامية — آخر ما يقرؤه القارئ في النسخة الورقية:
+              توقيع نهاية الوثيقة كالكتب، والرابط مشتق من النطاق الرسمي
+              (لا تذييل مثبّت يتكرر فوق المتن — الهوية هنا وفي ترويسة الغلاف) */}
           <div className="print-only print-colophon" aria-hidden>
             <div className="print-colophon-ornament">✦</div>
             <p className="print-colophon-line">انتهت هذه النسخة — قراءة هادئة تكون لها لازمة</p>
             <p className="print-colophon-brand">منصة كلام له لازمة · {article.title}</p>
-          </div>
-
-          {/* تذييل الطباعة الثابت — يتكرر أسفل كل ورقة عند الطباعة من المتصفح:
-              هوية المنصة يمينًا + رابط المقال العربي المقروء (بلا ترميز ٪)
-              وسطًا بسطر واحد مقصوص + النطاق الرسمي يسارًا — ورقم الصفحة
-              والإجمالي يضيفهما محرك المتصفح عبر عدّادات @page الأصلية */}
-          <div className="print-only print-footer" aria-hidden>
-            <span>منصة كلام له لازمة — فكر بلا ضجيج</span>
-            {/* الرابط المعروض عربي مقروء مفكوك الترميز — QR يحمل النسخة المرمّزة */}
-            <span className="print-footer-url">{`${siteUrl.replace(/^https?:\/\//, "")}/article/${article.slug}`}</span>
-            <span className="print-footer-brand">ziadamrme.vercel.app</span>
+            <p className="print-colophon-url">{`${siteUrl.replace(/^https?:\/\//, "")}/article/${article.slug}`}</p>
           </div>
         </article>
 
