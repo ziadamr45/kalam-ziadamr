@@ -187,6 +187,40 @@ html[data-tashkeel-pref="on"] .tashkeel-ok .article-body.is-tashkeel {
   transition: opacity 0.18s ease;
 }
 
+/* ============================================================
+   مفتاح التشكيل — حالته البصرية من سمة التفضيل على <html>
+   (تُزرع قبل أي بكسل من سكربت <head> في layout.tsx) لا من
+   حالة React بعد الترطيب — وإلا رُئي الزر مطفأً ثم انزلق
+   مقبضه لوضع التشغيل بعد كل ريفريش (نفس جذر فلاش النص لكن
+   على مستوى الزر: النص كانت البوابة تخفيه والزر كان ظاهرًا
+   بمظهر الإطفاء حتى يستيقظ state). aria-checked يبقى من React
+   للحالة الدلالية — تغيّره لا يُرى ولا يسبب تزيّف hydration
+   لأن الرسم الأول يطابق الخادم ثم تزامنه الـ layout effect
+   ============================================================ */
+.tashkeel-toggle-track {
+  background: var(--border);
+}
+
+.tashkeel-toggle-knob {
+  right: 18px;
+}
+
+.tashkeel-toggle-label {
+  color: var(--ink-muted);
+}
+
+html[data-tashkeel-pref="on"] .tashkeel-toggle-track {
+  background: var(--accent);
+}
+
+html[data-tashkeel-pref="on"] .tashkeel-toggle-knob {
+  right: 2px;
+}
+
+html[data-tashkeel-pref="on"] .tashkeel-toggle-label {
+  color: var(--accent-strong);
+}
+
 /* هوامش مريحة للإبهام والعين على الهواتف — تنبسط على الشاشات الأكبر */
 @media (max-width: 640px) {
   .article-body {

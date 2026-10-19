@@ -386,17 +386,16 @@ export function ArticleReader({
               className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-2"
               title="تبديل النص المشكول بالحركات الكاملة"
             >
-              <span className="text-xs font-medium" style={{ color: tashkeel ? "var(--accent-strong)" : "var(--ink-muted)" }}>
+              {/* شكل الزر من أصناف CSS تقودها سمة <html> المزروعة قبل أي
+                  بكسل (انظر قواعد tashkeel-toggle في globals.css) — لو
+                  بقي مربوطًا بحالة React لرُئي مطفأً ثم انزلق للتشغيل
+                  بعد الترطيب مع كل ريفريش. aria-checked يبقى من React
+                  للحالة الدلالية دون أي أثر بصري */}
+              <span className="tashkeel-toggle-label text-xs font-medium">
                 تشكيل
               </span>
-              <span
-                className="relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors duration-300"
-                style={{ background: tashkeel ? "var(--accent)" : "var(--border)" }}
-              >
-                <span
-                  className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ease-fluid"
-                  style={{ right: tashkeel ? "2px" : "18px" }}
-                />
+              <span className="tashkeel-toggle-track relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors duration-300">
+                <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ease-fluid" />
               </span>
             </button>
           )}
