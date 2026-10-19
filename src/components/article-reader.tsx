@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
@@ -15,6 +15,10 @@ import {
 import { parseBlocks, blockWordCount, blockPlainWords, type Block } from "@/lib/content-blocks";
 import { stripDiacritics } from "@/lib/utils";
 import type { OfflineArticle } from "@/types/offline";
+
+/* layout effect متزامن على العميل (يطبّق التفضيل قبل أول رسم بعد الترطيب
+   فيلاحق المتن المشكول الإطار الأول) وعديم الفاعلية على الخادم */
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type ReaderArticle = {
   id: string;
@@ -44,9 +48,12 @@ export function ArticleReader({
   /* تبديل التشكيل الفوري — مرهون بإذن الأدمن (عامًا + لهذا المقال) */
   const [tashkeel, setTashkeel] = useState(false);
   /* بوابة منع الفلاش: تُرفع بعد أول تطبيق لتفضيل المستخدم، فيعود
-     التبديل اليدوي التالي لسلوكه الفوري المعتاد بمحرك تثبيت الموضع */
+     التبديل اليدوي التالي لسلوكه الفوري المعتاد بمحرك تثبيت الموضع.
+     القراءة في layout effect: يُطبَّق التفضيل قبل أن يرسم المتصفح إطار
+     الترطيب الأول — فلا يُرى المجرد أبدًا (البوابة أخفته قبله) ولا يبقى
+     فراغ بعد الترطيب إطارًا زائدًا */
   const [tashkeelGateLifted, setTashkeelGateLifted] = useState(false);
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     let prefOn = false;
     try {
       prefOn = tashkeelAllowed && window.localStorage.getItem("kalam_tashkeel") === "on";
@@ -352,19 +359,13 @@ export function ArticleReader({
   }, [article.content, summaryPoints]);
 
   return (
-    <div className="relative">
-      {/* سكربت ما قبل أول رسم — للمفعّلين التشكيل حصرًا: يزرع الإشارة على
-          <html> قبل أن يلمس الشاشة أي بكسل من المتن، فتُخفى النسخة المجردة
-          القادمة من الخادم (ISR مشترك) حتى تُطبق المشكولة بعد الإدراج —
-          لا نصٌّ يُرى مجردًا ثم يتبدل أمامه بعد ثانية */}
-      {tashkeelAllowed && (
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              'try{if(localStorage.getItem("kalam_tashkeel")==="on"){document.documentElement.setAttribute("data-tashkeel-pref","on")}}catch(e){}',
-          }}
-        />
-      )}
+    <div className={`relative ${tashkeelAllowed ? "tashkeel-ok" : ""}`}>
+      {/* سمة data-tashkeel-pref تُزرع من سكربت <head> في layout.tsx قبل أي
+          بكسل وتعيش على <html> عبر التنقيات الناعمة كلها — كان تُزرع من
+          سكربت داخل الشجرة هنا فلا يُنفَّذ في التنقية الناعمة (الرئيسية ←
+          مقال) فيُرى المتن مجردًا ثم يتبدل: هذا كان جذر الفلاش. البوابة
+          في CSS تخفي المجرد للمفعّل التشكيل حصرًا (.tashkeel-ok أعلاه)
+          حتى تُطبق المشكولة بعد الترطيب — لا نصٌّ يُرى مجردًا أبدًا */}
 
       {/* شريط أدوات القراءة — مثبت أسفل الشاشة: مفتاح التشكيل مثبّت في المقدمة
           دون انقطاع، والأزرار التنفيذية مجموعة مرنة لا تخرج عن إطار الشاشة */}

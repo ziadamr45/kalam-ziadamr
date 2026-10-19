@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { get, set } from "idb-keyval";
 import { easternDigits } from "@/lib/utils";
@@ -8,6 +8,15 @@ import { easternDigits } from "@/lib/utils";
 type Cue = { t: number; id: string };
 type BlockMeta = { id: string; words: number };
 type WordTiming = { w: string; s: number; e: number };
+
+/* layout effect متزامن على العميل — تفضيلات الاستماع تُستعاد قبل أول رسم
+   بعد الترطيب فلا يُرى الزران على الافتراضي ثم يتبدلان */
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/* تفضيلات الاستماع الدائمة (عبر المقالات وإعادة التحميل) — سرعة التشغيل
+   ووضع التتبع التلقائي حقّا قارئ لا جلسة، فلا يُعاد ضبطهما مع كل صفحة */
+const RATE_KEY = "kalam_audio_rate";
+const FOLLOW_KEY = "kalam_audio_follow";
 
 function fmtTime(sec: number): string {
   if (!isFinite(sec) || sec < 0) sec = 0;
@@ -399,12 +408,51 @@ export function AudioPlayer({
   }, [skip]);
 
   const cycleRate = useCallback(() => {
-    setRate((r) => {
-      const next = r === 1 ? 1.25 : r === 1.25 ? 1.5 : 1;
-      if (audioRef.current) audioRef.current.playbackRate = next;
-      return next;
-    });
+    const next = rate === 1 ? 1.25 : rate === 1.25 ? 1.5 : 1;
+    setRate(next);
+    if (audioRef.current) {
+      /* defaultPlaybackRate معًا: خوارزمية تحميل عنصر الوسائط تُصفّر
+         playbackRate عند تعيين src جديد — الافتراضية هي التي تثبت */
+      audioRef.current.defaultPlaybackRate = next;
+      audioRef.current.playbackRate = next;
+    }
+    try {
+      localStorage.setItem(RATE_KEY, String(next));
+    } catch {}
+  }, [rate]);
+
+  /* إيقاف/تشغيل التتبع التلقائي — تفضيل دائم يُحفظ مثل السرعة */
+  const toggleFollow = useCallback(() => {
+    const next = !follow;
+    setFollow(next);
+    try {
+      localStorage.setItem(FOLLOW_KEY, next ? "on" : "off");
+    } catch {}
+  }, [follow]);
+
+  /* استعادة تفضيلات الاستماع المحفوظة — قبل أول رسم بعد الترطيب،
+   ومزامنة العنصر الصوتي مع أي تغيير لاحق للسرعة ضمانًا */
+  useIsomorphicLayoutEffect(() => {
+    try {
+      const saved = parseFloat(localStorage.getItem(RATE_KEY) ?? "");
+      if (saved === 1.25 || saved === 1.5) {
+        setRate(saved);
+        if (audioRef.current) {
+          audioRef.current.defaultPlaybackRate = saved;
+          audioRef.current.playbackRate = saved;
+        }
+      }
+    } catch {}
+    try {
+      if (localStorage.getItem(FOLLOW_KEY) === "off") setFollow(false);
+    } catch {}
   }, []);
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.defaultPlaybackRate = rate;
+      audioRef.current.playbackRate = rate;
+    }
+  }, [rate]);
 
   const onTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
@@ -467,8 +515,12 @@ export function AudioPlayer({
       if (cancelled) return;
       audio.src = url;
       if (saved.rate && saved.rate !== 1) {
+        audio.defaultPlaybackRate = saved.rate;
         audio.playbackRate = saved.rate;
         setRate(saved.rate);
+        try {
+          localStorage.setItem(RATE_KEY, String(saved.rate));
+        } catch {}
       }
       const apply = () => {
         if (cancelled || clearedResumeRef.current) return;
@@ -672,7 +724,7 @@ export function AudioPlayer({
         </button>
 
         <button
-          onClick={() => setFollow((f) => !f)}
+          onClick={toggleFollow}
           className={`rounded-full p-2 transition-colors hover:bg-[var(--accent-soft)] ${follow ? "" : "opacity-40"}`}
           style={{ color: "var(--accent-strong)" }}
           title="تتبع القراءة تلقائيًا"

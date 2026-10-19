@@ -80,7 +80,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
      4) بعد اكتمال التلاشي تنهار العناصر المخفاة (display:none) فلا تبقى
         مساحات فارغة فوق المتن وتحته، مع تعويض التمرير ليبقى النص
         المعروض ثابتًا أمام العين لحظة الانهيار
-     5) إشعار هادئ لثانيتين */
+     5) حفظ الوضع بعد اكتمال الانهيار (لا قبله — حتى لا يُستعاد من
+        ريفرش حصل في نص ثانية التلاشي فينحرف الموضع)
+     6) إشعار هادئ لثانيتين */
   const enterImmersion = useCallback(() => {
     setDrawerOpen(false);
     setImmersed(true);
@@ -97,17 +99,29 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       if (before != null && after != null && after !== before) {
         window.scrollBy({ top: after - before, behavior: "instant" as ScrollBehavior });
       }
+      /* حفظ الوضع بعد اكتمال الانهيار وتعويض التمرير — سمة <html> تحاكي
+         حالة body فيُعاد إنتاجها من التفضيل قبل أول رسم عند أي إعادة تحميل */
+      try {
+        window.localStorage.setItem("kalam_immersion", "on");
+        document.documentElement.setAttribute("data-immersion", "on");
+      } catch {}
     }, 540);
   }, []);
 
-  /* الخروج من الغمر: إعادة المكان أولًا (عناصر بلا رؤية بعد)، تعويض التمرير
-     ليبقى موضع القراءة كما هو، ثم إزالة الغمر فيعود الظهور بالتدريج */
+  /* الخروج من الغمر: إزالة الحفظ والسمة أولًا ثم إعادة المكان (عناصر بلا
+     رؤية بعد) وتعويض التمرير ليبقى موضع القراءة كما هو، ثم إزالة الغمر
+     فيعود الظهور بالتدريج — رفع سمة <html> قبل القياس ضروري لأن قواعدها
+     تطوي العناصر نفسها فلا يُقاس فرق التوسّع الحقيقي إلا بعد رفعها */
   const exitImmersion = useCallback(() => {
     setImmersed(false);
     if (collapseTimer.current) {
       clearTimeout(collapseTimer.current);
       collapseTimer.current = null;
     }
+    try {
+      window.localStorage.removeItem("kalam_immersion");
+    } catch {}
+    document.documentElement.removeAttribute("data-immersion");
     const body = document.getElementById("article-body");
     const before = body?.getBoundingClientRect().top ?? null;
     document.body.classList.remove("immersion-collapsed");
@@ -172,6 +186,23 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   useEffect(() => {
     if (immersed && !isArticlePage) exitImmersion();
   }, [immersed, isArticlePage, exitImmersion]);
+
+  /* استعادة وضع القراءة المركزة بعد إعادة التحميل — لمن كان في الغمر حين
+     أعاد التحميل: سمة <html> كانت مزروعة قبل أول رسم (فُطْيت الواجهة
+     واستُعيد موضع التمرير المحفوظ عليها)، فيكفي هنا مزامنة حالة React
+     مع ما يراه القارئ فعلًا — بلا إشعار ولا انتقالات ولا قفزات، والزر
+     الخارج مرئي فور اكتمال الترطيب */
+  useEffect(() => {
+    if (!isArticlePage) return;
+    let on = false;
+    try {
+      on = window.localStorage.getItem("kalam_immersion") === "on";
+    } catch {}
+    if (!on) return;
+    setImmersed(true);
+    document.body.classList.add("immersion", "immersion-collapsed");
+    document.documentElement.setAttribute("data-immersion", "on");
+  }, [isArticlePage]);
 
   if (immersed) {
     return (

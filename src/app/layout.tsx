@@ -101,6 +101,16 @@ export const viewport: Viewport = {
 /** سكربت منع الوميض — يطبّق الثيم المحفوظ قبل الترطيب */
 const themeNoFlashScript = `(function(){try{var t=localStorage.getItem('kalam_theme');if(!t){var m=document.cookie.match(/(?:^|; )kalam_theme=(light|dark)/);t=m?m[1]:'light';}if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');document.documentElement.classList.add('dark');}}catch(e){}})();`;
 
+/** سكربت ما قبل أول رسم لتفضيلات القراءة — يُنفَّذ في <head> على كل صفحة:
+    التشكيل: يزرع data-tashkeel-pref فتُخفي بوابة CSS المتن المجرد قبل أي بكسل.
+    كانت السمة تُزرع من سكربت داخل شجرة صفحة المقال فلا يُنفَّذ إطلاقًا في
+    التنقية الناعمة (الرئيسية ← مقال) فيُرى المتن مجردًا ثم يتبدل — وهذا هو
+    جذر الفلاش؛ السمة هنا تعيش على <html> عبر التنقيات الناعمة كلها.
+    الغمر: على صفحات المقالات حصرًا يزرع data-immersion ليُطوى واجهة المقال
+    قبل استعادته بعد إعادة التحميل فيرسم المتصفح تخطيط الغمر النهائي من أول
+    لحظة ويستعيد موضع التمرير المحفوظ عليه حرفيًا — لا وميض ولا قفزة */
+const readerPrefsNoFlashScript = `(function(){try{if(localStorage.getItem('kalam_tashkeel')==='on')document.documentElement.setAttribute('data-tashkeel-pref','on');if(localStorage.getItem('kalam_immersion')==='on'&&location.pathname.indexOf('/article/')===0)document.documentElement.setAttribute('data-immersion','on');}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -118,6 +128,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="كلام له لازمة" />
         <meta name="application-name" content="كلام له لازمة" />
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
+        <script dangerouslySetInnerHTML={{ __html: readerPrefsNoFlashScript }} />
       </head>
       <body className="font-ui min-h-screen flex flex-col antialiased">
         {/* شريط التقدم العلوي الفوري — شريط ذهبي نحيف يظهر لحظة لمس أي رابط

@@ -169,17 +169,21 @@ mark[data-search-hit="active"] {
    بوابة منع فلاش التشكيل — للمستخدم الذي فعّل التشكيل
    الصفحات مخزنة في ISR مشترك بين الزوار، فالخادم يرسل المتن
    المجرد دومًا، وكان النص المشكول يُطبق بعد الإدراج فيبدو كأن
-   الصفحة «جاءت مجردة ثم تحولت» بعد ثانية. الحل: سكربت مصغر قبل
-   أول رسم يزرع data-tashkeel-pref على <html>، فتُخفى النسخة
-   المجردة حتى تُطبق المشكولة — لا يُرى نصٌّ ثم يتبدل أمامه.
-   تُرفع البوابة بعد أول تطبيق (tashkeel-gate-lifted) فيبقى
-   التبديل اليدوي التالي فوريًا بمحرك تثبيت الموضع كما هو.
+   الصفحة «جاءت مجردة ثم تحولت» بعد ثانية. الحل: سكربت <head>
+   في layout.tsx يزرع data-tashkeel-pref على <html> قبل أي بكسل
+   وعلى كل صفحة (فتعيش السمة عبر التنقيات الناعمة — السكربت
+   السابق داخل شجرة صفحة المقال لا يُنفَّذ في التنقية الناعمة
+   من الرئيسية وكان هذا جذر الفلاش)، فتُخفى النسخة المجردة
+   حتى تُطبق المشكولة. تُرفع البوابة بعد أول تطبيق (tashkeel-gate-lifted)
+   فيبقى التبديل اليدوي التالي فوريًا بمحرك تثبيت الموضع كما هو.
+   قيد .tashkeel-ok: لا إخفاء إلا حيث للتشكيل أن يُطبق أصلًا
+   (مقالات أذِن فيها الأدمن) — فلا فراغ زائف علىغيرها
    ============================================================ */
-html[data-tashkeel-pref="on"] .article-body:not(.is-tashkeel):not(.tashkeel-gate-lifted) {
+html[data-tashkeel-pref="on"] .tashkeel-ok .article-body:not(.is-tashkeel):not(.tashkeel-gate-lifted) {
   opacity: 0;
 }
 
-html[data-tashkeel-pref="on"] .article-body.is-tashkeel {
+html[data-tashkeel-pref="on"] .tashkeel-ok .article-body.is-tashkeel {
   transition: opacity 0.18s ease;
 }
 
@@ -304,6 +308,17 @@ body.immersion .page-chrome {
    لأنها لا تشغل مكانًا في تدفق الصفحة أصلًا، فيبقى تلاشيها الحي كما هو */
 body.immersion-collapsed .site-footer,
 body.immersion-collapsed .page-chrome:not(.fixed) {
+  display: none !important;
+}
+
+/* استعادة الغمر قبل الترطيب — لمن كان في وضع القراءة المركزة حين أعاد
+   التحميل: سمة data-immersion تُزرع من سكربت <head> (على صفحات المقالات
+   حصرًا) فتُطوى واجهة المقال قبل أي بكسل، فيرسم المتصفح تخطيط الغمر
+   النهائي من أول لحظة ويستعيد موضع التمرير المحفوظ عليه حرفيًا —
+   لا وميض للواجهة ولا قفزة للموضع، والقارئ يجد مقاله كما تركه */
+html[data-immersion="on"] .site-header,
+html[data-immersion="on"] .site-footer,
+html[data-immersion="on"] .page-chrome {
   display: none !important;
 }
 
