@@ -200,7 +200,8 @@ export function ArticleReader({
   const loggedIn = status === "authenticated";
   const [cloudSaved, setCloudSaved] = useState(false);
   const [localSaved, setLocalSaved] = useState(false);
-  const [saveBusy, setSaveBusy] = useState(false);
+  /* حالة الانشغال بالحفظ تُميّز المصدر (سحابي/محلي) ليرفع كل زر مؤشره الخاص — null = لا حفظ جارٍ */
+  const [saveBusy, setSaveBusy] = useState<"cloud" | "local" | null>(null);
   const [saveMenuOpen, setSaveMenuOpen] = useState(false);
   const saveMenuRef = useRef<HTMLDivElement | null>(null);
   const anySaved = cloudSaved || localSaved;
@@ -239,7 +240,7 @@ export function ArticleReader({
       requestAuth({ kind: "save" });
       return;
     }
-    setSaveBusy(true);
+    setSaveBusy("cloud");
     try {
       await fetch("/api/saves", {
         method: "POST",
@@ -248,7 +249,7 @@ export function ArticleReader({
       });
       setCloudSaved(true);
     } catch {}
-    setSaveBusy(false);
+    setSaveBusy(null);
   }, [article.id, article.slug, cloudSaved, saveBusy, loggedIn]);
 
   /* تنفيذ النية المحفوظة — عاد المستخدم من الدخول ليُكمل الحفظ تلقائيًا */
@@ -267,7 +268,7 @@ export function ArticleReader({
   /* حفظ لقطة محلية على هذا الجهاز — للقراءة دون اتصال */
   const handleSaveLocal = useCallback(async () => {
     if (saveBusy || localSaved) return;
-    setSaveBusy(true);
+    setSaveBusy("local");
     const snapshot: OfflineArticle = {
       id: article.id,
       slug: article.slug,
@@ -284,7 +285,7 @@ export function ArticleReader({
       await saveOfflineArticle(snapshot);
       setLocalSaved(true);
     } catch {}
-    setSaveBusy(false);
+    setSaveBusy(null);
   }, [article, localSaved, saveBusy]);
 
   /* تتبع القراءة: زيارة، إكمال، بقاء */
@@ -421,7 +422,7 @@ export function ArticleReader({
                   <button
                     role="menuitem"
                     onClick={() => void handleSaveCloud()}
-                    disabled={cloudSaved || saveBusy}
+                    disabled={cloudSaved || saveBusy !== null}
                     className="w-full rounded-xl p-3 text-right transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-65"
                   >
                     <span className="flex items-center justify-between gap-2">
@@ -431,9 +432,16 @@ export function ArticleReader({
                         </svg>
                         حفظ في حسابي (مزامنة سحابية)
                       </span>
-                      {cloudSaved && (
+                      {saveBusy === "cloud" ? (
+                        <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
+                          <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                          جارٍ الحفظ…
+                        </span>
+                      ) : cloudSaved ? (
                         <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
-                      )}
+                      ) : null}
                     </span>
                     <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
                       {loggedIn
@@ -448,7 +456,7 @@ export function ArticleReader({
                   <button
                     role="menuitem"
                     onClick={() => void handleSaveLocal()}
-                    disabled={localSaved || saveBusy}
+                    disabled={localSaved || saveBusy !== null}
                     className="w-full rounded-xl p-3 text-right transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-65"
                   >
                     <span className="flex items-center justify-between gap-2">
@@ -459,9 +467,16 @@ export function ArticleReader({
                         </svg>
                         حفظ على هذا الجهاز (قراءة بدون إنترنت)
                       </span>
-                      {localSaved && (
+                      {saveBusy === "local" ? (
+                        <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
+                          <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                          جارٍ الحفظ…
+                        </span>
+                      ) : localSaved ? (
                         <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
-                      )}
+                      ) : null}
                     </span>
                     <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
                       للقراءة في أي وقت بدون اتصال على هذا المتصفح
