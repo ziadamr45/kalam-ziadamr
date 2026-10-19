@@ -19,18 +19,41 @@ const publishedWhere: Prisma.ArticleWhereInput = {
   ],
 };
 
+/**
+ * درع الاستعلامات ضد الهزات اللحظية — ثلاث محاولات متباعدة قبل الاستسلام.
+ * في بيئة serverless يسقط أغلب أعطال الاتصال العابرة (بداية باردة،
+ * زحمة تجمع الاتصالات) خلال مئات المللي ثانية، فتُعيد المحاولة العطلَ
+ * إلى وضعه قبل أن يصل إلى صفحةٍ تُخزَّن في كاش ISR.
+ * عند استنفاد المحاولات يُرفع الخطأ عمدًا: فشل التوليد يجعل Next.js
+ * يُبقي آخر نسخة سليمة من الصفحة (stale-while-error) بدل تخزين
+ * انكسارٍ لحظي على هيئة «مقالات مختفية» أو 404 زائفة لدقائق.
+ */
+async function withDbRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < attempts) {
+        await new Promise((r) => setTimeout(r, 250 * 2 ** (attempt - 1)));
+      }
+    }
+  }
+  console.error("[kalam:db-retry] استنفد الاستعلام محاولاته الثلاث", lastErr);
+  throw lastErr;
+}
+
 /** أحدث المقالات المنشورة */
 export async function getLatestArticles(limit = 9): Promise<ArticleWithSection[]> {
-  try {
-    return await prisma.article.findMany({
+  return withDbRetry(() =>
+    prisma.article.findMany({
       where: publishedWhere,
       orderBy: { publishedAt: "desc" },
       take: limit,
       include: { section: true },
-    });
-  } catch {
-    return [];
-  }
+    }),
+  );
 }
 
 /** مقالات قسم معين */
@@ -38,16 +61,14 @@ export async function getArticlesBySection(
   sectionSlug: string,
   limit = 30,
 ): Promise<ArticleWithSection[]> {
-  try {
-    return await prisma.article.findMany({
+  return withDbRetry(() =>
+    prisma.article.findMany({
       where: { ...publishedWhere, section: { slug: sectionSlug } },
       orderBy: { publishedAt: "desc" },
       take: limit,
       include: { section: true },
-    });
-  } catch {
-    return [];
-  }
+    }),
+  );
 }
 
 /**
@@ -76,8 +97,10 @@ export async function getArticleBySlug(
 ): Promise<ArticleWithSection | null> {
   if (!slug) return null;
   const decoded = safeDecodeSlug(slug);
-  try {
-    const article = await prisma.article.findFirst({
+  /* العودة بـ null مسموحة فقط نتيجةَ استعلامٍ ناجح (slug غير موجود أصلًا)،
+     أما عطل قاعدة البيانات فيُرفع — وإلا خُزِّست 404 زائفة لمقال حي */
+  return withDbRetry(() =>
+    prisma.article.findFirst({
       where: {
         AND: [
           { OR: [{ slug: decoded }, { slug }] },
@@ -90,21 +113,23 @@ export async function getArticleBySlug(
         ],
       },
       include: { section: true },
-    });
-    return article;
-  } catch {
-    return null;
-  }
+    }),
+  );
 }
 
 /** جميع الـ slugs المنشورة (لـ generateStaticParams) */
 export async function getPublishedSlugs(): Promise<{ slug: string }[]> {
   try {
-    return await prisma.article.findMany({
-      where: publishedWhere,
-      select: { slug: true },
-    });
+    return await withDbRetry(() =>
+      prisma.article.findMany({
+        where: publishedWhere,
+        select: { slug: true },
+      }),
+    );
   } catch {
+    /* قائمة ما يُسبق توليده وقت البناء فقط — فشلها لا يُخزِّن محتوى
+       فاضيًا إطلاقًا: dynamicParams يولّد المقالات عند الطلب، فالصمت
+       هنا أمان لا سامّية */
     return [];
   }
 }
@@ -116,21 +141,25 @@ export async function getPublishedSlugs(): Promise<{ slug: string }[]> {
  */
 export async function getActiveSections() {
   try {
-    const sections = await prisma.section.findMany({
-      where: { active: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: {
-        _count: {
-          select: {
-            articles: {
-              where: { status: "PUBLISHED" },
+    const sections = await withDbRetry(() =>
+      prisma.section.findMany({
+        where: { active: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        include: {
+          _count: {
+            select: {
+              articles: {
+                where: { status: "PUBLISHED" },
+              },
             },
           },
         },
-      },
-    });
+      }),
+    );
     if (sections.length > 0) return sections;
   } catch {}
+  /* عمدًا null لا خطأ: الأقسام زينة تجويلية ولها بديل ثابت أصيل
+     في SECTIONS — تدهور رشيق لا يُخزِّن صفحةً فاضية من المقالات */
   return null;
 }
 
@@ -140,8 +169,8 @@ export async function getRelatedArticles(
   sectionId: string | null,
   limit = 3,
 ): Promise<ArticleWithSection[]> {
-  try {
-    return await prisma.article.findMany({
+  return withDbRetry(() =>
+    prisma.article.findMany({
       where: {
         ...publishedWhere,
         id: { not: articleId },
@@ -150,18 +179,16 @@ export async function getRelatedArticles(
       orderBy: { publishedAt: "desc" },
       take: limit,
       include: { section: true },
-    });
-  } catch {
-    return [];
-  }
+    }),
+  );
 }
 
 /** التعليقات المعتمدة لمقال — بالهوية المعروضة والرتبة، مع خوارزمية أولوية
     «النقاشات الموثقة»: المُلهم مثبتًا أعلى، ثم تثبيت الكاتب الذاتي،
     ثم تعليقات الحسابات الموثقة لتظهر في مقدمة الحوار، ثم الأحدث */
 export async function getApprovedComments(articleId: string) {
-  try {
-    return await prisma.comment.findMany({
+  return withDbRetry(() =>
+    prisma.comment.findMany({
       where: { articleId, status: "APPROVED" },
       orderBy: [
         { isInspiring: "desc" },
@@ -196,52 +223,48 @@ export async function getApprovedComments(articleId: string) {
           },
         },
       },
-    });
-  } catch {
-    return [];
-  }
+    }),
+  );
 }
 
 /** إحصاءات إعجاب/عدم إعجاب تعليقات مقال — خريطة commentId → { likes, dislikes } */
 export async function getCommentVoteStats(articleId: string) {
-  try {
-    const comments = await prisma.comment.findMany({
+  const comments = await withDbRetry(() =>
+    prisma.comment.findMany({
       where: { articleId, status: "APPROVED" },
       select: { id: true },
-    });
-    const ids = comments.map((c) => c.id);
-    if (!ids.length) return {};
-    const grouped = await prisma.commentVote.groupBy({
+    }),
+  );
+  const ids = comments.map((c) => c.id);
+  if (!ids.length) return {};
+  const grouped = await withDbRetry(() =>
+    prisma.commentVote.groupBy({
       by: ["commentId", "value"],
       where: { commentId: { in: ids } },
       _count: { value: true },
-    });
-    const stats: Record<string, { likes: number; dislikes: number }> = {};
-    for (const g of grouped) {
-      const row = (stats[g.commentId] ??= { likes: 0, dislikes: 0 });
-      if (g.value === "LIKE") row.likes = g._count.value;
-      else row.dislikes = g._count.value;
-    }
-    return stats;
-  } catch {
-    return {};
+    }),
+  );
+  const stats: Record<string, { likes: number; dislikes: number }> = {};
+  for (const g of grouped) {
+    const row = (stats[g.commentId] ??= { likes: 0, dislikes: 0 });
+    if (g.value === "LIKE") row.likes = g._count.value;
+    else row.dislikes = g._count.value;
   }
+  return stats;
 }
 
 /** عدادات التفاعل الحالية */
 export async function getInteractionCounts(articleId: string) {
-  try {
-    const grouped = await prisma.interaction.groupBy({
+  const grouped = await withDbRetry(() =>
+    prisma.interaction.groupBy({
       by: ["value"],
       where: { articleId },
       _count: { value: true },
-    });
-    const likes = grouped.find((g) => g.value === 1)?._count.value ?? 0;
-    const dislikes = grouped.find((g) => g.value === -1)?._count.value ?? 0;
-    return { likes, dislikes };
-  } catch {
-    return { likes: 0, dislikes: 0 };
-  }
+    }),
+  );
+  const likes = grouped.find((g) => g.value === 1)?._count.value ?? 0;
+  const dislikes = grouped.find((g) => g.value === -1)?._count.value ?? 0;
+  return { likes, dislikes };
 }
 
 /** تصويت الزائر الحالي إن وُجد */
@@ -254,7 +277,9 @@ export async function getMyVote(
     if (opts.userId) where.userId = opts.userId;
     else if (opts.visitorFp) where.visitorFp = opts.visitorFp;
     else return null;
-    const row = await prisma.interaction.findFirst({ where });
+    const row = await withDbRetry(() =>
+      prisma.interaction.findFirst({ where }),
+    );
     return row?.value ?? null;
   } catch {
     return null;
@@ -264,10 +289,12 @@ export async function getMyVote(
 /** slugs الأقسام لخريطة الموقع */
 export async function getSectionSlugs(): Promise<string[]> {
   try {
-    const sections = await prisma.section.findMany({
-      where: { active: true },
-      select: { slug: true },
-    });
+    const sections = await withDbRetry(() =>
+      prisma.section.findMany({
+        where: { active: true },
+        select: { slug: true },
+      }),
+    );
     return sections.map((s) => s.slug);
   } catch {
     return [];
