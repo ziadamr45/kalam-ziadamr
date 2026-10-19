@@ -99,11 +99,16 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       if (before != null && after != null && after !== before) {
         window.scrollBy({ top: after - before, behavior: "instant" as ScrollBehavior });
       }
-      /* حفظ الوضع بعد اكتمال الانهيار وتعويض التمرير — سمة <html> تحاكي
-         حالة body فيُعاد إنتاجها من التفضيل قبل أول رسم عند أي إعادة تحميل */
+      /* حفظ الوضع والمِرساة بعد اكتمال الانهيار وتعويض التمرير — لا يُحفظ
+         قبلها حتى لا يُستعاد من ريفرش حصل في نص ثانية التلاشي فينحرف الموضع.
+         سمة <html> تحاكي حالة body فيُعاد إنتاجها من التفضيل قبل أول رسم */
       try {
         window.localStorage.setItem("kalam_immersion", "on");
         document.documentElement.setAttribute("data-immersion", "on");
+        window.sessionStorage.setItem(
+          `kalam_immersion_anchor:${window.location.pathname}`,
+          String(Math.round(window.scrollY)),
+        );
       } catch {}
     }, 540);
   }, []);
@@ -120,6 +125,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
     }
     try {
       window.localStorage.removeItem("kalam_immersion");
+    } catch {}
+    try {
+      window.sessionStorage.removeItem(`kalam_immersion_anchor:${window.location.pathname}`);
     } catch {}
     document.documentElement.removeAttribute("data-immersion");
     const body = document.getElementById("article-body");
@@ -170,8 +178,10 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   useEffect(() => {
     document.body.classList.toggle("immersion", immersed);
     if (!immersed) document.body.classList.remove("immersion-collapsed");
-    return () =>
-      document.body.classList.remove("immersion", "immersion-collapsed");
+    /* الـ cleanup يمسح «immersion» فقط — مسح «immersion-collapsed» هنا كان
+       يمحو الانهيار الذي أضافته استعادة ما بعد الريفريش بين عمليَي التأثير
+       فيضيع قياس التعويض عند الخروج؛ والانهيار يُنظَّف صراحة في exitImmersion */
+    return () => document.body.classList.remove("immersion");
   }, [immersed]);
 
   /* قفل تمرير الصفحة أثناء فتح الدرج + شريط تمرير مضبوط */
@@ -191,7 +201,10 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
      أعاد التحميل: سمة <html> كانت مزروعة قبل أول رسم (فُطْيت الواجهة
      واستُعيد موضع التمرير المحفوظ عليها)، فيكفي هنا مزامنة حالة React
      مع ما يراه القارئ فعلًا — بلا إشعار ولا انتقالات ولا قفزات، والزر
-     الخارج مرئي فور اكتمال الترطيب */
+     الخارج مرئي فور اكتمال الترطيب.
+     ومعها مِرساة الموضع: استعادة المتصفح/Next قد تُثبَّت على تخطيط الخط
+     الاحتياطي الأقصر قبل وصول خط أميري فيُثبَّت الموضع ثم يفلت أكثر من
+   مئة بكسل عند تضخم التخطيط — المرساة تُعاد بعد استقرار الخطوط فلا انحراف */
   useEffect(() => {
     if (!isArticlePage) return;
     let on = false;
@@ -202,7 +215,46 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
     setImmersed(true);
     document.body.classList.add("immersion", "immersion-collapsed");
     document.documentElement.setAttribute("data-immersion", "on");
-  }, [isArticlePage]);
+
+    const anchorKey = `kalam_immersion_anchor:${window.location.pathname}`;
+    let anchor: number | null = null;
+    try {
+      const raw = window.sessionStorage.getItem(anchorKey);
+      if (raw) anchor = Number.parseInt(raw, 10) || null;
+    } catch {}
+
+    /* تتبّع خفيف للموضع أثناء القراءة في الغمر (كل 600ms كحد أقصى) */
+    let lastSave = 0;
+    const onSaveScroll = () => {
+      const now = Date.now();
+      if (now - lastSave < 600) return;
+      lastSave = now;
+      try {
+        window.sessionStorage.setItem(anchorKey, String(Math.round(window.scrollY)));
+      } catch {}
+    };
+    window.addEventListener("scroll", onSaveScroll, { passive: true });
+
+    /* إعادة الإرساء بعد اكتمال قياسات الخط النهائية */
+    let alive = true;
+    void (async () => {
+      try {
+        await document.fonts.ready;
+      } catch {}
+      if (!alive) return;
+      requestAnimationFrame(() => {
+        if (!alive || anchor == null) return;
+        if (Math.abs(window.scrollY - anchor) > 2) {
+          window.scrollTo({ top: anchor, behavior: "instant" as ScrollBehavior });
+        }
+      });
+    })();
+
+    return () => {
+      alive = false;
+      window.removeEventListener("scroll", onSaveScroll);
+    };
+  }, [isArticlePage, pathname]);
 
   if (immersed) {
     return (
