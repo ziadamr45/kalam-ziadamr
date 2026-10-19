@@ -223,9 +223,12 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       if (raw) anchor = Number.parseInt(raw, 10) || null;
     } catch {}
 
-    /* تتبّع خفيف للموضع أثناء القراءة في الغمر (كل 600ms كحد أقصى) */
+    /* تتبّع خفيف للموضع أثناء القراءة في الغمر (كل 600ms كحد أقصى) —
+       لا حفظ خارج الغمر: المستمع يعيش مع الصفحة بعد الاستعادة فحارس
+       الفئة يمنع كتابة مرساة لعارضٍ خرج من الوضع أصلًا */
     let lastSave = 0;
     const onSaveScroll = () => {
+      if (!document.body.classList.contains("immersion")) return;
       const now = Date.now();
       if (now - lastSave < 600) return;
       lastSave = now;
