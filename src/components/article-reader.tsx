@@ -43,10 +43,16 @@ export function ArticleReader({
 }) {
   /* تبديل التشكيل الفوري — مرهون بإذن الأدمن (عامًا + لهذا المقال) */
   const [tashkeel, setTashkeel] = useState(false);
+  /* بوابة منع الفلاش: تُرفع بعد أول تطبيق لتفضيل المستخدم، فيعود
+     التبديل اليدوي التالي لسلوكه الفوري المعتاد بمحرك تثبيت الموضع */
+  const [tashkeelGateLifted, setTashkeelGateLifted] = useState(false);
   useEffect(() => {
+    let prefOn = false;
     try {
-      setTashkeel(tashkeelAllowed && window.localStorage.getItem("kalam_tashkeel") === "on");
+      prefOn = tashkeelAllowed && window.localStorage.getItem("kalam_tashkeel") === "on";
     } catch {}
+    setTashkeel(prefOn);
+    setTashkeelGateLifted(true);
   }, [tashkeelAllowed]);
 
   /* مرساة المتن — تُقاس منها نسبة موضع القارئ قبل التبديل وبعده */
@@ -75,14 +81,15 @@ export function ArticleReader({
       if (raw > 0 && raw < 1) progress = raw;
     }
 
-    /* 2) تبديل وضع التشكيل */
-    setTashkeel((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem("kalam_tashkeel", next ? "on" : "off");
-      } catch {}
-      return next;
-    });
+    /* 2) تبديل وضع التشكيل — مع مزامنة سمة البوابة على <html>
+        لتطابق التفضيل الجديد في التنقلات التالية داخل الموقع */
+    const next = !tashkeel;
+    setTashkeel(next);
+    try {
+      window.localStorage.setItem("kalam_tashkeel", next ? "on" : "off");
+      if (next) document.documentElement.setAttribute("data-tashkeel-pref", "on");
+      else document.documentElement.removeAttribute("data-tashkeel-pref");
+    } catch {}
 
     /* 3) إعادة التموضع بنفس النسبة النسبية فور اكتمال إعادة الرندرة —
         الإطار الأول يثبّت الأبعاد الجديدة والثاني يضمن اكتمال الـ layout،
@@ -103,7 +110,7 @@ export function ArticleReader({
         });
       });
     }
-  }, [tashkeelAllowed]);
+  }, [tashkeelAllowed, tashkeel]);
 
   /* المختصر المفيد */
   const [showSummary, setShowSummary] = useState(false);
@@ -346,6 +353,19 @@ export function ArticleReader({
 
   return (
     <div className="relative">
+      {/* سكربت ما قبل أول رسم — للمفعّلين التشكيل حصرًا: يزرع الإشارة على
+          <html> قبل أن يلمس الشاشة أي بكسل من المتن، فتُخفى النسخة المجردة
+          القادمة من الخادم (ISR مشترك) حتى تُطبق المشكولة بعد الإدراج —
+          لا نصٌّ يُرى مجردًا ثم يتبدل أمامه بعد ثانية */}
+      {tashkeelAllowed && (
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{if(localStorage.getItem("kalam_tashkeel")==="on"){document.documentElement.setAttribute("data-tashkeel-pref","on")}}catch(e){}',
+          }}
+        />
+      )}
+
       {/* شريط أدوات القراءة — مثبت أسفل الشاشة: مفتاح التشكيل مثبّت في المقدمة
           دون انقطاع، والأزرار التنفيذية مجموعة مرنة لا تخرج عن إطار الشاشة */}
       <div
@@ -581,11 +601,14 @@ export function ArticleReader({
 
       {/* جسم المقال — العارض الموحد لمحرك التنسيق الموسع (كاريوكي آمن)
           مسافة سفلية واسعة (pb-32) حتى لا تحجب الكبسولة العائمة السطور الأخيرة أبدًا
-          contentRef: مرساة محرك تثبيت موضع القراءة عند تبديل التشكيل */}
+          contentRef: مرساة محرك تثبيت موضع القراءة عند تبديل التشكيل
+          tashkeel-gate-lifted: علامة رفع بوابة منع الفلاش (انظر CSS) */}
       <div
         ref={contentRef}
         id="article-body"
-        className={`article-body mt-10 pb-32 ${tashkeel ? "is-tashkeel" : ""}`}
+        className={`article-body mt-10 pb-32 ${tashkeel ? "is-tashkeel" : ""} ${
+          tashkeelGateLifted ? "tashkeel-gate-lifted" : ""
+        }`}
         style={{ color: "var(--ink)" }}
       >
         <ArticleBlocks blocks={blocks} offsets={wordOffsets} />

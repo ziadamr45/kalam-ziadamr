@@ -165,6 +165,24 @@ mark[data-search-hit="active"] {
   line-height: 2.5;
 }
 
+/* ============================================================
+   بوابة منع فلاش التشكيل — للمستخدم الذي فعّل التشكيل
+   الصفحات مخزنة في ISR مشترك بين الزوار، فالخادم يرسل المتن
+   المجرد دومًا، وكان النص المشكول يُطبق بعد الإدراج فيبدو كأن
+   الصفحة «جاءت مجردة ثم تحولت» بعد ثانية. الحل: سكربت مصغر قبل
+   أول رسم يزرع data-tashkeel-pref على <html>، فتُخفى النسخة
+   المجردة حتى تُطبق المشكولة — لا يُرى نصٌّ ثم يتبدل أمامه.
+   تُرفع البوابة بعد أول تطبيق (tashkeel-gate-lifted) فيبقى
+   التبديل اليدوي التالي فوريًا بمحرك تثبيت الموضع كما هو.
+   ============================================================ */
+html[data-tashkeel-pref="on"] .article-body:not(.is-tashkeel):not(.tashkeel-gate-lifted) {
+  opacity: 0;
+}
+
+html[data-tashkeel-pref="on"] .article-body.is-tashkeel {
+  transition: opacity 0.18s ease;
+}
+
 /* هوامش مريحة للإبهام والعين على الهواتف — تنبسط على الشاشات الأكبر */
 @media (max-width: 640px) {
   .article-body {
@@ -279,6 +297,14 @@ body.immersion .page-chrome {
   transform: translateY(-8px);
   transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* انهيار المخفاة بعد اكتمال تلاشيها — لا مساحات فارغة فوق المتن وتحته.
+   العناصر الثابتة (fixed: شريط أدوات القراءة، لوحة المختصر) لا تنهار
+   لأنها لا تشغل مكانًا في تدفق الصفحة أصلًا، فيبقى تلاشيها الحي كما هو */
+body.immersion-collapsed .site-footer,
+body.immersion-collapsed .page-chrome:not(.fixed) {
+  display: none !important;
 }
 
 /* شريحة الاقتباس العائمة */

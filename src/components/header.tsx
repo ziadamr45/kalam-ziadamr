@@ -65,6 +65,8 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   /* إشعار «وضع القراءة المركزة» — كبسولة هادئة لثانيتين */
   const [readerToast, setReaderToast] = useState(false);
   const readerToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* مؤقت انهيار العناصر المخفاة — يُطلق بعد اكتمال تلاشيها البصري */
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastY = useRef(0);
 
   /* حصر «وضع القراءة المركزة» بصفحات المقالات الفردي حصريًا —
@@ -74,23 +76,53 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
 
   /* تفعيل وضع القراءة المركزة بسلاسة:
      1) إغلاق الدرج إن كان مفتوحًا  2) تلاشٍ تدريجي للعناصر (CSS قائم)
-     3) تمرير انسيابي تلقائي إلى أول المقال فورًا  4) إشعار هادئ لثانيتين */
+     3) القارئ يبقى في موضع قراءته حرفيًا — لا قفز لأول المقال
+     4) بعد اكتمال التلاشي تنهار العناصر المخفاة (display:none) فلا تبقى
+        مساحات فارغة فوق المتن وتحته، مع تعويض التمرير ليبقى النص
+        المعروض ثابتًا أمام العين لحظة الانهيار
+     5) إشعار هادئ لثانيتين */
   const enterImmersion = useCallback(() => {
     setDrawerOpen(false);
     setImmersed(true);
-    requestAnimationFrame(() => {
-      document
-        .getElementById("article-body")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
     if (readerToastTimer.current) clearTimeout(readerToastTimer.current);
     setReaderToast(true);
     readerToastTimer.current = setTimeout(() => setReaderToast(false), 2000);
+    if (collapseTimer.current) clearTimeout(collapseTimer.current);
+    collapseTimer.current = setTimeout(() => {
+      const body = document.getElementById("article-body");
+      const before = body?.getBoundingClientRect().top ?? null;
+      document.body.classList.add("immersion-collapsed");
+      void document.body.offsetHeight; /* إجبار حساب التخطيط فورًا */
+      const after = body?.getBoundingClientRect().top ?? null;
+      if (before != null && after != null && after !== before) {
+        window.scrollBy({ top: after - before, behavior: "instant" as ScrollBehavior });
+      }
+    }, 540);
+  }, []);
+
+  /* الخروج من الغمر: إعادة المكان أولًا (عناصر بلا رؤية بعد)، تعويض التمرير
+     ليبقى موضع القراءة كما هو، ثم إزالة الغمر فيعود الظهور بالتدريج */
+  const exitImmersion = useCallback(() => {
+    setImmersed(false);
+    if (collapseTimer.current) {
+      clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+    const body = document.getElementById("article-body");
+    const before = body?.getBoundingClientRect().top ?? null;
+    document.body.classList.remove("immersion-collapsed");
+    void document.body.offsetHeight;
+    const after = body?.getBoundingClientRect().top ?? null;
+    if (before != null && after != null && after !== before) {
+      window.scrollBy({ top: after - before, behavior: "instant" as ScrollBehavior });
+    }
+    document.body.classList.remove("immersion");
   }, []);
 
   useEffect(
     () => () => {
       if (readerToastTimer.current) clearTimeout(readerToastTimer.current);
+      if (collapseTimer.current) clearTimeout(collapseTimer.current);
     },
     [],
   );
@@ -113,17 +145,19 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setImmersed(false);
+        exitImmersion();
         setDrawerOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [exitImmersion]);
 
   useEffect(() => {
     document.body.classList.toggle("immersion", immersed);
-    return () => document.body.classList.remove("immersion");
+    if (!immersed) document.body.classList.remove("immersion-collapsed");
+    return () =>
+      document.body.classList.remove("immersion", "immersion-collapsed");
   }, [immersed]);
 
   /* قفل تمرير الصفحة أثناء فتح الدرج + شريط تمرير مضبوط */
@@ -136,8 +170,8 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
 
   /* صمام أمان: لو انتقل القارئ من مقال لمسار آخر وهو في الغمر يُطفأ فورًا */
   useEffect(() => {
-    if (immersed && !isArticlePage) setImmersed(false);
-  }, [immersed, isArticlePage]);
+    if (immersed && !isArticlePage) exitImmersion();
+  }, [immersed, isArticlePage, exitImmersion]);
 
   if (immersed) {
     return (
@@ -162,7 +196,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
         {/* زر الخروج — كبسولة واضحة مثبتة أعلى الشاشة (فصل هندسي كامل عن
             كبسولة التحكم الصوتي المثبتة أسفلها)، بمساحة لمس مريحة ≥ 48px */}
         <button
-          onClick={() => setImmersed(false)}
+          onClick={exitImmersion}
           className="fixed left-5 top-5 z-50 min-h-[48px] rounded-full border px-5 py-2.5 text-xs font-bold shadow-lift transition-all hover:scale-105 active:scale-95 sm:text-sm"
           style={{
             background: "var(--surface)",
