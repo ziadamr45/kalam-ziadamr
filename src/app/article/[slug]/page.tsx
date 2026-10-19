@@ -140,6 +140,41 @@ export default async function ArticlePage({
           {/* ترويسة الطباعة الرسمية — QR متجهي نقي يرسمه المتصفح (للطباعة حصريًا) */}
           <PrintMasthead url={articleFullUrl} />
 
+          {/* ورقة غلاف الوثيقة الورقية — حصرًا في نسخة الطباعة/PDF:
+              القسم + العنوان الكبير + سطر البيانات + صورة الغلاف + المختصر
+              ثم فاصل صفحة، فيبدأ المتن بورقة جديدة كالكتب الرصينة.
+              (ترويسة العنوان وصورة الغلاف الأصليتان للشاشة تخفيان في الطباعة
+              لأن هذه الورقة تحملهما بدلًا منهما) */}
+          <div className="print-only print-cover-page" aria-hidden>
+            {article.section && (
+              <span className="print-cover-section">{article.section.name}</span>
+            )}
+            <div className="print-cover-title">{article.title}</div>
+            <div className="print-cover-meta">
+              فريق كلام له لازمة · {formatArabicDate(article.publishedAt)} · مدة القراءة المتوقعة:{" "}
+              {formatReadingTime(article.readingTimeSec)}
+            </div>
+            <div className="print-cover-rule" aria-hidden />
+            {article.coverImage && (
+              <div className="print-cover-figure">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={article.coverImage} alt="" />
+              </div>
+            )}
+            {article.summary.trim() && (
+              <div className="print-cover-summary">
+                <p className="print-cover-summary-label">المختصر</p>
+                {article.summary
+                  .split(/\n+/)
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+                  .map((line, i) => (
+                    <p key={i}>{line}</p>
+                  ))}
+              </div>
+            )}
+          </div>
+
           {/* تصنيف القسم */}
           {article.section && (
             <div className="page-chrome mb-6 text-center">
@@ -270,9 +305,11 @@ export default async function ArticlePage({
               </p>
             </section>
           )}
-          {/* سطر الطباعة — يظهر في نسخة الـ PDF حصريًا */}
-          <div className="print-only mt-12 border-t pt-4 text-center text-xs" style={{ borderColor: "var(--border)", color: "#555" }}>
-            منصة كلام له لازمة · {article.title}
+          {/* خاتمة الوثيقة الورقية المختومة — تظهر في نسخة الـ PDF حصريًا */}
+          <div className="print-only print-colophon" aria-hidden>
+            <div className="print-colophon-ornament">✦</div>
+            <p className="print-colophon-line">انتهت هذه النسخة — قراءة هادئة تكون لها لازمة</p>
+            <p className="print-colophon-brand">منصة كلام له لازمة · {article.title}</p>
           </div>
 
           {/* تذييل الطباعة الثابت — يتكرر أسفل كل ورقة عند الطباعة من المتصفح:

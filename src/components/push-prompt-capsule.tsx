@@ -86,8 +86,14 @@ export default function PushPromptCapsule() {
     setBusy(true);
     try {
       const res = await subscribeToPush();
-      /* نجاح الاشتراك أو رفض صريح للإذن — كلاهما يصمتان للأبد احترامًا لقرار الزائر */
-      if (res.ok || res.reason === "denied") {
+      /* قرار الزائر المتصفحي هو التفاعل الحاسم: منح الإذن يخمد الكبسولة
+         فورًا حتى لو تعذر حفظ الاشتراك سحابيًا (الزائر غير مسجَّل — الـAPI
+         يرد 401)؛ وإلا بقيت الكبسولة معلقة على الشاشة رغم أنه فعّل الإشعارات
+         فعلًا. المزامنة السحابية تتم صامتةً لاحقًا عبر resyncExistingSubscription
+         لحظة دخوله من الجرس — فلا يُسأل ثانيًا أبدًا */
+      const granted =
+        typeof Notification !== "undefined" && Notification.permission === "granted";
+      if (res.ok || res.reason === "denied" || granted) {
         try {
           window.localStorage.setItem(DONE_KEY, "1");
         } catch {}
