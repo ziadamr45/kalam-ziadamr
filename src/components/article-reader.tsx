@@ -391,8 +391,11 @@ export function ArticleReader({
               <span className="hidden sm:inline">المختصر المفيد</span>
             </button>
 
-            {/* حفظ — قائمة مزدوجة واضحة: سحابي في الحساب + محلي على الجهاز */}
-            <div ref={saveMenuRef} className="relative shrink-0">
+            {/* حفظ — قائمة مزدوجة واضحة: سحابي في الحساب + محلي على الجهاز
+                الحاوية relative على الشاشات الكبيرة فقط؛ على التليفون تبقى
+                static ليتُرسّى المنيو المطلق إلى شريط الأدوات الثابت (position:fixed
+                عابر لعرض الشاشة) — فلا يمكن قصه مهما كان عرض الجهاز */}
+            <div ref={saveMenuRef} className="shrink-0 sm:relative">
               <button
                 onClick={() => setSaveMenuOpen((v) => !v)}
                 aria-expanded={saveMenuOpen}
@@ -405,10 +408,13 @@ export function ArticleReader({
                 <span className="hidden sm:inline">{anySaved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
               </button>
 
+              {/* التليفون: بطاقة عائمة متمددة فوق الشريط بهوامش 12px (نمط لوحة
+                  المختصر) — كاملة الظهور على كل العروض؛ التابلت/الكمبيوتر:
+                  نفس الارتساء الأصيل على الحافة اليمنى لزر حفظ كما كان */}
               {saveMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full right-0 mb-2 w-[19rem] max-w-[calc(100vw-2rem)] rounded-2xl border p-2 shadow-lift animate-fade-in"
+                  className="absolute bottom-full left-3 right-3 mb-2 w-auto max-w-none rounded-2xl border p-2 shadow-lift animate-fade-in sm:left-auto sm:right-0 sm:w-[19rem] sm:max-w-[calc(100vw-2rem)]"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >
                   {/* الخيار السحابي — مزامنة الحساب */}
