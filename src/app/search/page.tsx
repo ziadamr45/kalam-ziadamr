@@ -9,6 +9,9 @@ import SearchView from "./search-view";
 export const metadata: Metadata = {
   title: "البحث الفكري",
   description: "ابحث في العناوين والمتن والأفكار — في كل مقالات المنصة",
+  /* صفحة أداة بحث داخلية لا محتوى مستقل — جوجل نفسه يوصي بعدم فهرسة
+     صفحات البحث حتى لا تستنزف زحفه وتتنافس مع المقالات في النتائج */
+  robots: { index: false, follow: true },
 };
 
 export default function SearchPage() {

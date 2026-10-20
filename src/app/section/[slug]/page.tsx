@@ -35,7 +35,8 @@ export async function generateMetadata({
   const def = SECTION_MAP[slug];
   const dbSections = await getActiveSections();
   const name = dbSections?.find((s) => s.slug === slug)?.name ?? def?.name ?? slug;
-  return { title: name };
+  /* الكانونيكال الرسمي للقسم — عنوان واحد معتمد لكل قسم */
+  return { title: name, alternates: { canonical: `/section/${slug}` } };
 }
 
 export default async function SectionPage({

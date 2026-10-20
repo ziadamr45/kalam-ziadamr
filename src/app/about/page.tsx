@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site-footer";
 export const metadata: Metadata = {
   title: "عن المنصة",
   description: "فلسفة «كلام له لازمة» ومعايير النشر الصارمة قبل أن يرى أي مقال النور.",
+  alternates: { canonical: "/about" },
 };
 
 const CHECKLIST = [

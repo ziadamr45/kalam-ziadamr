@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
@@ -8,6 +9,12 @@ import { SECTIONS } from "@/lib/sections";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 
 export const revalidate = 300;
+
+/* الكانونيكال الرسمي للرئيسية — بغيره يعتمد جوجل عنوان الطلب وقد
+   يشتت الإشارة بين نسخ النطاق (بالشرطات المائلة وبغيرها) */
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 const PHILOSOPHY = [
   {

@@ -47,9 +47,14 @@ async function getMeta() {
   try {
     const { getSiteConfig } = await import("@/lib/site-config");
     const cfg = await getSiteConfig();
-    return { title: cfg.SITE_META_TITLE || "كلام له لازمة", desc: cfg.SITE_META_DESC };
+    return {
+      name: cfg.SITE_NAME || "كلام له لازمة",
+      title: cfg.SITE_META_TITLE || "كلام له لازمة",
+      desc: cfg.SITE_META_DESC,
+    };
   } catch {
     return {
+      name: "كلام له لازمة",
       title: "كلام له لازمة",
       desc: "مش كل كلام لازم يتقال.. بس فيه كلام له لازمة. منصة فكرية ومعرفية عربية: مقالات رصينة، بلا ضجيج، بلا إعلانات — كلام يستحق وقّتك.",
     };
@@ -111,9 +116,29 @@ const themeNoFlashScript = `(function(){try{var t=localStorage.getItem('kalam_th
     لحظة ويستعيد موضع التمرير المحفوظ عليه حرفيًا — لا وميض ولا قفزة */
 const readerPrefsNoFlashScript = `(function(){try{if(localStorage.getItem('kalam_tashkeel')==='on')document.documentElement.setAttribute('data-tashkeel-pref','on');if(localStorage.getItem('kalam_immersion')==='on'&&location.pathname.indexOf('/article/')===0)document.documentElement.setAttribute('data-immersion','on');}catch(e){}})();`;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  /* بيانات الموقع المنظمة (WebSite schema) — هي التي يقرأها جوجل لعرض
+     اسم الموقع في نتائج البحث بدلًا من اسم المنصة المستضيفة: بغيرها
+     يعتمد جوجل على النطاق المسجل فيعرض «Vercel» بدل اسم المنصة.
+     الاسم والوصف من التكوين السيادي للموقع نفسه — لا شيء مُخترَع */
+  const { name, desc } = await getMeta();
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name,
+    url: SITE_URL,
+    inLanguage: "ar",
+    description: desc,
+    publisher: {
+      "@type": "Organization",
+      name,
+      url: SITE_URL,
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/icons/icon-512.png` },
+    },
+  };
+
   return (
     <html
       lang="ar"
@@ -131,6 +156,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: readerPrefsNoFlashScript }} />
       </head>
       <body className="font-ui min-h-screen flex flex-col antialiased">
+        {/* بيانات الموقع المنظمة — على كل صفحة ليعيش الاسم مع أي صفحة يزحف إليها جوجل */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
         {/* شريط التقدم العلوي الفوري — شريط ذهبي نحيف يظهر لحظة لمس أي رابط
             ليمنح القارئ إشعارًا بصريًا فوريًا بأن الطلب قيد الاستجابة */}
         <NextTopLoader

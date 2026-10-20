@@ -57,6 +57,18 @@ export async function generateStaticParams() {
   }
 }
 
+/* تنظيف مختصر المقال لوصف الميتا — طي الأسطر والمسافات إلى سطر واحد
+   ثم قصّ على حد كلمة كاملة عند 165 حرفًا بعلامة حذف: الوصف في نتائج
+   البحث يُعرض سطرًا مقروءًا بدل كتلة متعددة الأسطر تُقتطع عشوائيًا.
+   النص من مختصر المقال نفسه حرفيًا — لا أي إضافة من خارجه */
+function cleanMetaText(raw: string): string {
+  const one = raw.replace(/\s+/g, " ").trim();
+  if (one.length <= 165) return one;
+  const cut = one.slice(0, 165);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 100 ? cut.slice(0, lastSpace) : cut).trimEnd() + "…";
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -68,20 +80,23 @@ export async function generateMetadata({
   const article = await getArticleBySlug(slug);
   if (!article) return { title: "مقال غير موجود" };
 
+  const metaDescription = cleanMetaText(article.summary);
+
   return {
     title: article.title,
-    description: article.summary,
+    description: metaDescription,
     openGraph: {
       type: "article",
       title: article.title,
-      description: article.summary,
+      description: metaDescription,
       publishedTime: article.publishedAt?.toISOString(),
+      modifiedTime: article.updatedAt.toISOString(),
       images: [{ url: article.coverImage || "/og-default.png", width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title: article.title,
-      description: article.summary,
+      description: metaDescription,
     },
     alternates: { canonical: `/article/${article.slug}` },
   };
@@ -110,20 +125,30 @@ export default async function ArticlePage({
   const tashkeelAllowed =
     siteCfg.TASHKEEL_ENABLED && article.tashkeelEnabled;
 
+  /* رابط المقال الحي — يُغذّي رمز QR المتجهي في ترويسة الطباعة والتذييل الثابت */
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://kalam-ziadamr.vercel.app").replace(/\/$/, "");
+  const articleFullUrl = `${siteUrl}/article/${encodeURIComponent(article.slug)}`;
+
+  /* بيانات المقال المنظمة — كل حقولها من سجل المقال نفسه
+     (تاريخا النشر والتعديل والغلاف والوصف المنظف) فهي التي تُظهر
+     للمقال تاريخًا وصورة صحيحين في نتائج البحث */
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: article.title,
-    description: article.summary,
+    description: cleanMetaText(article.summary),
+    image: [article.coverImage || `${siteUrl}/og-default.png`],
     datePublished: article.publishedAt?.toISOString(),
+    dateModified: article.updatedAt.toISOString(),
     author: { "@type": "Organization", name: "كلام له لازمة" },
-    publisher: { "@type": "Organization", name: "كلام له لازمة" },
+    publisher: {
+      "@type": "Organization",
+      name: "كلام له لازمة",
+      logo: { "@type": "ImageObject", url: `${siteUrl}/icons/icon-512.png` },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": articleFullUrl },
     inLanguage: "ar",
   };
-
-  /* رابط المقال الحي — يُغذّي رمز QR المتجهي في ترويسة الطباعة والتذييل الثابت */
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://kalam-ziadamr.vercel.app").replace(/\/$/, "");
-  const articleFullUrl = `${siteUrl}/article/${encodeURIComponent(article.slug)}`;
 
   return (
     <>
