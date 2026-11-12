@@ -116,6 +116,12 @@ const themeNoFlashScript = `(function(){try{var t=localStorage.getItem('kalam_th
     لحظة ويستعيد موضع التمرير المحفوظ عليه حرفيًا — لا وميض ولا قفزة */
 const readerPrefsNoFlashScript = `(function(){try{if(localStorage.getItem('kalam_tashkeel')==='on')document.documentElement.setAttribute('data-tashkeel-pref','on');if(localStorage.getItem('kalam_immersion')==='on'&&location.pathname.indexOf('/article/')===0)document.documentElement.setAttribute('data-immersion','on');}catch(e){}})();`;
 
+/** حارس chunks بعد النشر — تبويب مفتوح من نسخة قديمة يطلب chunk حذفته
+    النسخة الجديدة فينهار التنقيل (ChunkLoadError / reading 'call').
+    عند أول فشل: إعادة تحميل واحدة تجلب HTML جديدًا وchunks جديدة،
+    ومسموح مرة كل 5 دقائق كحد أقصى فلا حلقة مطلقة أبدًا */
+const chunkLoadGuardScript = `(function(){function r(){var n=Date.now();try{var l=+sessionStorage.getItem('kalam_chunk_reload')||0;if(n-l<300000)return;sessionStorage.setItem('kalam_chunk_reload',String(n));}catch(e){}location.reload();}window.addEventListener('error',function(e){var t=e&&e.target;if(t&&t!==window&&t.tagName==='SCRIPT'&&typeof t.src==='string'&&t.src.indexOf('/_next/')!==-1){r();return;}var m=(e&&e.message)||'';if(/ChunkLoadError|dynamically imported module|Loading chunk|reading 'call'/.test(m))r();},true);window.addEventListener('unhandledrejection',function(e){var m='';try{m=String((e.reason&&e.reason.message)||e.reason||'');}catch(x){}if(/ChunkLoadError|dynamically imported module|Loading chunk|reading 'call'/.test(m))r();});})();`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -154,6 +160,7 @@ export default async function RootLayout({
         <meta name="application-name" content="كلام له لازمة" />
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
         <script dangerouslySetInnerHTML={{ __html: readerPrefsNoFlashScript }} />
+        <script dangerouslySetInnerHTML={{ __html: chunkLoadGuardScript }} />
       </head>
       <body className="font-ui min-h-screen flex flex-col antialiased">
         {/* بيانات الموقع المنظمة — على كل صفحة ليعيش الاسم مع أي صفحة يزحف إليها جوجل */}
