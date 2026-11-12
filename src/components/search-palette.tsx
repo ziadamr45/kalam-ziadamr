@@ -35,7 +35,7 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
       <>
         {parts.map((p, i) =>
           clean.some((c) => new RegExp(`^${c}$`, "i").test(p)) ? (
-            <mark key={i} className="rounded px-0.5" style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}>
+            <mark key={i} className="rounded-sm px-0.5" style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}>
               {p}
             </mark>
           ) : (
@@ -215,7 +215,7 @@ export default function SearchPalette() {
         data-tour="search-btn"
         title="البحث الفكري الفوري (Ctrl+K)"
         aria-label="البحث الفكري الفوري"
-        className="hidden items-center gap-2 rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)] md:flex"
+        className="hidden items-center gap-2 rounded-full p-2 transition-all hover:scale-110 hover:bg-(--accent-soft) md:flex"
         style={{ color: "var(--ink)" }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -229,7 +229,7 @@ export default function SearchPalette() {
         onClick={() => setOpen(true)}
         data-tour="search-btn"
         aria-label="البحث الفكري الفوري"
-        className="rounded-full p-2.5 transition-colors active:bg-[var(--accent-soft)] md:hidden"
+        className="rounded-full p-2.5 transition-colors active:bg-(--accent-soft) md:hidden"
         style={{ color: "var(--ink)" }}
       >
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -240,8 +240,8 @@ export default function SearchPalette() {
 
       {/* النافذة السينمائية */}
       {open && (
-        <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="البحث في المنصة">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 z-80" role="dialog" aria-modal="true" aria-label="البحث في المنصة">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setOpen(false)} />
           <div className="absolute inset-x-4 top-[12vh] mx-auto max-w-2xl animate-fade-up overflow-hidden rounded-2xl border shadow-lift" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
             {/* حقل الإدخال */}
             <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ borderColor: "var(--border)" }}>
@@ -255,11 +255,11 @@ export default function SearchPalette() {
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="ابحث في العناوين والمتن والأفكار.."
-                className="min-w-0 flex-1 bg-transparent text-base outline-none"
+                className="min-w-0 flex-1 bg-transparent text-base outline-hidden"
                 style={{ color: "var(--ink)" }}
                 autoComplete="off"
               />
-              <kbd className="hidden shrink-0 rounded border px-1.5 py-0.5 text-[10px] sm:block" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
+              <kbd className="hidden shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] sm:block" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
                 Esc
               </kbd>
             </div>
@@ -276,14 +276,14 @@ export default function SearchPalette() {
                       </span>
                       <button
                         onClick={clearHistory}
-                        className="rounded-full px-2 py-0.5 text-[11px] transition-colors hover:bg-[var(--accent-soft)]"
+                        className="rounded-full px-2 py-0.5 text-[11px] transition-colors hover:bg-(--accent-soft)"
                         style={{ color: "var(--accent-strong)" }}
                       >
                         مسح الكل
                       </button>
                     </div>
                     {history.map((h) => (
-                      <div key={h.query} className="flex items-center rounded-xl transition-colors hover:bg-[var(--accent-soft)]">
+                      <div key={h.query} className="flex items-center rounded-xl transition-colors hover:bg-(--accent-soft)">
                         <button
                           onClick={() => setQ(h.query)}
                           className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-right"
@@ -301,7 +301,7 @@ export default function SearchPalette() {
                           onClick={() => dropOne(h.query)}
                           aria-label={`إزالة ${h.query} من السجل`}
                           title="إزالة من السجل"
-                          className="ml-0.5 shrink-0 rounded-full p-1.5 transition-colors hover:bg-[var(--accent-soft)]"
+                          className="ml-0.5 shrink-0 rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
                           style={{ color: "var(--ink-muted)" }}
                         >
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>

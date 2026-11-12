@@ -91,7 +91,7 @@ function SaveCard({
         </div>
         <button
           onClick={onRemove}
-          className="shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+          className="shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors hover:bg-(--accent-soft)"
           style={{ color: "#b4443c" }}
         >
           {removeLabel}
@@ -211,7 +211,7 @@ export default function SavedClient() {
   };
 
   const actionBtn =
-    "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-60";
+    "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition-colors hover:bg-(--accent-soft) disabled:opacity-60";
 
   return (
     <>

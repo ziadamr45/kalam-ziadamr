@@ -247,7 +247,7 @@ export function ProfileEditor({
               }}
               maxLength={40}
               placeholder={googleName || "اكتب اسمك كما تريد أن يقرؤه الناس"}
-              className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--accent)]"
+              className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm outline-hidden transition-colors focus:border-(--accent)"
               style={{
                 borderColor: nameError ? "#DC2626" : "var(--border)",
                 color: "var(--ink)",
@@ -272,7 +272,7 @@ export function ProfileEditor({
               rows={3}
               maxLength={200}
               placeholder="عبارة مقتضبة تعبّر عنك — «أقرأ ل أفهم» مثلًا"
-              className="w-full resize-none rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]"
+              className="w-full resize-none rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent)"
               style={{
                 borderColor: bioError ? "#DC2626" : "var(--border)",
                 color: "var(--ink)",
@@ -314,7 +314,7 @@ export function ProfileEditor({
                 rows={5}
                 maxLength={1200}
                 placeholder="اهتماماتك الفكرية، مشاريعك، اتجاهاتك القرائية، وخلاصة تجربتك — هذه بطاقتك أمام القراء"
-                className="w-full resize-y rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]"
+                className="w-full resize-y rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent)"
                 style={{ borderColor: "var(--border)", color: "var(--ink)" }}
               />
               <p className="mt-1 text-right text-[11px]" style={{ color: "var(--ink-muted)" }}>
@@ -341,7 +341,7 @@ export function ProfileEditor({
                       }}
                       placeholder="https://..."
                       maxLength={300}
-                      className="w-full rounded-xl border bg-transparent px-3 py-2.5 text-left text-xs outline-none transition-colors focus:border-[var(--accent)]"
+                      className="w-full rounded-xl border bg-transparent px-3 py-2.5 text-left text-xs outline-hidden transition-colors focus:border-(--accent)"
                       style={{ borderColor: "var(--border)", color: "var(--ink)" }}
                     />
                   </div>
@@ -369,7 +369,7 @@ export function ProfileEditor({
                 <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
                   <input
                     type="checkbox"
-                    className="mt-1.5 accent-[var(--accent)]"
+                    className="mt-1.5 accent-(--accent)"
                     checked={prefs.pushNewArticles}
                     onChange={(e) => {
                       setPrefs((p) => ({ ...p, pushNewArticles: e.target.checked }));
@@ -391,7 +391,7 @@ export function ProfileEditor({
                 <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
                   <input
                     type="checkbox"
-                    className="mt-1.5 accent-[var(--accent)]"
+                    className="mt-1.5 accent-(--accent)"
                     checked={prefs.impactAndReplies}
                     onChange={(e) => {
                       setPrefs((p) => ({ ...p, impactAndReplies: e.target.checked }));

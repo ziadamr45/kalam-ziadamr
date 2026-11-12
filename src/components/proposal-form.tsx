@@ -75,7 +75,7 @@ export function ProposalForm() {
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
             placeholder="عنوان المقترح — موضوع فكري، سؤال عميق، أو اقتراح تطوير"
-            className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm outline-hidden focus:border-(--accent)"
             style={{ borderColor: "var(--border)", color: "var(--ink)", background: "var(--surface)" }}
           />
           <textarea
@@ -84,7 +84,7 @@ export function ProposalForm() {
             rows={5}
             maxLength={4000}
             placeholder="طوّر فكرتك هنا (50 حرفًا على الأقل).. ما الذي يستحق أن تُناقشه منصة «كلام له لازمة»؟"
-            className="w-full resize-none rounded-xl border bg-transparent px-4 py-3 text-sm leading-8 outline-none focus:border-[var(--accent)]"
+            className="w-full resize-none rounded-xl border bg-transparent px-4 py-3 text-sm leading-8 outline-hidden focus:border-(--accent)"
             style={{ borderColor: "var(--border)", color: "var(--ink)", background: "var(--surface)" }}
           />
           <div className="flex flex-wrap items-center gap-3">

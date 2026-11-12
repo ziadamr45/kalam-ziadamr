@@ -96,8 +96,8 @@ export function ImpactLogModal({ open, onClose }: { open: boolean; onClose: () =
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="سجل الأثر الكامل">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-70 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="سجل الأثر الكامل">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
 
       <div
         className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border shadow-lift animate-fade-in sm:rounded-3xl"
@@ -117,7 +117,7 @@ export function ImpactLogModal({ open, onClose }: { open: boolean; onClose: () =
           <button
             onClick={onClose}
             aria-label="إغلاق السجل"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-lg transition-colors hover:bg-[var(--accent-soft)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-lg transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
           >
             ✕

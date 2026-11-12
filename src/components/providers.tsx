@@ -199,7 +199,7 @@ function SessionEndedToast() {
   return (
     <div
       role="status"
-      className="animate-fade-up fixed inset-x-4 bottom-6 z-[90] mx-auto max-w-md rounded-2xl border px-5 py-4 shadow-lift"
+      className="animate-fade-up fixed inset-x-4 bottom-6 z-90 mx-auto max-w-md rounded-2xl border px-5 py-4 shadow-lift"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
       <div className="flex items-start gap-3">
@@ -228,7 +228,7 @@ function SessionEndedToast() {
         <button
           onClick={() => setShow(false)}
           aria-label="إغلاق التنبيه"
-          className="ms-auto shrink-0 rounded-full p-1 transition-colors hover:bg-[var(--accent-soft)]"
+          className="ms-auto shrink-0 rounded-full p-1 transition-colors hover:bg-(--accent-soft)"
           style={{ color: "var(--ink-muted)" }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

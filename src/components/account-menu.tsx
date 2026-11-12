@@ -114,7 +114,7 @@ export function AccountMenu() {
             <Link
               href="/profile"
               onClick={() => setOpen(false)}
-              className="block rounded-xl px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
+              className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
               style={{ color: "var(--ink)" }}
             >
               ملفي ورصيد أثري
@@ -122,7 +122,7 @@ export function AccountMenu() {
             <Link
               href="/saved"
               onClick={() => setOpen(false)}
-              className="block rounded-xl px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
+              className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
               style={{ color: "var(--ink)" }}
             >
               قراءاتي المحفوظة
@@ -136,7 +136,7 @@ export function AccountMenu() {
                 } catch {}
                 await signOut({ redirectTo: "/" });
               }}
-              className="mt-1 block w-full rounded-xl px-3 py-2 text-right transition-colors hover:bg-[var(--accent-soft)]"
+              className="mt-1 block w-full rounded-xl px-3 py-2 text-right transition-colors hover:bg-(--accent-soft)"
               style={{ color: "#b4443c" }}
             >
               تسجيل الخروج

@@ -405,7 +405,7 @@ export function DiscussCompanion({
           onClick={openDrawer}
           aria-haspopup="dialog"
           aria-expanded={open}
-          className="group flex items-center gap-2.5 rounded-full px-6 py-3 text-sm font-bold shadow-soft transition-all hover:scale-105 focus:outline-none focus-visible:ring-2"
+          className="group flex items-center gap-2.5 rounded-full px-6 py-3 text-sm font-bold shadow-soft transition-all hover:scale-105 focus:outline-hidden focus-visible:ring-2"
           style={{
             background: "var(--accent-soft)",
             color: "var(--accent-strong)",
@@ -431,7 +431,7 @@ export function DiscussCompanion({
 
       {/* النافذة الجانبية الناعمة */}
       <div
-        className={`fixed inset-0 z-[70] ${ready ? "" : "pointer-events-none"}`}
+        className={`fixed inset-0 z-70 ${ready ? "" : "pointer-events-none"}`}
         role="dialog"
         aria-modal="true"
         aria-label={`نقاش فكري حول: ${articleTitle}`}
@@ -526,7 +526,7 @@ export function DiscussCompanion({
                 type="button"
                 onClick={closeDrawer}
                 aria-label="إغلاق النقاش"
-                className="rounded-full p-2 transition-colors hover:bg-[var(--accent-soft)]"
+                className="rounded-full p-2 transition-colors hover:bg-(--accent-soft)"
                 style={{ color: "var(--ink-muted)" }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -703,7 +703,7 @@ export function DiscussCompanion({
                       ? "عدّل رسالتك ثم أرسل.."
                       : "اسأل أو ناقش بهدوء واحترام.."
                 }
-                className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)] disabled:opacity-50"
+                className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent) disabled:opacity-50"
                 style={{ borderColor: "var(--border)", color: "var(--ink)" }}
               />
               <button

@@ -60,7 +60,7 @@ export default async function ContactPage() {
                   href={c.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded-2xl border px-4 py-3.5 text-sm font-bold transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  className="flex items-center justify-between rounded-2xl border px-4 py-3.5 text-sm font-bold transition-all hover:-translate-y-0.5 hover:border-(--accent) hover:text-(--accent)"
                   style={{ borderColor: "var(--border)", background: "var(--surface)", color: "var(--ink)" }}
                 >
                   <span>{c.label}</span>
@@ -76,7 +76,7 @@ export default async function ContactPage() {
                     href={c.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-full border px-4 py-1.5 text-xs font-semibold transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="rounded-full border px-4 py-1.5 text-xs font-semibold transition-all hover:-translate-y-0.5 hover:border-(--accent) hover:text-(--accent)"
                     style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
                   >
                     {c.label}

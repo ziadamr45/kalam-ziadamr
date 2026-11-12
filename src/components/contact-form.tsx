@@ -94,7 +94,7 @@ export function ContactForm() {
   }
 
   const inputCls =
-    "w-full rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]";
+    "w-full rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent)";
 
   return (
     <form

@@ -36,7 +36,7 @@ export function ArticleCard({ article, index = 0 }: { article: ArticleCardData; 
         </span>
       )}
       <h3
-        className="font-ui text-lg font-bold leading-9 transition-colors group-hover:text-[var(--accent)]"
+        className="font-ui text-lg font-bold leading-9 transition-colors group-hover:text-(--accent)"
         style={{ color: "var(--ink)" }}
       >
         {article.title}

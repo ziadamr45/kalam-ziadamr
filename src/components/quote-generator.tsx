@@ -843,7 +843,7 @@ export function QuoteGenerator({
           requestOpen();
         }}
         onClick={requestOpen}
-        className="rounded-full px-3 py-1.5 transition-all hover:bg-[var(--accent-soft)]"
+        className="rounded-full px-3 py-1.5 transition-all hover:bg-(--accent-soft)"
         style={{ color: "var(--ink-muted)" }}
         title="حوّل أي جملة إلى بطاقة اقتباس جاهزة للمشاركة"
       >
@@ -887,7 +887,7 @@ export function QuoteGenerator({
                 copySelection();
               }}
               onClick={copySelection}
-              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-(--accent-soft)"
               style={{ color: copied ? "var(--accent-strong)" : "var(--ink)" }}
             >
               {copied ? "نُسخ ✓" : "نسخ مع المصدر"}
@@ -899,7 +899,7 @@ export function QuoteGenerator({
                 searchSelection();
               }}
               onClick={searchSelection}
-              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-(--accent-soft)"
               style={{ color: "var(--ink)" }}
               title="ابحث عن النص المحدد في جوجل"
             >
@@ -912,7 +912,7 @@ export function QuoteGenerator({
                 shareSelection();
               }}
               onClick={shareSelection}
-              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+              className="whitespace-nowrap rounded-full px-3 py-2 text-xs transition-colors hover:bg-(--accent-soft)"
               style={{ color: "var(--ink)" }}
             >
               مشاركة
@@ -930,7 +930,7 @@ export function QuoteGenerator({
       {selectionHint && mounted && createPortal(
         <div
           role="status"
-          className="pointer-events-none fixed inset-x-0 bottom-24 z-[70] flex justify-center px-4 animate-fade-in"
+          className="pointer-events-none fixed inset-x-0 bottom-24 z-70 flex justify-center px-4 animate-fade-in"
         >
           <p
             className="max-w-sm rounded-2xl border px-4 py-3 text-center text-xs font-bold leading-6 shadow-lift"
@@ -947,7 +947,7 @@ export function QuoteGenerator({
         mounted &&
         createPortal(
           <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in"
             onClick={() => setOpen(false)}
           >
             <div
@@ -966,7 +966,7 @@ export function QuoteGenerator({
                 <button
                   onClick={() => setOpen(false)}
                   aria-label="إغلاق"
-                  className="rounded-full p-2 transition-colors hover:bg-[var(--accent-soft)]"
+                  className="rounded-full p-2 transition-colors hover:bg-(--accent-soft)"
                   style={{ color: "var(--ink-muted)" }}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
@@ -1074,7 +1074,7 @@ export function QuoteGenerator({
         mounted &&
         createPortal(
           <div
-            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4"
+            className="fixed inset-0 z-60 flex items-end justify-center bg-black/60 p-0 backdrop-blur-xs animate-fade-in sm:items-center sm:p-4"
             onClick={() => setPickerOpen(false)}
           >
             <div
@@ -1089,7 +1089,7 @@ export function QuoteGenerator({
                 <button
                   onClick={() => setPickerOpen(false)}
                   aria-label="إغلاق"
-                  className="rounded-full p-2 transition-colors hover:bg-[var(--accent-soft)]"
+                  className="rounded-full p-2 transition-colors hover:bg-(--accent-soft)"
                   style={{ color: "var(--ink-muted)" }}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
@@ -1118,7 +1118,7 @@ export function QuoteGenerator({
                     <button
                       key={i}
                       onClick={() => adoptQuote(q)}
-                      className="block w-full rounded-2xl border px-4 py-3 text-right text-sm leading-7 transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                      className="block w-full rounded-2xl border px-4 py-3 text-right text-sm leading-7 transition-all hover:border-(--accent) hover:bg-(--accent-soft)"
                       style={{ borderColor: "var(--border)", color: "var(--ink)" }}
                     >
                       <span style={{ color: "var(--accent-strong)" }}>«</span>
@@ -1140,7 +1140,7 @@ export function QuoteGenerator({
                   rows={3}
                   maxLength={400}
                   placeholder="الصق هنا الجملة التي ألهمتك.."
-                  className="w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]"
+                  className="w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent)"
                   style={{ borderColor: "var(--border)", color: "var(--ink)" }}
                 />
                 <button

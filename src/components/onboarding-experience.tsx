@@ -262,7 +262,7 @@ export function OnboardingExperience() {
     const s = slides[slide];
     const isLast = slide === slides.length - 1;
     return (
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="ترحيب بالعضو الجديد">
+      <div className="fixed inset-0 z-90 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="ترحيب بالعضو الجديد">
         <div className="absolute inset-0 backdrop-blur-md bg-zinc-950/80" onClick={isLast ? undefined : () => setSlide((v) => Math.min(slides.length - 1, v + 1))} />
 
         <div
@@ -272,7 +272,7 @@ export function OnboardingExperience() {
           {/* زر التخطي — متاح في كل مرحلة، يختم التجربة نهائيًا */}
           <button
             onClick={() => void finish()}
-            className="absolute left-4 top-4 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-colors hover:bg-[var(--accent-soft)]"
+            className="absolute left-4 top-4 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
           >
             تخطي
@@ -364,7 +364,7 @@ export function OnboardingExperience() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[90]"
+      className="pointer-events-none fixed inset-0 z-90"
       role="dialog"
       aria-modal="true"
       aria-label="جولة إرشادية تفاعلية"
@@ -418,7 +418,7 @@ export function OnboardingExperience() {
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => void finish()}
-            className="rounded-full px-3.5 py-2 text-[11px] font-bold transition-colors hover:bg-[var(--accent-soft)]"
+            className="rounded-full px-3.5 py-2 text-[11px] font-bold transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
           >
             تخطي

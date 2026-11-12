@@ -325,7 +325,7 @@ export function CommentsSection({
             aria-hidden="true"
             value={honey}
             onChange={(e) => setHoney(e.target.value)}
-            className="pointer-events-none absolute h-0 w-0 -translate-x-[9999px] opacity-0"
+            className="pointer-events-none absolute h-0 w-0 translate-x-[-9999px] opacity-0"
           />
           <textarea
             value={content}
@@ -333,7 +333,7 @@ export function CommentsSection({
             rows={3}
             maxLength={1200}
             placeholder="شارك رأيك بهدوء واحترام.. الكلام الراقي أقوى أثرًا."
-            className="w-full resize-none rounded-xl border bg-transparent p-4 leading-8 outline-none transition-colors focus:border-[var(--accent)]"
+            className="w-full resize-none rounded-xl border bg-transparent p-4 leading-8 outline-hidden transition-colors focus:border-(--accent)"
             style={{ borderColor: "var(--border)", color: "var(--ink)" }}
           />
 
@@ -453,7 +453,7 @@ export function CommentsSection({
                         <button
                           type="button"
                           onClick={() => setCardFor(cardFor === c.id ? null : c.id)}
-                          className="cursor-pointer text-sm font-bold underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-[var(--accent-strong)]"
+                          className="cursor-pointer text-sm font-bold underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-(--accent-strong)"
                           style={{ color: "var(--ink)" }}
                           title="اضغط لعرض البطاقة الفكرية الموسعة"
                           aria-expanded={cardFor === c.id}
@@ -506,7 +506,7 @@ export function CommentsSection({
                       setReportFor(reportFor === c.id ? null : c.id);
                       setReportError(null);
                     }}
-                    className="rounded-full p-2 text-xs transition-colors hover:bg-[var(--accent-soft)]"
+                    className="rounded-full p-2 text-xs transition-colors hover:bg-(--accent-soft)"
                     style={{ color: "var(--ink-muted)" }}
                     title="إبلاغ عن التعليق"
                     aria-label="إبلاغ عن التعليق"
@@ -654,7 +654,7 @@ export function CommentsSection({
                       rows={2}
                       maxLength={500}
                       placeholder="صف المخالفة بدقة.."
-                      className="textarea-bordered mt-2 w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-none transition-colors focus:border-[var(--accent)]"
+                      className="textarea-bordered mt-2 w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent)"
                       style={{ borderColor: "var(--border)", color: "var(--ink)" }}
                     />
                   )}
@@ -672,7 +672,7 @@ export function CommentsSection({
                     aria-hidden="true"
                     value={honey}
                     onChange={(e) => setHoney(e.target.value)}
-                    className="pointer-events-none absolute h-0 w-0 -translate-x-[9999px] opacity-0"
+                    className="pointer-events-none absolute h-0 w-0 translate-x-[-9999px] opacity-0"
                   />
                   <button
                     onClick={() => sendReport(c.id)}

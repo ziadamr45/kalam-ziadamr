@@ -174,7 +174,7 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       {/* عدّاد التقدم الحي — يظهر داخل الشارة إن لم يكن هناك استئناف */}
       {progress > 5 && progress < 96 && !resume && (
         <div
-          className="no-print pointer-events-none fixed bottom-[4.75rem] left-1/2 z-30 -translate-x-1/2 rounded-full border px-3.5 py-1.5 text-xs shadow-soft"
+          className="no-print pointer-events-none fixed bottom-19 left-1/2 z-30 -translate-x-1/2 rounded-full border px-3.5 py-1.5 text-xs shadow-soft"
           style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--ink-muted)" }}
           aria-hidden
         >

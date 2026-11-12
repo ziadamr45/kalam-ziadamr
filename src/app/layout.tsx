@@ -13,14 +13,14 @@ const amiri = Amiri({
   subsets: ["arabic", "latin"],
   weight: ["400", "700"],
   style: ["normal", "italic"],
-  variable: "--font-body",
+  variable: "--font-next-body",
   display: "swap",
 });
 
 const readex = Readex_Pro({
   subsets: ["arabic", "latin"],
   weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-ui",
+  variable: "--font-next-ui",
   display: "swap",
 });
 

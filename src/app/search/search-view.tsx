@@ -31,7 +31,7 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
       <>
         {parts.map((p, i) =>
           clean.some((c) => new RegExp(`^${c}$`, "i").test(p)) ? (
-            <mark key={i} className="rounded px-0.5" style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}>
+            <mark key={i} className="rounded-sm px-0.5" style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}>
               {p}
             </mark>
           ) : (
@@ -109,7 +109,7 @@ export default function SearchView() {
 
       {/* حقل الإدخال */}
       <div
-        className="mt-8 flex items-center gap-3 rounded-2xl border px-5 py-4 shadow-sm"
+        className="mt-8 flex items-center gap-3 rounded-2xl border px-5 py-4 shadow-xs"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
@@ -121,7 +121,7 @@ export default function SearchView() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="اكتب ما تبحث عنه.."
-          className="min-w-0 flex-1 bg-transparent text-lg outline-none"
+          className="min-w-0 flex-1 bg-transparent text-lg outline-hidden"
           style={{ color: "var(--ink)" }}
           autoComplete="off"
           enterKeyHint="search"
@@ -130,7 +130,7 @@ export default function SearchView() {
           <button
             onClick={() => setQ("")}
             aria-label="مسح البحث"
-            className="shrink-0 rounded-full p-1.5 transition-colors hover:bg-[var(--accent-soft)]"
+            className="shrink-0 rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

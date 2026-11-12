@@ -664,11 +664,11 @@ export function AudioPlayer({
         </button>
 
         {/* إرجاع ١٠ ثوانٍ — سهم دائري رأسه لليمين (الرجوع عكس اتجاه التقدم في الـRTL) + الرقم في المركز */}
-        <button onClick={() => skip(-10)} aria-label="إرجاع ١٠ ثوانٍ إلى الخلف" className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]" style={{ color: "var(--ink-muted)" }} title="إرجاع ١٠ ثوانٍ إلى الخلف">
+        <button onClick={() => skip(-10)} aria-label="إرجاع ١٠ ثوانٍ إلى الخلف" className="rounded-full p-2 text-sm transition-colors hover:bg-(--accent-soft)" style={{ color: "var(--ink-muted)" }} title="إرجاع ١٠ ثوانٍ إلى الخلف">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><g transform="scale(-1,1) translate(-24,0)"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></g><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
         {/* تقديم ١٠ ثوانٍ — سهم دائري رأسه لليسار (اتجاه التقدم في الـRTL) + الرقم في المركز */}
-        <button onClick={() => skip(10)} aria-label="تقديم ١٠ ثوانٍ إلى الأمام" className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]" style={{ color: "var(--ink-muted)" }} title="تقديم ١٠ ثوانٍ إلى الأمام">
+        <button onClick={() => skip(10)} aria-label="تقديم ١٠ ثوانٍ إلى الأمام" className="rounded-full p-2 text-sm transition-colors hover:bg-(--accent-soft)" style={{ color: "var(--ink-muted)" }} title="تقديم ١٠ ثوانٍ إلى الأمام">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
 
@@ -678,7 +678,7 @@ export function AudioPlayer({
           <button
             onClick={() => void startFromBeginning()}
             aria-label="مسح موضع الاستئناف والعودة إلى بداية الصوت"
-            className="rounded-full p-2 text-sm transition-colors hover:bg-[var(--accent-soft)]"
+            className="rounded-full p-2 text-sm transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
             title="مسح موضع الاستئناف والعودة إلى بداية الصوت"
           >
@@ -716,7 +716,7 @@ export function AudioPlayer({
 
         <button
           onClick={cycleRate}
-          className="rounded-full px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-[var(--accent-soft)]"
+          className="rounded-full px-2.5 py-1.5 text-xs font-bold transition-colors hover:bg-(--accent-soft)"
           style={{ color: "var(--accent-strong)" }}
           title="سرعة التشغيل"
         >
@@ -725,7 +725,7 @@ export function AudioPlayer({
 
         <button
           onClick={toggleFollow}
-          className={`rounded-full p-2 transition-colors hover:bg-[var(--accent-soft)] ${follow ? "" : "opacity-40"}`}
+          className={`rounded-full p-2 transition-colors hover:bg-(--accent-soft) ${follow ? "" : "opacity-40"}`}
           style={{ color: "var(--accent-strong)" }}
           title="تتبع القراءة تلقائيًا"
           aria-pressed={follow}

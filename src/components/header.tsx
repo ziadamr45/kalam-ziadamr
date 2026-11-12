@@ -264,7 +264,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       <>
         {/* إشعار التفعيل — كبسولة عائمة هادئة أعلى الشاشة لثانيتين */}
         {readerToast && (
-          <div className="fixed left-1/2 top-5 z-[60] -translate-x-1/2 animate-fade-in">
+          <div className="fixed left-1/2 top-5 z-60 -translate-x-1/2 animate-fade-in">
             <p
               className="whitespace-nowrap rounded-full border px-5 py-2.5 text-xs font-semibold shadow-lift sm:text-sm"
               style={{
@@ -326,7 +326,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           <nav className="hidden items-center gap-1 text-sm md:flex">
             <Link
               href="/"
-              className="rounded-full px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
+              className="rounded-full px-3 py-2 transition-colors hover:bg-(--accent-soft)"
               style={{ color: pathname === "/" ? "var(--accent-strong)" : "var(--ink)" }}
             >
               الرئيسية
@@ -338,7 +338,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
               onMouseLeave={() => setSectionsOpen(false)}
             >
               <button
-                className="rounded-full px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
+                className="rounded-full px-3 py-2 transition-colors hover:bg-(--accent-soft)"
                 style={{ color: "var(--ink)" }}
                 aria-haspopup="true"
                 aria-expanded={sectionsOpen}
@@ -354,7 +354,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
                     <Link
                       key={s.slug}
                       href={`/section/${encodeURIComponent(s.slug)}`}
-                      className="block rounded-xl px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
+                      className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
                       onClick={() => setSectionsOpen(false)}
                     >
                       <span className="flex items-center justify-between gap-2">
@@ -383,7 +383,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
 
             <Link
               href="/about"
-              className="rounded-full px-3 py-2 transition-colors hover:bg-[var(--accent-soft)]"
+              className="rounded-full px-3 py-2 transition-colors hover:bg-(--accent-soft)"
               style={{ color: pathname === "/about" ? "var(--accent-strong)" : "var(--ink)" }}
             >
               عن المنصة
@@ -398,7 +398,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
                 onClick={enterImmersion}
                 title="وضع الغمر الكامل"
                 aria-label="وضع الغمر الكامل"
-                className="rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)]"
+                className="rounded-full p-2 transition-all hover:scale-110 hover:bg-(--accent-soft)"
                 style={{ color: "var(--accent)" }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -427,7 +427,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
               onClick={() => setDrawerOpen(true)}
               aria-label="فتح قائمة التنقل"
               aria-expanded={drawerOpen}
-              className="rounded-full p-2.5 transition-colors active:bg-[var(--accent-soft)]"
+              className="rounded-full p-2.5 transition-colors active:bg-(--accent-soft)"
               style={{ color: "var(--ink)" }}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -441,14 +441,14 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       {/* درج التنقل المتنقل — ينزلق من اليسار موافقًا لموضع زر الهمبرجر،
           مع بقاء محاذاة النصوص والروابط لليمين (RTL) */}
       <div
-        className={`fixed inset-0 z-[55] md:hidden ${drawerOpen ? "" : "pointer-events-none"}`}
+        className={`fixed inset-0 z-55 md:hidden ${drawerOpen ? "" : "pointer-events-none"}`}
         aria-hidden={!drawerOpen}
         inert={!drawerOpen}
       >
         {/* الطبقة المعتمة */}
         <div
           onClick={() => setDrawerOpen(false)}
-          className={`absolute inset-0 bg-black/45 backdrop-blur-sm transition-opacity duration-300 ${
+          className={`absolute inset-0 bg-black/45 backdrop-blur-xs transition-opacity duration-300 ${
             drawerOpen ? "opacity-100" : "opacity-0"
           }`}
         />
@@ -460,7 +460,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           aria-label={drawerOpen ? "إغلاق القائمة" : "فتح قائمة التنقل"}
           aria-expanded={drawerOpen}
           tabIndex={drawerOpen ? 0 : -1}
-          className={`fixed left-3 top-[10px] z-[60] flex h-11 w-11 items-center justify-center rounded-full border shadow-soft transition-all duration-300 ease-fluid md:hidden ${
+          className={`fixed left-3 top-[10px] z-60 flex h-11 w-11 items-center justify-center rounded-full border shadow-soft transition-all duration-300 ease-fluid md:hidden ${
             drawerOpen
               ? "pointer-events-auto scale-100 opacity-100"
               : "pointer-events-none scale-75 opacity-0"
@@ -506,7 +506,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             <Link
               href="/"
               onClick={() => setDrawerOpen(false)}
-              className="flex items-center justify-between rounded-2xl px-4 py-3.5 text-base font-semibold transition-colors active:bg-[var(--accent-soft)]"
+              className="flex items-center justify-between rounded-2xl px-4 py-3.5 text-base font-semibold transition-colors active:bg-(--accent-soft)"
               style={{ color: pathname === "/" ? "var(--accent-strong)" : "var(--ink)" }}
             >
               الرئيسية
@@ -526,7 +526,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
                   key={s.slug}
                   href={`/section/${encodeURIComponent(s.slug)}`}
                   onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 transition-colors active:bg-[var(--accent-soft)]"
+                  className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 transition-colors active:bg-(--accent-soft)"
                 >
                   <span className="min-w-0">
                     <span className="block font-semibold" style={{ color: "var(--ink)" }}>
@@ -564,7 +564,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
                   key={l.href}
                   href={l.href}
                   onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-between rounded-2xl px-4 py-3.5 font-semibold transition-colors active:bg-[var(--accent-soft)]"
+                  className="flex items-center justify-between rounded-2xl px-4 py-3.5 font-semibold transition-colors active:bg-(--accent-soft)"
                   style={{ color: pathname === l.href ? "var(--accent-strong)" : "var(--ink)" }}
                 >
                   {l.label}

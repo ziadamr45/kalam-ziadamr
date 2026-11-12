@@ -312,7 +312,7 @@ export default function SearchJump({ version }: { version?: string }) {
           onClick={() => goTo(active - 1)}
           aria-label="المطابقة السابقة"
           title="المطابقة السابقة"
-          className="rounded-full p-1.5 transition-colors hover:bg-[var(--accent-soft)]"
+          className="rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
           style={{ color: "var(--ink-muted)" }}
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -320,7 +320,7 @@ export default function SearchJump({ version }: { version?: string }) {
           </svg>
         </button>
         <span
-          className="min-w-[4.75rem] text-center text-xs font-bold tabular-nums"
+          className="min-w-19 text-center text-xs font-bold tabular-nums"
           style={{ color: "var(--ink)" }}
         >
           {ar(active + 1)} من {ar(matches.length)}
@@ -329,7 +329,7 @@ export default function SearchJump({ version }: { version?: string }) {
           onClick={() => goTo(active + 1)}
           aria-label="المطابقة التالية"
           title="المطابقة التالية"
-          className="rounded-full p-1.5 transition-colors hover:bg-[var(--accent-soft)]"
+          className="rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
           style={{ color: "var(--ink-muted)" }}
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -341,7 +341,7 @@ export default function SearchJump({ version }: { version?: string }) {
           onClick={close}
           aria-label="إنهاء التظليل وإخفاء الكبسولة"
           title="إنهاء التظليل"
-          className="rounded-full p-1.5 transition-colors hover:bg-[var(--accent-soft)]"
+          className="rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
           style={{ color: "var(--ink-muted)" }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>

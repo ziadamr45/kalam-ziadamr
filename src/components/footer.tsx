@@ -127,7 +127,7 @@ export function Footer({
                   rel="noopener noreferrer"
                   title={s.label}
                   aria-label={s.label}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border transition-all hover:-translate-y-0.5 hover:border-(--accent) hover:text-(--accent)"
                   style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
                 >
                   {s.icon}
@@ -145,7 +145,7 @@ export function Footer({
                 <li key={s.slug}>
                   <Link
                     href={`/section/${s.slug}`}
-                    className="transition-colors hover:text-[var(--accent)]"
+                    className="transition-colors hover:text-(--accent)"
                     style={{ color: "var(--ink-muted)" }}
                   >
                     {s.name}
@@ -161,32 +161,32 @@ export function Footer({
             </p>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link href="/about" className="transition-colors hover:text-[var(--accent)]" style={{ color: "var(--ink-muted)" }}>
+                <Link href="/about" className="transition-colors hover:text-(--accent)" style={{ color: "var(--ink-muted)" }}>
                   فلسفتنا ومعايير النشر
                 </Link>
               </li>
               <li>
-                <Link href="/saved" className="transition-colors hover:text-[var(--accent)]" style={{ color: "var(--ink-muted)" }}>
+                <Link href="/saved" className="transition-colors hover:text-(--accent)" style={{ color: "var(--ink-muted)" }}>
                   قراءاتي المحفوظة
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="transition-colors hover:text-[var(--accent)]" style={{ color: "var(--ink-muted)" }}>
+                <Link href="/contact" className="transition-colors hover:text-(--accent)" style={{ color: "var(--ink-muted)" }}>
                   اتصل بنا
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="transition-colors hover:text-[var(--accent)]" style={{ color: "var(--ink-muted)" }}>
+                <Link href="/privacy" className="transition-colors hover:text-(--accent)" style={{ color: "var(--ink-muted)" }}>
                   سياسة الخصوصية
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="transition-colors hover:text-[var(--accent)]" style={{ color: "var(--ink-muted)" }}>
+                <Link href="/terms" className="transition-colors hover:text-(--accent)" style={{ color: "var(--ink-muted)" }}>
                   شروط الاستخدام
                 </Link>
               </li>
               <li>
-                <Link href="/dialogue-ethics" className="transition-colors hover:text-[var(--accent)]" style={{ color: "var(--ink-muted)" }}>
+                <Link href="/dialogue-ethics" className="transition-colors hover:text-(--accent)" style={{ color: "var(--ink-muted)" }}>
                   أخلاقيات الحوار والتعليق
                 </Link>
               </li>

@@ -97,7 +97,7 @@ export function AccountDangerZone() {
             id="delete-word"
             value={word}
             onChange={(e) => setWord(e.target.value.trim())}
-            className="mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+            className="mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-hidden"
             style={{ borderColor: "#FECACA" }}
             placeholder="حذف"
             autoComplete="off"

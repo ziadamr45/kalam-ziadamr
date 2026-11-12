@@ -140,7 +140,7 @@ export default function PushPromptCapsule() {
           </button>
           <button
             onClick={() => dismiss(true)}
-            className="rounded-full px-4 py-2 text-sm transition-colors hover:bg-[var(--accent-soft)]"
+            className="rounded-full px-4 py-2 text-sm transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
           >
             لاحقًا

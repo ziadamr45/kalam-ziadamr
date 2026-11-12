@@ -195,7 +195,7 @@ export function NotificationDetailModal({
      يعتقه من كل سلاسل الأسلاف، والتوسيط مطلق مع تمرير داخلي آمن. */
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-9999 flex items-center justify-center p-4 sm:p-6"
       style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
       role="dialog"
@@ -234,7 +234,7 @@ export function NotificationDetailModal({
           <button
             onClick={onClose}
             aria-label="إغلاق التفاصيل"
-            className="shrink-0 rounded-full p-1.5 text-lg leading-none transition-colors hover:bg-[var(--accent-soft)]"
+            className="shrink-0 rounded-full p-1.5 text-lg leading-none transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
           >
             ✕
@@ -247,7 +247,7 @@ export function NotificationDetailModal({
             {title}
           </h3>
           <p
-            className="mt-2 whitespace-pre-line break-words text-sm leading-8"
+            className="mt-2 whitespace-pre-line wrap-break-word text-sm leading-8"
             style={{ color: "var(--ink-muted)" }}
           >
             {message}
@@ -541,7 +541,7 @@ function PushEnableRow({
     return (
       <Link
         href="/auth/login"
-        className="block rounded-xl px-3 py-2.5 text-center text-xs font-bold transition-colors hover:bg-[var(--accent-soft)]"
+        className="block rounded-xl px-3 py-2.5 text-center text-xs font-bold transition-colors hover:bg-(--accent-soft)"
         style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
       >
         سجّل الدخول بجوجل لتفعيل الإشعارات الفورية
@@ -604,7 +604,7 @@ function NotificationList({
         <li key={n.id} className="relative">
           <button
             onClick={() => onOpen(n)}
-            className="block w-full rounded-xl px-3 py-2.5 pl-8 text-right transition-colors hover:bg-[var(--accent-soft)]"
+            className="block w-full rounded-xl px-3 py-2.5 pl-8 text-right transition-colors hover:bg-(--accent-soft)"
           >
             <span className="flex items-start gap-2.5">
               <TypeIcon type={n.type} />
@@ -632,7 +632,7 @@ function NotificationList({
             }}
             aria-label={`إخفاء إشعار: ${n.title}`}
             title="إخفاء نهائي"
-            className="absolute left-1.5 top-2 rounded-full p-1.5 text-[11px] leading-none transition-colors hover:bg-[var(--accent-soft)]"
+            className="absolute left-1.5 top-2 rounded-full p-1.5 text-[11px] leading-none transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
           >
             ✕
@@ -664,7 +664,7 @@ export function NotificationToasts() {
   return (
     <>
       {stack.length > 0 && (
-        <div className="pointer-events-none fixed bottom-4 left-4 z-[90] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
+        <div className="pointer-events-none fixed bottom-4 left-4 z-90 flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
           {stack.map((t) => {
             /* تحصين مزدوج: نص التوست صلب دائمًا — أي شكل ناقص لا يُسقط الصفحة */
             const rawMsg = t.message ?? "";
@@ -707,7 +707,7 @@ export function NotificationToasts() {
                   }}
                   aria-label={`إخفاء إشعار: ${t.title}`}
                   title="إخفاء نهائي"
-                  className="absolute left-1.5 top-1.5 rounded-full p-1.5 text-[11px] leading-none transition-colors hover:bg-[var(--accent-soft)]"
+                  className="absolute left-1.5 top-1.5 rounded-full p-1.5 text-[11px] leading-none transition-colors hover:bg-(--accent-soft)"
                   style={{ color: "var(--ink-muted)" }}
                 >
                   ✕
@@ -766,7 +766,7 @@ export function NotificationBell() {
         aria-expanded={open}
         title="الإشعارات"
         data-tour="notif-bell"
-        className="relative rounded-full p-2 transition-all hover:scale-110 hover:bg-[var(--accent-soft)]"
+        className="relative rounded-full p-2 transition-all hover:scale-110 hover:bg-(--accent-soft)"
         style={{ color: "var(--ink)" }}
       >
         <BellGlyph />
@@ -852,7 +852,7 @@ export function DrawerNotifications() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-base font-semibold transition-colors active:bg-[var(--accent-soft)]"
+        className="flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-base font-semibold transition-colors active:bg-(--accent-soft)"
         style={{ color: "var(--ink)" }}
       >
         <span className="flex items-center gap-3">

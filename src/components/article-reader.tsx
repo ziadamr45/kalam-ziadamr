@@ -376,14 +376,14 @@ export function ArticleReader({
           borderColor: "var(--border)",
         }}
       >
-        <div className="mx-auto flex max-w-screen-md items-center justify-between gap-1 sm:gap-3">
+        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1 sm:gap-3">
           {/* مفتاح التشكيل ثابت في المقدمة (يمين الشاشة) دون زحزحة إطلاقًا */}
           {tashkeelAllowed && (
             <button
               onClick={toggleTashkeel}
               role="switch"
               aria-checked={tashkeel}
-              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 py-2 transition-all hover:bg-[var(--accent-soft)] sm:px-2"
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:px-2"
               title="تبديل النص المشكول بالحركات الكاملة"
             >
               {/* شكل الزر من أصناف CSS تقودها سمة <html> المزروعة قبل أي
@@ -395,7 +395,7 @@ export function ArticleReader({
                 تشكيل
               </span>
               <span className="tashkeel-toggle-track relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors duration-300">
-                <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ease-fluid" />
+                <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
               </span>
             </button>
           )}
@@ -405,7 +405,7 @@ export function ArticleReader({
             {/* المختصر المفيد */}
             <button
               onClick={() => setShowSummary((v) => !v)}
-              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
+              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
             >
               <span className="sm:hidden">المختصر</span>
@@ -421,7 +421,7 @@ export function ArticleReader({
                 onClick={() => setSaveMenuOpen((v) => !v)}
                 aria-expanded={saveMenuOpen}
                 aria-haspopup="menu"
-                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-[var(--accent-soft)]" : ""}`}
+                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
                 style={{ color: anySaved ? "var(--accent-strong)" : "var(--ink-muted)" }}
                 title="خيارات الحفظ: في حسابك متزامنًا، أو على هذا الجهاز دون إنترنت"
               >
@@ -435,7 +435,7 @@ export function ArticleReader({
               {saveMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full left-3 right-3 mb-2 w-auto max-w-none rounded-2xl border p-2 shadow-lift animate-fade-in sm:left-auto sm:right-0 sm:w-[19rem] sm:max-w-[calc(100vw-2rem)]"
+                  className="absolute bottom-full left-3 right-3 mb-2 w-auto max-w-none rounded-2xl border p-2 shadow-lift animate-fade-in sm:left-auto sm:right-0 sm:w-76 sm:max-w-[calc(100vw-2rem)]"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >
                   {/* الخيار السحابي — مزامنة الحساب */}
@@ -443,7 +443,7 @@ export function ArticleReader({
                     role="menuitem"
                     onClick={() => void handleSaveCloud()}
                     disabled={cloudSaved || saveBusy !== null}
-                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-65"
+                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:opacity-65"
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
@@ -477,7 +477,7 @@ export function ArticleReader({
                     role="menuitem"
                     onClick={() => void handleSaveLocal()}
                     disabled={localSaved || saveBusy !== null}
-                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-[var(--accent-soft)] disabled:opacity-65"
+                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:opacity-65"
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
@@ -513,7 +513,7 @@ export function ArticleReader({
             <button
               type="button"
               onClick={() => window.print()}
-              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-[var(--accent-soft)] sm:px-3 sm:text-sm"
+              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}
               title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
             >

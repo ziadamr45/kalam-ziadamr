@@ -37,7 +37,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       onClick={toggleTheme}
       title={ready ? (theme === "dark" ? "الوضع الفاتح" : "الوضع الليلي") : "تبديل الثيم"}
       aria-label="تبديل وضع العرض"
-      className={`rounded-full transition-all duration-300 hover:scale-110 hover:bg-[var(--accent-soft)] active:bg-[var(--accent-soft)] ${className}`}
+      className={`rounded-full transition-all duration-300 hover:scale-110 hover:bg-(--accent-soft) active:bg-(--accent-soft) ${className}`}
       style={{ color: "var(--ink)" }}
     >
       {ready ? (
