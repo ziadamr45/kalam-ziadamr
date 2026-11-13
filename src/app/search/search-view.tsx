@@ -74,6 +74,13 @@ export default function SearchView() {
     inputRef.current?.focus();
   }, []);
 
+  /* الجسر من البحث الفوري: معامل ?q= يعبّي الحقل ويشعل البحث تلقائيًا —
+     رابط «فتح في صفحة البحث الكاملة» في الـPalette يمرر الاستعلام إلى هنا */
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get("q")?.trim();
+    if (initial) setQ(initial);
+  }, []);
+
   /* بحث لحظي مراجَل — نفس إيقاع الـ Palette */
   useEffect(() => {
     const term = q.trim();

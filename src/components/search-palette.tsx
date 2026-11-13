@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createPortal } from "react-dom";
 
 /**
  * محرك البحث الفكري الفوري — نافذة سينمائية (Command Palette):
@@ -9,6 +11,11 @@ import { useRouter } from "next/navigation";
  *  • بحث لحظي في العناوين والموجز والمتن مع مقاطع مطابقة
  *  • مُبرِز ذهبي للكلمات المطابقة (Highlighter)
  *  • تنقل كامل بلوحة المفاتيح: أسهم للتنقل، Enter للفتح، Esc للإغلاق
+ *
+ * تنبيه رسم حاسم: نافذة الحوار تُرسَم عبر createPortal إلى document.body
+ * وليس داخل الشجرة المحلية — الهيدر يحمل backdrop-blur فأي عنصر fixed
+ * داخل شجرته يُحبس بفضائه ويُقص على حدوده، فتظهر طبقة التعتيم والضبابية
+ * على الهيدر وحده وتُترك باقي الصفحة مكشوفة. البوابة إلى الجسم تقطع ذلك.
  */
 
 type Hit = {
@@ -206,6 +213,8 @@ export default function SearchPalette() {
   }, [active]);
 
   const terms = q.trim().split(/\s+/);
+  const term = q.trim();
+  const searchHref = term ? `/search?q=${encodeURIComponent(term)}` : "/search";
 
   return (
     <>
@@ -238,10 +247,12 @@ export default function SearchPalette() {
         </svg>
       </button>
 
-      {/* النافذة السينمائية */}
-      {open && (
-        <div className="fixed inset-0 z-80" role="dialog" aria-modal="true" aria-label="البحث في المنصة">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setOpen(false)} />
+      {/* النافذة السينمائية — بوابة إلى الجسم: طبقة التعتيم والضبابية تغطي
+          الشاشة كاملة وراء صندوق البحث لا الهيدر وحده */}
+      {open &&
+        createPortal(
+          <div className="fixed inset-0 z-80" role="dialog" aria-modal="true" aria-label="البحث في المنصة">
+            <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <div className="absolute inset-x-4 top-[12vh] mx-auto max-w-2xl animate-fade-up overflow-hidden rounded-2xl border shadow-lift" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
             {/* حقل الإدخال */}
             <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ borderColor: "var(--border)" }}>
@@ -352,13 +363,22 @@ export default function SearchPalette() {
               )}
             </div>
 
-            {/* تلميحات التنقل */}
+            {/* تلميحات التنقل + الجسر إلى صفحة البحث الكاملة */}
             <div className="flex items-center justify-between border-t px-4 py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
               <span>↑↓ للتنقل · Enter للفتح</span>
-              <span>بحث فوري في كل المنصة</span>
+              <Link
+                href={searchHref}
+                onClick={() => setOpen(false)}
+                className="shrink-0 font-bold transition-colors hover:underline"
+                style={{ color: "var(--accent-strong)" }}
+                title="المتابعة في صفحة البحث الكاملة — الاستعلام يُنقل معك"
+              >
+                فتح في صفحة البحث الكاملة ←
+              </Link>
             </div>
           </div>
-        </div>
+        </div>,
+          document.body
       )}
     </>
   );
