@@ -20,6 +20,15 @@ import { prisma } from "@/lib/prisma";
 
 type Shortcut = NonNullable<MetadataRoute.Manifest["shortcuts"]>[number];
 
+/* امتداد البيان بمِيز launch_handler — التركيز على نافذة التطبيق القائمة
+   بدل فتح نسخ جديدة تتزاحم مع الجلسة (Next لم يُضف الحقل لتعريفاته بعد).
+   navigate-existing لا focus-existing: الأولى تركّز النافذة القائمة وتوجّهها
+   للرابط كي تبقى الاختصارات والروابط العميقة (/continue والمشاركات) تعمل،
+   والثانية تبتلع التنقل كليًا فتكسرها */
+type ManifestWithLaunchHandler = MetadataRoute.Manifest & {
+  launch_handler?: { client_mode?: string | string[] };
+};
+
 const STATIC_SHORTCUTS: Shortcut[] = [
   {
     name: "أحدث المقالات",
@@ -140,7 +149,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     }
   } catch {}
 
-  return {
+  const manifest: ManifestWithLaunchHandler = {
     name: "كلام له لازمة | منصة فكرية واعية",
     short_name: "كلام له لازمة",
     description:
@@ -154,8 +163,12 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     background_color: "#FDFBF7",
     theme_color: "#F8F4EC",
     categories: ["news", "education", "lifestyle"],
+    /* التركيز على نافذة التطبيق القائمة وتوجيهها بدل نسخة جديدة —
+       يمنع تزاوج نافذتين وقت رجوع Google من تسجيل الدخول (سباق PWA) */
+    launch_handler: { client_mode: "navigate-existing" },
     shortcuts,
     icons,
     screenshots: SCREENSHOTS,
   };
+  return manifest;
 }

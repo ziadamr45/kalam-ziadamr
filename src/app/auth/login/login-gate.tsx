@@ -77,6 +77,17 @@ function LoginGateInner() {
   const callback = params.get("callback") || "/";
   const authError = params.get("error");
 
+  /* سباق أندرويد مع PWA عند العودة من Google: أندرويد يخطف رابط
+     /api/auth/callback/google ويفتحه في التطبيق المثبت فيتوزع الطلب بين
+     المتصفح والتطبيق — الكود يُستهلك مرة والكوكي تسمّع بعد أجزاء من
+     الثانية، فتهبط الصفحة بـ?error= ثم تدخل الجلسة بعدها بلحظة.
+     القاعدة: صندوق الخطأ لا يُعرض إلا بعد سكون الجلسة على
+     unauthenticated فعليًا — أثناء التحقق أو مع جلسة صالحة هو وميض زائف
+     يُخفى تمامًا، والتحويل للوجهة يجري فورًا في التأثير أدناه. */
+  const sessionUnsettled = status === "loading" || status === "authenticated";
+  const showError = Boolean(authError) && !sessionUnsettled;
+  const errorMessage = authError ? (AUTH_ERRORS[authError] || AUTH_ERRORS.Default) : null;
+
   useEffect(() => {
     if (status === "authenticated") {
       router.replace(callback.startsWith("/") ? callback : "/");
@@ -136,15 +147,22 @@ function LoginGateInner() {
           عند أول زيارة — بحساب Google موثوق واحدًا لا يزيد.
         </p>
 
-        {/* إشعار الخطأ الودي — الشاشة السوداء مستحيلة من الآن فصاعدًا */}
-        {authError && (
+        {/* إشعار الخطأ الودي — الشاشة السوداء مستحيلة من الآن فصاعدًا.
+            لا يظهر إلا بعد سكون الجلسة على unauthenticated (سباق PWA أعلاه):
+            أثناء التحقق تظهر ملاحظة محايدة هادئة بدل وميض الخطأ الأحمر */}
+        {authError && sessionUnsettled && (
+          <p className="mt-6 animate-pulse text-xs" style={{ color: "var(--ink-muted)" }}>
+            جارٍ التحقق من جلستك — لحظات..
+          </p>
+        )}
+        {showError && (
           <div
             className="mt-6 w-full rounded-2xl border p-4 text-right text-xs leading-7"
             style={{ background: "#FEF2F2", borderColor: "#FECACA", color: "#991B1B" }}
             role="alert"
           >
             <strong className="block font-bold">تعذّر تسجيل الدخول</strong>
-            {AUTH_ERRORS[authError] || AUTH_ERRORS.Default}
+            {errorMessage}
             <div className="mt-2 flex gap-3">
               <button
                 onClick={() => router.replace("/auth/login")}
