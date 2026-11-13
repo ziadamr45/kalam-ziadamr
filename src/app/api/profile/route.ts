@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { displayName, validateCustomName, validateBio } from "@/lib/identity";
 import { analyzeComment } from "@/lib/moderation";
-import { logEvent, getClientIp } from "@/lib/audit";
+import { logEvent, writePublicTrail, getClientIp } from "@/lib/audit";
 import { recordServerError } from "@/lib/error-alert";
 import { parsePrivileges } from "@/lib/vip";
 import { SOCIAL_LINK_KEYS, type VerifiedSocialLinks } from "@/lib/verification-meta";
@@ -154,6 +154,13 @@ export async function PUT(request: Request) {
       select: { customName: true, customImage: true, bio: true, extendedBio: true, verifiedSocialLinks: true, notificationPrefs: true },
     });
 
+    writePublicTrail({
+      actorId: userId,
+      actorEmail: session.user.email ?? userId,
+      actionType: "PROFILE_UPDATED",
+      description: "تحديث الهوية المعروضة للقارئ من الموقع العام (الاسم/الصورة/النبذة)",
+      metadata: { ip: getClientIp(request) },
+    });
     logEvent({
       type: "PROFILE_UPDATED",
       actorType: "USER",

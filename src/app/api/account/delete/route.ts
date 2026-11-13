@@ -96,6 +96,8 @@ export async function DELETE(request: Request) {
           actorRole: user.role,
           actionCategory: "USER_SELF_ACTION",
           actionType: "USER_SELF_HARD_DELETE",
+          source: "PUBLIC",
+          description: "حذف ذاتي شامل للحساب من الموقع العام (GDPR)",
           targetId: uid,
           targetEmail: user.email,
           reason: "طلب حذف ذاتي فوري من صفحة الملف الشخصي — محو برمجي شامل بلا استبقاء",

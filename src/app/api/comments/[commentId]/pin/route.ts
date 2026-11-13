@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { logEvent } from "@/lib/audit";
+import { logEvent, writePublicTrail } from "@/lib/audit";
 import { recordServerError } from "@/lib/error-alert";
 import { userHasPrivilege } from "@/lib/vip";
 
@@ -64,6 +64,16 @@ export async function POST(
       }
     });
 
+    writePublicTrail({
+      actorId: session.user.id,
+      actorEmail: session.user.email ?? session.user.id,
+      actionType: "COMMENT_SELF_PINNED",
+      description: pin
+        ? "تثبيت ذاتي لتعليق القارئ المميز — صلاحية الحسابات الموثقة"
+        : "فك تثبيت ذاتي لتعليق",
+      targetId: comment.id,
+      metadata: { articleId: comment.articleId, pin },
+    });
     void logEvent({
       type: "COMMENT_SELF_PINNED",
       actorType: "USER",

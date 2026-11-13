@@ -87,6 +87,40 @@ export async function logErrorReport(input: {
   }
 }
 
+
+/**
+ * القيد الرقابي للموقع العام — يكتب مباشرة في «السجل السيادي» الموحد
+ * (AuditTrail) بمصدر PUBLIC وتصنيف الإجراء الذاتي، ليظهر في شاشة /ledger
+ * وتقارير PDF وأدوات MCP بنفس شفافية قيود اللوحة والبوابة والتيرمينال.
+ * الكتابة fire-and-forget: فشلها لا يعطل تجربة القارئ أبدًا.
+ */
+export function writePublicTrail(input: {
+  actorId: string;
+  actorEmail: string;
+  actionType: string;
+  description?: string | null;
+  targetId?: string | null;
+  targetEmail?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): void {
+  void prisma.auditTrail
+    .create({
+      data: {
+        actorId: input.actorId,
+        actorEmail: input.actorEmail,
+        actorRole: "USER",
+        actionCategory: "USER_SELF_ACTION",
+        actionType: input.actionType,
+        source: "PUBLIC",
+        description: input.description ?? null,
+        targetId: input.targetId ?? null,
+        targetEmail: input.targetEmail ?? null,
+        metadata: (input.metadata ?? undefined) as never,
+      },
+    })
+    .catch(() => {});
+}
+
 /** استخراج IP الزائر من ترويسات Vercel */
 export function getClientIp(request: Request): string | null {
   return (
