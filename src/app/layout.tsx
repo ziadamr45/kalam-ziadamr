@@ -78,13 +78,14 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "كلام له لازمة",
       title,
       description: desc,
-      images: [{ url: "/og-default.png", width: 1200, height: 630 }],
+      /* ?v=2 يكسر كاش تطبيقات المحادثات (واتساب/تليجرام) عند تحديث الصورة */
+      images: [{ url: "/og-default.png?v=2", width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description: desc,
-      images: ["/og-default.png"],
+      images: ["/og-default.png?v=2"],
     },
     icons: {
       icon: "/icons/icon-192.png",
