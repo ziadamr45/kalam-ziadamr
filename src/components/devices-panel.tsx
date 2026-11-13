@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 /**
  * لوحة «الأجهزة المتصلة» — إدارة جلسات الحساب من صفحة الملف الشخصي:
@@ -85,6 +86,10 @@ export function DevicesPanel() {
 
   useEffect(() => {
     void load();
+    /* نبض دوري كل 5 دقائق — كل استدعاء يحدّث آخر نشاط الجهاز الحالي وآخر
+       عنوانه في الخادم، فلا يقدَّم التاريخ قديمًا ما دامت الصفحة مفتوحة */
+    const beat = setInterval(() => void load(), 5 * 60 * 1000);
+    return () => clearInterval(beat);
   }, [load]);
 
   const revoke = useCallback(
@@ -92,7 +97,7 @@ export function DevicesPanel() {
       const isCurrent = device.deviceHash === currentHash;
       const label = `${TYPE_LABELS[device.deviceType ?? ""] ?? "الجهاز"} — ${device.browser ?? ""} على ${device.os ?? ""}`;
       const confirmText = isCurrent
-        ? "ستسجّل الخروج من الجهاز الذي تستخدمه الآن فورًا. هل أنت متأكد؟"
+        ? "تنبيه: هذه هي الجلسة التي أنت فاتح منها الآن — إبطالها سيخرجك من الحساب فورًا. هل تريد المتابعة؟"
         : `ستُبطل جلسة «${label}» فورًا. هل أنت متأكد؟`;
       if (!window.confirm(confirmText)) return;
 
@@ -108,9 +113,14 @@ export function DevicesPanel() {
         if (!res.ok || !data.ok) throw new Error(data.error ?? "تعذر إبطال الجلسة");
         setDevices((prev) => prev.filter((d) => d.deviceHash !== device.deviceHash));
         if (isCurrent) {
-          /* الجهاز الحالي أُبطلت جلسته — توديع نظيف إلى الرئيسية ثم دخول جديد */
-          await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
-          window.location.href = "/";
+          /* الجهاز الحالي أُبطلت جلسته — خروج فعلي عبر signOut الرسمية
+             (استدعاء /api/auth/signout الخام بلا CSRF token كان يفشل صامتًا
+             فيبقى المستخدم في صفحة ميتة)، ومسح مؤشر الدخول أولًا كي لا
+             يعدّه حارس مراقبة الجلسة إبطالًا مفاجئًا يطلق إنذارًا كاذبًا */
+          try {
+            window.localStorage.removeItem("kalam_was_logged_in");
+          } catch {}
+          await signOut({ redirectTo: "/" });
           return;
         }
         setMessage({ ok: true, text: `أُبطلت جلسة «${label}» فورًا` });
@@ -189,7 +199,7 @@ export function DevicesPanel() {
                           style={{ background: "rgba(60,122,78,0.16)", color: "#3c7a4e" }}
                         >
                           <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "#3c7a4e" }} />
-                          هذا الجهاز الحالي
+                          هذا الجهاز (الجلسة الحالية) · نشط الآن
                         </span>
                       )}
                     </span>

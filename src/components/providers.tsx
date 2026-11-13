@@ -32,6 +32,14 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
       (typeof window !== "undefined" && window.localStorage.getItem("kalam_theme")) as Theme | null;
     if (stored === "dark" || stored === "light") setTheme(stored);
     setReady(true);
+    /* بطاقة تفضيلات القراءة في الملف الشخصي تبلّغ عن تغيير الثيم بهذا
+       الحدث كي يبقى زر الترويسة متزامنًا ولا يقلب الثيم عكسيًا */
+    const syncExternal = (e: Event) => {
+      const next = (e as CustomEvent<Theme>).detail;
+      if (next === "dark" || next === "light") setTheme(next);
+    };
+    window.addEventListener("kalam-theme-change", syncExternal);
+    return () => window.removeEventListener("kalam-theme-change", syncExternal);
   }, []);
 
   const applyTheme = useCallback((next: Theme) => {

@@ -9,6 +9,8 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
 import { DevicesPanel } from "@/components/devices-panel";
+import { ReadingPreferencesCard } from "@/components/reading-preferences-card";
+import { PrivacyToolsCard } from "@/components/privacy-tools-card";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
 import { parsePrivileges, PRIVILEGE_LABELS, roleLabelAr } from "@/lib/vip";
@@ -32,7 +34,16 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
   REJECTED: { text: "مرفوض", color: "#b4443c" },
 };
 
-export default async function ProfilePage() {
+const TABS: Array<{ key: string; href: string; label: string }> = [
+  { key: "profile", href: "/profile", label: "ملفي وأثري" },
+  { key: "settings", href: "/profile?tab=settings", label: "الإعدادات والتفضيلات" },
+  { key: "security", href: "/profile?tab=security", label: "الأمان والجلسات" },
+];
+
+export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  /* التبويب من الرابط ?tab= — أي قيمة غريبة تعود للتبويب الرئيسي بأمان */
+  const { tab: rawTab } = await searchParams;
+  const tab = rawTab === "settings" || rawTab === "security" ? rawTab : "profile";
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/auth/login?callback=/profile");
@@ -115,8 +126,37 @@ export default async function ProfilePage() {
     <>
       <SiteHeader />
       <main className="flex-1">
+        {/* ==================== شرائط التبويبات الثلاثة ==================== */}
+        <section className="mx-auto max-w-3xl px-4 pt-28 sm:px-6">
+          <nav
+            className="flex gap-1.5 rounded-2xl border p-1.5 shadow-soft"
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+            aria-label="أقسام الملف الشخصي"
+          >
+            {TABS.map((t) => {
+              const active = tab === t.key;
+              return (
+                <Link
+                  key={t.key}
+                  href={t.href}
+                  className="flex-1 rounded-xl px-2 py-2.5 text-center text-xs font-bold transition-all"
+                  style={{
+                    background: active ? "var(--accent)" : "transparent",
+                    color: active ? "#fff" : "var(--ink-muted)",
+                  }}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {t.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </section>
+
+        {tab === "profile" && (
+          <>
         {/* ==================== بطاقة الهوية ==================== */}
-        <section className="mx-auto max-w-3xl px-4 pt-32 sm:px-6">
+        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <div
             className="flex flex-col items-center gap-6 rounded-3xl border p-8 shadow-lift sm:flex-row sm:text-right"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
@@ -306,7 +346,11 @@ export default async function ProfilePage() {
             </p>
           </div>
         </section>
+          </>
+        )}
 
+        {tab === "settings" && (
+          <>
         {/* ==================== إعدادات الهوية ==================== */}
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <ProfileEditor
@@ -329,6 +373,20 @@ export default async function ProfilePage() {
           />
         </section>
 
+        {/* ==================== تفضيلات القراءة الافتراضية ==================== */}
+        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <ReadingPreferencesCard />
+        </section>
+
+        {/* ==================== الخصوصية والتجربة ==================== */}
+        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <PrivacyToolsCard />
+        </section>
+          </>
+        )}
+
+        {tab === "profile" && (
+          <>
         {/* ==================== سجل الأثر — شفافية كاملة نقطة بنقطة ==================== */}
         {logs.length > 0 && (
           <section className="mx-auto mt-10 max-w-3xl px-4 sm:px-6">
@@ -476,18 +534,25 @@ export default async function ProfilePage() {
           </p>
         </section>
 
+          </>
+        )}
+
+        {tab === "security" && (
+          <>
         {/* ==================== الأجهزة المتصلة — إدارة جلسات الحساب وأمانها ==================== */}
         <section
-          className="mx-auto mt-10 max-w-3xl rounded-2xl border p-5 shadow-soft sm:p-6"
+          className="mx-auto mt-6 max-w-3xl rounded-2xl border p-5 shadow-soft sm:p-6"
           style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         >
           <DevicesPanel />
         </section>
 
-        {/* منطقة حذف الحساب — وعد سياسة الخصوصية مُطبّق حرفيًا */}
+        {/* منطقة حذف الحساب — وعد سياسة الخصوصية مُطبّق حرفيًا، تحت مظلة تبويب الأمان */}
         <section className="mx-auto mt-4 max-w-3xl px-4 pb-24 sm:px-6">
           <AccountDangerZone />
         </section>
+          </>
+        )}
       </main>
       {/* كبسولة تفعيل الإشعارات الذكية — صفحة الحساب من مواضع الظهور المشروعة */}
       <PushPromptCapsule />

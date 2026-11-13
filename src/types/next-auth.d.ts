@@ -4,6 +4,9 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      /** بصمة جهاز هذه الجلسة المختومة في التوكن عند الولادة —
+          تمييز «الجهاز الحالي» في لوحة الأجهزة المتصلة */
+      deviceHash?: string;
     } & DefaultSession["user"];
     /** إشارة إبطال الجلسة عن بُعد — صحيحة حين يُحذف سجل الجهاز من قاعدة البيانات */
     deviceRevoked?: boolean;

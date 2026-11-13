@@ -129,6 +129,15 @@ export function AccountMenu() {
             >
               قراءاتي المحفوظة
             </Link>
+            {/* الإعدادات والأمان بضغطة واحدة — تعديل الهوية والأجهزة والخصوصية بلا لفّ الصفحة */}
+            <Link
+              href="/profile?tab=settings"
+              onClick={() => setOpen(false)}
+              className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
+              style={{ color: "var(--ink)" }}
+            >
+              الإعدادات والأمان
+            </Link>
             <button
               onClick={async () => {
                 /* الخروج الطبيعي يمسح مؤشر الدخول أولًا — كي لا يعتبره

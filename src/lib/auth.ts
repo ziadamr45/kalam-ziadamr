@@ -237,6 +237,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
 
           session.user.id = String(token.uid);
+          /* بصمة جهاز هذه الجلسة تصل للعميل — لوحة الأجهزة تعتمدها
+             أولًا في تمييز «الجهاز الحالي» وبصمة الطلب احتياطًا */
+          if (typeof token.dvh === "string" && token.dvh) {
+            session.user.deviceHash = token.dvh;
+          }
           /* الهوية المعروضة حيًا من قاعدة البيانات:
              الاسم المخصص والصورة الشخصية أولًا ثم بيانات Google الأصلية —
              فيتكيف الهيدر والقوائم فور أي تعديل من صفحة الملف الشخصي */
