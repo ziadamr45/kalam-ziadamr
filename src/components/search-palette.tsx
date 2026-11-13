@@ -76,7 +76,7 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
 
 export default function SearchPalette({ hostDialog = false }: { hostDialog?: boolean }) {
   const router = useRouter();
-  const open = useSyncExternalStore(subscribePalette, () => paletteOpen);
+  const open = useSyncExternalStore(subscribePalette, () => paletteOpen, () => paletteOpen);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [active, setActive] = useState(0);
