@@ -88,7 +88,12 @@ export async function generateMetadata(): Promise<Metadata> {
       images: ["/og-default.png?v=2"],
     },
     icons: {
-      icon: "/icons/icon-192.png",
+      /* أيقونة التبويب المخصصة: قناع سوبر-إليبس ناعم بدل المربع الحاد —
+         وأيقونات PWA الكاملة تبقى في manifest.ts للتثبيت على الموبايل */
+      icon: [
+        { url: "/favicon.ico?v=3", type: "image/x-icon" },
+        { url: "/icons/favicon-tab.png?v=3", sizes: "96x96", type: "image/png" },
+      ],
       apple: "/icons/apple-touch-icon.png",
     },
     manifest: "/manifest.webmanifest",

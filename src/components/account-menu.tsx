@@ -68,19 +68,21 @@ export function AccountMenu() {
         title={u.name || "حسابي"}
         data-tour="account-avatar"
         /* محاذاة رأسية صريحة: flex + items-center + justify-center + self-center
-           تقتل فجوة سطر الأساس (baseline descender) التي كانت ترفع الصورة ~2px،
-           وh-9 w-9 توحّد القياس مع جرس الإشعارات (36px) على نفس المحور */
-        className="flex h-9 w-9 items-center justify-center self-center overflow-hidden rounded-full border transition-all duration-300 hover:scale-110"
+           تقتل فجوة سطر الأساس (baseline descender) التي كانت ترفع الصورة ~2px.
+           h-8 w-8 (32px): درجة أصغر من جرس الإشعارات (36px) كي تتوازن مع
+           أيقونات الجرس والثيم والبحث — الصورة تملأ الدائرة فتبدو أثقل بصريًا،
+           وإطار خفيف بنسبة أعمق يحفظ وضوح الدائرة عند الحجم الأصغر */
+        className="flex h-8 w-8 items-center justify-center self-center overflow-hidden rounded-full border transition-all duration-300 hover:scale-110"
         style={{
-          borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.2)",
+          borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.35)",
         }}
       >
         {u.image ? (
           <Image
             src={u.image}
             alt={u.name || "صورة الحساب"}
-            width={36}
-            height={36}
+            width={32}
+            height={32}
             referrerPolicy="no-referrer"
             /* h-full/w-full بدل مقاس ثابت: على اللمس (موبايل/تابلت) يكبّر globals.css
                الزر نفسه إلى 44px فكانت الصورة 36px تظهر مربعة داخل الدائرة —
