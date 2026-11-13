@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -12,10 +12,14 @@ import { createPortal } from "react-dom";
  *  • مُبرِز ذهبي للكلمات المطابقة (Highlighter)
  *  • تنقل كامل بلوحة المفاتيح: أسهم للتنقل، Enter للفتح، Esc للإغلاق
  *
- * تنبيه رسم حاسم: نافذة الحوار تُرسَم عبر createPortal إلى document.body
- * وليس داخل الشجرة المحلية — الهيدر يحمل backdrop-blur فأي عنصر fixed
- * داخل شجرته يُحبس بفضائه ويُقص على حدوده، فتظهر طبقة التعتيم والضبابية
- * على الهيدر وحده وتُترك باقي الصفحة مكشوفة. البوابة إلى الجسم تقطع ذلك.
+ * تنبيهان معماريان:
+ *  1. حالة الفتح مشتركة على مستوى الوحدة — الهيدر يركّب هذا المكوّن مرتين
+ *     (زر سطح المكتب + زر الهاتف)، فلو حملت كل نسخة حالتها الخاصة لفتح
+ *     Ctrl+K نافذتين معًا. والنافذة نفسها ترسمها نسخة واحدة حصرًا (hostDialog).
+ *  2. نافذة الحوار تُرسَم عبر createPortal إلى document.body وليس داخل
+ *     الشجرة المحلية — الهيدر يحمل backdrop-blur فأي عنصر fixed داخل شجرته
+ *     يُحبس بفضائه ويُقص على حدوده، فتظهر طبقة التعتيم والضبابية على الهيدر
+ *     وحده وتُترك باقي الصفحة مكشوفة. البوابة إلى الجسم تقطع ذلك.
  */
 
 type Hit = {
@@ -30,6 +34,20 @@ type Hit = {
 };
 
 type HistoryItem = { query: string; at: string };
+
+/* ===== حالة النافذة المشتركة (متجر وحدوي صغير) ===== */
+let paletteOpen = false;
+const paletteListeners = new Set<() => void>();
+function subscribePalette(listener: () => void) {
+  paletteListeners.add(listener);
+  return () => paletteListeners.delete(listener);
+}
+function setPaletteOpen(v: boolean) {
+  if (paletteOpen !== v) {
+    paletteOpen = v;
+    paletteListeners.forEach((l) => l());
+  }
+}
 
 /** يلفّ كل ظهور لكلمات البحث داخل النص بوسم تمييز ذهبي */
 function Highlight({ text, terms }: { text: string; terms: string[] }) {
@@ -56,9 +74,9 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
   }
 }
 
-export default function SearchPalette() {
+export default function SearchPalette({ hostDialog = false }: { hostDialog?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const open = useSyncExternalStore(subscribePalette, () => paletteOpen);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [active, setActive] = useState(0);
@@ -71,10 +89,12 @@ export default function SearchPalette() {
      • يُجلب مبكرًا مع أول تركيب للمكوّن (الهيدر) لا لحظة فتح النافذة —
        فحين يفتحه القارئ يكون جاهزًا فورًا بلا انتظار شبكة أو خادم بارد
      • عند كل فتح: تحديث خلفي هادئ فقط إن شخ الكاش (دقيقة) — بلا وميض ولا انتظار
-     • الزائر غير المسجل تصله 401 فيبقى السجل فارغًا بلا أي أثر في الواجهة */
+     • الزائر غير المسجل تصله 401 فيبقى السجل فارغًا بلا أي أثر في الواجهة
+     • كل ذلك للنسخة المضيفة حصرًا — النسخة الثانية أزرار فقط بلا أي حالة */
   const lastFetchRef = useRef(0);
 
   const loadHistory = useCallback((force = false) => {
+    if (!hostDialog) return;
     const now = Date.now();
     if (!force && now - lastFetchRef.current < 60_000) return;
     lastFetchRef.current = now;
@@ -84,7 +104,7 @@ export default function SearchPalette() {
         if (d) setHistory((d.history ?? []).slice(0, 10));
       })
       .catch(() => {});
-  }, []);
+  }, [hostDialog]);
 
   /* التحميل المبكر — قبل فتح النافذة بأشواط */
   useEffect(() => {
@@ -130,21 +150,22 @@ export default function SearchPalette() {
     fetch("/api/search/history", { method: "DELETE" }).catch(() => {});
   }, []);
 
-  /* الاختصار العالمي Cmd+K / Ctrl+K */
+  /* الاختصار العالمي Cmd+K / Ctrl+K — مربوط من النسخة المضيفة وحدها */
   useEffect(() => {
+    if (!hostDialog) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        setPaletteOpen(!paletteOpen);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [hostDialog]);
 
-  /* التركيز عند الفتح + قفل تمرير الخلفية */
+  /* التركيز عند الفتح + قفل تمرير الخلفية — للنسخة المضيفة حصرًا */
   useEffect(() => {
-    if (!open) return;
+    if (!hostDialog || !open) return;
     const t = setTimeout(() => inputRef.current?.focus(), 30);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -152,10 +173,11 @@ export default function SearchPalette() {
       clearTimeout(t);
       document.body.style.overflow = prev;
     };
-  }, [open]);
+  }, [hostDialog, open]);
 
   /* بحث لحظي مراجَل */
   useEffect(() => {
+    if (!hostDialog) return;
     const term = q.trim();
     if (term.length < 2) {
       setHits([]);
@@ -174,11 +196,11 @@ export default function SearchPalette() {
         .finally(() => setBusy(false));
     }, 250);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [hostDialog, q]);
 
   const go = useCallback(
     (slug: string) => {
-      setOpen(false);
+      setPaletteOpen(false);
       const term = q.trim();
       setQ("");
       if (term.length >= 2) remember(term);
@@ -193,7 +215,7 @@ export default function SearchPalette() {
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") setPaletteOpen(false);
       else if (e.key === "ArrowDown") {
         e.preventDefault();
         setActive((i) => Math.min(i + 1, hits.length - 1));
@@ -220,7 +242,7 @@ export default function SearchPalette() {
     <>
       {/* زر البحث — سطح المكتب */}
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => setPaletteOpen(true)}
         data-tour="search-btn"
         title="البحث الفكري الفوري (Ctrl+K)"
         aria-label="البحث الفكري الفوري"
@@ -235,7 +257,7 @@ export default function SearchPalette() {
 
       {/* زر البحث — الهاتف */}
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => setPaletteOpen(true)}
         data-tour="search-btn"
         aria-label="البحث الفكري الفوري"
         className="rounded-full p-2.5 transition-colors active:bg-(--accent-soft) md:hidden"
@@ -247,139 +269,140 @@ export default function SearchPalette() {
         </svg>
       </button>
 
-      {/* النافذة السينمائية — بوابة إلى الجسم: طبقة التعتيم والضبابية تغطي
-          الشاشة كاملة وراء صندوق البحث لا الهيدر وحده */}
-      {open &&
+      {/* النافذة السينمائية — النسخة المضيفة وحدها ترسمها، وبوابة إلى الجسم:
+          طبقة التعتيم والضبابية تغطي الشاشة كاملة وراء صندوق البحث لا الهيدر وحده */}
+      {hostDialog &&
+        open &&
         createPortal(
           <div className="fixed inset-0 z-80" role="dialog" aria-modal="true" aria-label="البحث في المنصة">
-            <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute inset-x-4 top-[12vh] mx-auto max-w-2xl animate-fade-up overflow-hidden rounded-2xl border shadow-lift" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
-            {/* حقل الإدخال */}
-            <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ borderColor: "var(--border)" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              <input
-                ref={inputRef}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="ابحث في العناوين والمتن والأفكار.."
-                className="min-w-0 flex-1 bg-transparent text-base outline-hidden"
-                style={{ color: "var(--ink)" }}
-                autoComplete="off"
-              />
-              <kbd className="hidden shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] sm:block" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
-                Esc
-              </kbd>
-            </div>
+            <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setPaletteOpen(false)} />
+            <div className="absolute inset-x-4 top-[12vh] mx-auto max-w-2xl animate-fade-up overflow-hidden rounded-2xl border shadow-lift" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+              {/* حقل الإدخال */}
+              <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ borderColor: "var(--border)" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  ref={inputRef}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="ابحث في العناوين والمتن والأفكار.."
+                  className="min-w-0 flex-1 bg-transparent text-base outline-hidden"
+                  style={{ color: "var(--ink)" }}
+                  autoComplete="off"
+                />
+                <kbd className="hidden shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] sm:block" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
+                  Esc
+                </kbd>
+              </div>
 
-            {/* النتائج */}
-            <div ref={listRef} className="max-h-[55vh] overflow-y-auto p-2">
-              {q.trim().length < 2 ? (
-                history.length > 0 ? (
-                  /* سجل البحث — يظهر للمسجلين فقط في وضع الخمول (قبل الكتابة) */
-                  <div className="pb-1">
-                    <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
-                      <span className="text-[11px] font-bold" style={{ color: "var(--ink-muted)" }}>
-                        بحثك الأخير
-                      </span>
-                      <button
-                        onClick={clearHistory}
-                        className="rounded-full px-2 py-0.5 text-[11px] transition-colors hover:bg-(--accent-soft)"
-                        style={{ color: "var(--accent-strong)" }}
-                      >
-                        مسح الكل
-                      </button>
-                    </div>
-                    {history.map((h) => (
-                      <div key={h.query} className="flex items-center rounded-xl transition-colors hover:bg-(--accent-soft)">
+              {/* النتائج */}
+              <div ref={listRef} className="max-h-[55vh] overflow-y-auto p-2">
+                {q.trim().length < 2 ? (
+                  history.length > 0 ? (
+                    /* سجل البحث — يظهر للمسجلين فقط في وضع الخمول (قبل الكتابة) */
+                    <div className="pb-1">
+                      <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
+                        <span className="text-[11px] font-bold" style={{ color: "var(--ink-muted)" }}>
+                          بحثك الأخير
+                        </span>
                         <button
-                          onClick={() => setQ(h.query)}
-                          className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-right"
-                          title={h.query}
+                          onClick={clearHistory}
+                          className="rounded-full px-2 py-0.5 text-[11px] transition-colors hover:bg-(--accent-soft)"
+                          style={{ color: "var(--accent-strong)" }}
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: "var(--ink-muted)" }} aria-hidden>
-                            <circle cx="12" cy="12" r="9" />
-                            <path d="M12 7v5l3 2" />
-                          </svg>
-                          <span className="truncate text-sm" style={{ color: "var(--ink)" }}>
-                            {h.query}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => dropOne(h.query)}
-                          aria-label={`إزالة ${h.query} من السجل`}
-                          title="إزالة من السجل"
-                          className="ml-0.5 shrink-0 rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
-                          style={{ color: "var(--ink-muted)" }}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-                            <path d="M18 6 6 18" />
-                            <path d="m6 6 12 12" />
-                          </svg>
+                          مسح الكل
                         </button>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
-                    اكتب حرفين على الأقل ليبدأ البحث في كل مقالات المنصة..
-                  </p>
-                )
-              ) : busy && hits.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm animate-pulse" style={{ color: "var(--ink-muted)" }}>
-                  جارٍ البحث..
-                </p>
-              ) : hits.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
-                  لا نتائج مطابقة — جرّب كلمات أخرى.
-                </p>
-              ) : (
-                hits.map((h, i) => (
-                  <button
-                    key={h.slug}
-                    onClick={() => go(h.slug)}
-                    onMouseEnter={() => setActive(i)}
-                    className="block w-full rounded-xl px-4 py-3 text-right transition-colors"
-                    style={{ background: i === active ? "var(--accent-soft)" : "transparent" }}
-                  >
-                    <div className="flex items-center gap-2">
-                      {h.section && (
-                        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--accent-soft)", color: h.sectionColor ?? "var(--accent-strong)" }}>
-                          {h.section}
-                        </span>
-                      )}
-                      <span className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
-                        <Highlight text={h.title} terms={terms} />
-                      </span>
+                      {history.map((h) => (
+                        <div key={h.query} className="flex items-center rounded-xl transition-colors hover:bg-(--accent-soft)">
+                          <button
+                            onClick={() => setQ(h.query)}
+                            className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-right"
+                            title={h.query}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: "var(--ink-muted)" }} aria-hidden>
+                              <circle cx="12" cy="12" r="9" />
+                              <path d="M12 7v5l3 2" />
+                            </svg>
+                            <span className="truncate text-sm" style={{ color: "var(--ink)" }}>
+                              {h.query}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => dropOne(h.query)}
+                            aria-label={`إزالة ${h.query} من السجل`}
+                            title="إزالة من السجل"
+                            className="ml-0.5 shrink-0 rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
+                            style={{ color: "var(--ink-muted)" }}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                              <path d="M18 6 6 18" />
+                              <path d="m6 6 12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                    <p className="mt-1 line-clamp-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-                      <Highlight text={h.snippet ?? h.summary} terms={terms} />
+                  ) : (
+                    <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
+                      اكتب حرفين على الأقل ليبدأ البحث في كل مقالات المنصة..
                     </p>
-                  </button>
-                ))
-              )}
-            </div>
+                  )
+                ) : busy && hits.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm animate-pulse" style={{ color: "var(--ink-muted)" }}>
+                    جارٍ البحث..
+                  </p>
+                ) : hits.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
+                    لا نتائج مطابقة — جرّب كلمات أخرى.
+                  </p>
+                ) : (
+                  hits.map((h, i) => (
+                    <button
+                      key={h.slug}
+                      onClick={() => go(h.slug)}
+                      onMouseEnter={() => setActive(i)}
+                      className="block w-full rounded-xl px-4 py-3 text-right transition-colors"
+                      style={{ background: i === active ? "var(--accent-soft)" : "transparent" }}
+                    >
+                      <div className="flex items-center gap-2">
+                        {h.section && (
+                          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--accent-soft)", color: h.sectionColor ?? "var(--accent-strong)" }}>
+                            {h.section}
+                          </span>
+                        )}
+                        <span className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
+                          <Highlight text={h.title} terms={terms} />
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+                        <Highlight text={h.snippet ?? h.summary} terms={terms} />
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
 
-            {/* تلميحات التنقل + الجسر إلى صفحة البحث الكاملة */}
-            <div className="flex items-center justify-between border-t px-4 py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
-              <span>↑↓ للتنقل · Enter للفتح</span>
-              <Link
-                href={searchHref}
-                onClick={() => setOpen(false)}
-                className="shrink-0 font-bold transition-colors hover:underline"
-                style={{ color: "var(--accent-strong)" }}
-                title="المتابعة في صفحة البحث الكاملة — الاستعلام يُنقل معك"
-              >
-                فتح في صفحة البحث الكاملة ←
-              </Link>
+              {/* تلميحات التنقل + الجسر إلى صفحة البحث الكاملة */}
+              <div className="flex items-center justify-between border-t px-4 py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
+                <span>↑↓ للتنقل · Enter للفتح</span>
+                <Link
+                  href={searchHref}
+                  onClick={() => setPaletteOpen(false)}
+                  className="shrink-0 font-bold transition-colors hover:underline"
+                  style={{ color: "var(--accent-strong)" }}
+                  title="المتابعة في صفحة البحث الكاملة — الاستعلام يُنقل معك"
+                >
+                  فتح في صفحة البحث الكاملة ←
+                </Link>
+              </div>
             </div>
-          </div>
-        </div>,
-          document.body
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
