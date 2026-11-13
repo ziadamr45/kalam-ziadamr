@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import QRCode from "qrcode";
+import { useDialogs } from "@/components/ui/dialogs";
 
 type SizePreset = { key: string; label: string; w: number; h: number };
 type CardVariant = "normal" | "quran" | "hadith";
@@ -533,6 +534,7 @@ export function QuoteGenerator({
   suggestedQuotes?: string[];
 }) {
   const { data: session } = useSession();
+  const { toast } = useDialogs();
   const [selectedText, setSelectedText] = useState("");
   const [variant, setVariant] = useState<CardVariant>("normal");
   const [chipPos, setChipPos] = useState<{ x: number; y: number } | null>(null);
@@ -772,12 +774,12 @@ export function QuoteGenerator({
       // fallback: نسخ النص
       try {
         await navigator.clipboard.writeText(`«${selectedText}» — كلام له لازمة`);
-        alert("تم نسخ الاقتباس.. الصقه حيث تريد.");
+        toast("تم نسخ الاقتباس.. الصقه حيث تريد.");
       } catch {}
     } finally {
       setIsSharing(false);
     }
-  }, [articleSlug, articleTitle, isExporting, isSharing, selectedText, showHint, trackImpact]);
+  }, [articleSlug, articleTitle, isExporting, isSharing, selectedText, showHint, toast, trackImpact]);
 
   /**
    * تصفير الكانفاس والحالات عند الإغلاق — لا تسرب شفافية ولا تراكم طبقات

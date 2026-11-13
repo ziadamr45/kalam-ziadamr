@@ -2,45 +2,56 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDialogs } from "@/components/ui/dialogs";
 
 /**
  * أدوات الخصوصية والتجربة — تبويب «الإعدادات والتفضيلات»:
  * - مسح سجل البحث الخاص بالحساب (وعد الخصوصية: سجلك بيدك وحدك).
- * - إعادة عرض جولة الترحيب لمن يريد مشاهدتها من جديد.
+ * - إعادة عرض بطاقة الترحيب لمن يريد مشاهدتها من جديد.
+ * كل التأكيدات والنتائج عبر نظام النوافذ الموحد — لا نوافذ متصفح إطلاقًا.
  */
 
 export function PrivacyToolsCard() {
   const router = useRouter();
+  const { confirm, toast } = useDialogs();
   const [busy, setBusy] = useState<null | "history" | "tour">(null);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const clearSearchHistory = async () => {
-    if (!window.confirm("سيُمسح سجل البحث الخاص بحسابك بالكامل — لا يمكن التراجع. هل تريد المتابعة؟")) return;
+    const ok = await confirm({
+      title: "مسح سجل البحث",
+      body: "سيُمسح سجل البحث الخاص بحسابك بالكامل — لا يمكن التراجع. هل تريد المتابعة؟",
+      confirmLabel: "نعم، امسحه",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy("history");
-    setMessage(null);
     try {
       const res = await fetch("/api/search/history", { method: "DELETE" });
       if (!res.ok) throw new Error("تعذر مسح السجل — جرّب مرة أخرى");
-      setMessage({ ok: true, text: "مُسح سجل البحث الخاص بحسابك بالكامل" });
+      toast("مُسح سجل البحث الخاص بحسابك بالكامل");
       router.refresh();
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : "تعذر الاتصال بالخادم" });
+      toast(err instanceof Error ? err.message : "تعذر الاتصال بالخادم", "error");
     } finally {
       setBusy(null);
     }
   };
 
   const replayTour = async () => {
-    if (!window.confirm("ستبدأ جولة الترحيب من جديد فورًا في هذه الصفحة. هل تريد المتابعة؟")) return;
+    const ok = await confirm({
+      title: "إعادة عرض الترحيب",
+      body: "ستظهر بطاقة الترحيب الفخمة من جديد فورًا في هذه الصفحة. هل تريد المتابعة؟",
+      confirmLabel: "نعم، اعرضها",
+    });
+    if (!ok) return;
     setBusy("tour");
-    setMessage(null);
     try {
       const res = await fetch("/api/onboarding", { method: "DELETE" });
-      if (!res.ok) throw new Error("تعذر تجهيز الجولة — جرّب مرة أخرى");
-      /* إعادة تحميل كاملة كي يعيد فحص الأهلية من قاعدة البيانات ويبدأ فورًا */
+      if (!res.ok) throw new Error("تعذر تجهيز الترحيب — جرّب مرة أخرى");
+      /* إعادة تحميل كاملة كي يعيد فحص الأهلية من قاعدة البيانات وتظهر فورًا */
       window.location.reload();
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof Error ? err.message : "تعذر الاتصال بالخادم" });
+      toast(err instanceof Error ? err.message : "تعذر الاتصال بالخادم", "error");
       setBusy(null);
     }
   };
@@ -56,19 +67,6 @@ export function PrivacyToolsCard() {
       <p className="mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
         سجلك وذكرياتك التجريبية بيدك وحدك — امسح ما تريد وعدِ ما تحب.
       </p>
-
-      {message && (
-        <p
-          className="mt-3 rounded-xl px-3 py-2 text-xs font-bold"
-          style={{
-            background: message.ok ? "rgba(60,122,78,0.12)" : "rgba(220,38,38,0.10)",
-            color: message.ok ? "#3c7a4e" : "#DC2626",
-          }}
-          role="status"
-        >
-          {message.text}
-        </p>
-      )}
 
       <div className="mt-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "var(--border)" }}>
@@ -93,10 +91,10 @@ export function PrivacyToolsCard() {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "var(--border)" }}>
           <div className="min-w-0">
             <p className="text-xs font-bold" style={{ color: "var(--ink)" }}>
-              جولة الترحيب التفاعلية
+              بطاقة الترحيب
             </p>
             <p className="mt-0.5 text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-              اشتاقت إليها؟ أعِد عرضها كأول مرة — تشرح المنصة خطوة خطوة.
+              اشتاقت إليها؟ أعِد عرض بطاقة الترحيب الفخمة كأول مرة.
             </p>
           </div>
           <button
@@ -105,7 +103,7 @@ export function PrivacyToolsCard() {
             className="rounded-xl border px-4 py-2 text-[11px] font-bold transition-transform active:scale-[0.98] disabled:opacity-50"
             style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
           >
-            {busy === "tour" ? "جارٍ التجهيز.." : "إعادة عرض الجولة"}
+            {busy === "tour" ? "جارٍ التجهيز.." : "إعادة عرض الترحيب"}
           </button>
         </div>
       </div>

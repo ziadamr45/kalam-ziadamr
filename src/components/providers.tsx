@@ -3,6 +3,7 @@
 import { SessionProvider, signOut } from "next-auth/react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { OnboardingExperience } from "@/components/onboarding-experience";
+import { DialogProvider } from "@/components/ui/dialogs";
 import { AuthGateOverlay } from "@/components/auth-gate";
 import { NotificationToasts } from "@/components/notification-bell";
 
@@ -253,18 +254,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <ThemeProvider>
-        {children}
-        {/* تجربة التهيئة الموحدة — لا ترسم شيئًا إلا للأعضاء الجدد بعد حسم الجلسة */}
-        <OnboardingExperience />
-        {/* بوابة المصادقة الموحدة للتفاعل الفكري — نافذة دخول ذكية تحتفظ بنية التفاعل */}
-        <AuthGateOverlay />
-        {/* التوست اللحظي للإشعارات الواردة أثناء التصفح (SSE) */}
-        <NotificationToasts />
-        {/* حارس إبطال الجلسة عن بُعد — مسح صارم للكوكيز يكسر حلقة التحديث */}
-        <SessionRevocationWatcher />
-        {/* تنبيه «تم إنهاء جلستك من لوحة التحكم» بعد التحويل النظيف */}
-        <SessionEndedToast />
-        <ServiceWorkerRegistrar />
+        {/* نظام النوافذ والتنبيهات الموحد — لا نوافذ متصفح تقليدية إطلاقًا */}
+        <DialogProvider>
+          {children}
+          {/* تجربة التهيئة الموحدة — لا ترسم شيئًا إلا للأعضاء الجدد بعد حسم الجلسة */}
+          <OnboardingExperience />
+          {/* بوابة المصادقة الموحدة للتفاعل الفكري — نافذة دخول ذكية تحتفظ بنية التفاعل */}
+          <AuthGateOverlay />
+          {/* التوست اللحظي للإشعارات الواردة أثناء التصفح (SSE) */}
+          <NotificationToasts />
+          {/* حارس إبطال الجلسة عن بُعد — مسح صارم للكوكيز يكسر حلقة التحديث */}
+          <SessionRevocationWatcher />
+          {/* تنبيه «تم إنهاء جلستك من لوحة التحكم» بعد التحويل النظيف */}
+          <SessionEndedToast />
+          <ServiceWorkerRegistrar />
+        </DialogProvider>
       </ThemeProvider>
     </SessionProvider>
   );

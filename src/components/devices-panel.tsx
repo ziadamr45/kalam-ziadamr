@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useDialogs } from "@/components/ui/dialogs";
 
 /**
  * لوحة «الأجهزة المتصلة» — إدارة جلسات الحساب من صفحة الملف الشخصي:
@@ -63,12 +63,11 @@ function DeviceGlyph({ type }: { type: string | null }) {
 }
 
 export function DevicesPanel() {
-  const router = useRouter();
+  const { confirm, toast } = useDialogs();
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [currentHash, setCurrentHash] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyHash, setBusyHash] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     try {
@@ -96,13 +95,18 @@ export function DevicesPanel() {
     async (device: DeviceRow): Promise<void> => {
       const isCurrent = device.deviceHash === currentHash;
       const label = `${TYPE_LABELS[device.deviceType ?? ""] ?? "الجهاز"} — ${device.browser ?? ""} على ${device.os ?? ""}`;
-      const confirmText = isCurrent
-        ? "تنبيه: هذه هي الجلسة التي أنت فاتح منها الآن — إبطالها سيخرجك من الحساب فورًا. هل تريد المتابعة؟"
-        : `ستُبطل جلسة «${label}» فورًا. هل أنت متأكد؟`;
-      if (!window.confirm(confirmText)) return;
+      /* نافذة التأكيد الموحدة بهوية المنصة — وللجلسة الحالية تحذير صريح بالخروج الفوري */
+      const ok = await confirm({
+        title: isCurrent ? "إبطال جلستك الحالية" : "إبطال جلسة جهاز",
+        body: isCurrent
+          ? "تنبيه: هذه هي الجلسة التي أنت فاتح منها الآن — إبطالها سيخرجك من الحساب فورًا. هل تريد المتابعة؟"
+          : `ستُبطل جلسة «${label}» فورًا ويجد صاحبها نفسه خارج الحساب عند أول تفاعل. هل تريد المتابعة؟`,
+        confirmLabel: isCurrent ? "نعم، أبطِلها واخرجني" : "نعم، أبطِل الجلسة",
+        tone: "danger",
+      });
+      if (!ok) return;
 
       setBusyHash(device.deviceHash);
-      setMessage(null);
       try {
         const res = await fetch("/api/profile/devices", {
           method: "DELETE",
@@ -123,14 +127,14 @@ export function DevicesPanel() {
           await signOut({ redirectTo: "/" });
           return;
         }
-        setMessage({ ok: true, text: `أُبطلت جلسة «${label}» فورًا` });
+        toast(`أُبطلت جلسة «${label}» فورًا`);
       } catch (err) {
-        setMessage({ ok: false, text: err instanceof Error ? err.message : "تعذر إبطال الجلسة" });
+        toast(err instanceof Error ? err.message : "تعذر إبطال الجلسة", "error");
       } finally {
         setBusyHash(null);
       }
     },
-    [currentHash],
+    [currentHash, confirm, toast],
   );
 
   return (
@@ -141,19 +145,6 @@ export function DevicesPanel() {
       <p className="mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
         كل جهاز سجّل الدخول إلى حسابك يوثق هنا تلقائيًا — ويمكنك إبطال جلسة أي جهاز عن بُعد لحظةً واحدة، حتى جهاز لم تعتد رؤيته.
       </p>
-
-      {message && (
-        <p
-          className="mt-3 rounded-xl px-3 py-2 text-xs font-bold"
-          style={{
-            background: message.ok ? "rgba(60,122,78,0.12)" : "rgba(220,38,38,0.10)",
-            color: message.ok ? "#3c7a4e" : "#DC2626",
-          }}
-          role="status"
-        >
-          {message.text}
-        </p>
-      )}
 
       {loading ? (
         <p className="mt-4 text-xs" style={{ color: "var(--ink-muted)" }}>
