@@ -49,15 +49,13 @@ function MorphBurger({ open }: { open: boolean }) {
   );
 }
 
-/* زر تبديل الثيم انتقل إلى مكوّن ThemeToggle المستقل (theme-toggle.tsx)
-   مع نمط الجهوزية الذي يمنع وميض الأيقونة عند إعادة التحميل */
-
 export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   const pathname = usePathname();
   const [solid, setSolid] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [immersed, setImmersed] = useState(false);
   const [sectionsOpen, setSectionsOpen] = useState(false);
+  const sectionsRef = useRef<HTMLDivElement | null>(null);
   /* درج التنقل المتنقل — انسيابي بلا لاج مع قفل التمرير */
   const [drawerOpen, setDrawerOpen] = useState(false);
   /* الأقسام الحية من قاعدة البيانات — لا مصفوفات ثابتة هنا بعد اليوم */
@@ -69,20 +67,23 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastY = useRef(0);
 
-  /* حصر «وضع القراءة المركزة» بصفحات المقالات الفردي حصريًا —
-     ظهوره في الرئيسية والتصنيفات والصفحات العامة يسبب ارتباكًا وإخفاءً
-     عشوائيًا للعناصر دون متن مقال يُقرأ */
   const isArticlePage = pathname?.startsWith("/article/") ?? false;
+  const isHomeActive = pathname === "/";
+  const isSectionActive = (pathname?.startsWith("/section/") ?? false) || sectionsOpen;
+  const isAboutActive = pathname === "/about";
 
-  /* تفعيل وضع القراءة المركزة بسلاسة:
-     1) إغلاق الدرج إن كان مفتوحًا  2) تلاشٍ تدريجي للعناصر (CSS قائم)
-     3) القارئ يبقى في موضع قراءته حرفيًا — لا قفز لأول المقال
-     4) بعد اكتمال التلاشي تنهار العناصر المخفاة (display:none) فلا تبقى
-        مساحات فارغة فوق المتن وتحته، مع تعويض التمرير ليبقى النص
-        المعروض ثابتًا أمام العين لحظة الانهيار
-     5) حفظ الوضع بعد اكتمال الانهيار (لا قبله — حتى لا يُستعاد من
-        ريفرش حصل في نص ثانية التلاشي فينحرف الموضع)
-     6) إشعار هادئ لثانيتين */
+  /* إغلاق قائمة الأقسام المنسدلة عند الضغط خارجها */
+  useEffect(() => {
+    if (!sectionsOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (sectionsRef.current && !sectionsRef.current.contains(e.target as Node)) {
+        setSectionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [sectionsOpen]);
+
   const enterImmersion = useCallback(() => {
     setDrawerOpen(false);
     setImmersed(true);
@@ -94,14 +95,11 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       const body = document.getElementById("article-body");
       const before = body?.getBoundingClientRect().top ?? null;
       document.body.classList.add("immersion-collapsed");
-      void document.body.offsetHeight; /* إجبار حساب التخطيط فورًا */
+      void document.body.offsetHeight;
       const after = body?.getBoundingClientRect().top ?? null;
       if (before != null && after != null && after !== before) {
         window.scrollBy({ top: after - before, behavior: "instant" as ScrollBehavior });
       }
-      /* حفظ الوضع والمِرساة بعد اكتمال الانهيار وتعويض التمرير — لا يُحفظ
-         قبلها حتى لا يُستعاد من ريفرش حصل في نص ثانية التلاشي فينحرف الموضع.
-         سمة <html> تحاكي حالة body فيُعاد إنتاجها من التفضيل قبل أول رسم */
       try {
         window.localStorage.setItem("kalam_immersion", "on");
         document.documentElement.setAttribute("data-immersion", "on");
@@ -113,10 +111,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
     }, 540);
   }, []);
 
-  /* الخروج من الغمر: إزالة الحفظ والسمة أولًا ثم إعادة المكان (عناصر بلا
-     رؤية بعد) وتعويض التمرير ليبقى موضع القراءة كما هو، ثم إزالة الغمر
-     فيعود الظهور بالتدريج — رفع سمة <html> قبل القياس ضروري لأن قواعدها
-     تطوي العناصر نفسها فلا يُقاس فرق التوسّع الحقيقي إلا بعد رفعها */
   const exitImmersion = useCallback(() => {
     setImmersed(false);
     if (collapseTimer.current) {
@@ -169,6 +163,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       if (e.key === "Escape") {
         exitImmersion();
         setDrawerOpen(false);
+        setSectionsOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -178,9 +173,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   useEffect(() => {
     document.body.classList.toggle("immersion", immersed);
     if (!immersed) document.body.classList.remove("immersion-collapsed");
-    /* الـ cleanup يمسح «immersion» فقط — مسح «immersion-collapsed» هنا كان
-       يمحو الانهيار الذي أضافته استعادة ما بعد الريفريش بين عمليَي التأثير
-       فيضيع قياس التعويض عند الخروج؛ والانهيار يُنظَّف صراحة في exitImmersion */
     return () => document.body.classList.remove("immersion");
   }, [immersed]);
 
@@ -197,14 +189,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
     if (immersed && !isArticlePage) exitImmersion();
   }, [immersed, isArticlePage, exitImmersion]);
 
-  /* استعادة وضع القراءة المركزة بعد إعادة التحميل — لمن كان في الغمر حين
-     أعاد التحميل: سمة <html> كانت مزروعة قبل أول رسم (فُطْيت الواجهة
-     واستُعيد موضع التمرير المحفوظ عليها)، فيكفي هنا مزامنة حالة React
-     مع ما يراه القارئ فعلًا — بلا إشعار ولا انتقالات ولا قفزات، والزر
-     الخارج مرئي فور اكتمال الترطيب.
-     ومعها مِرساة الموضع: استعادة المتصفح/Next قد تُثبَّت على تخطيط الخط
-     الاحتياطي الأقصر قبل وصول خط أميري فيُثبَّت الموضع ثم يفلت أكثر من
-   مئة بكسل عند تضخم التخطيط — المرساة تُعاد بعد استقرار الخطوط فلا انحراف */
   useEffect(() => {
     if (!isArticlePage) return;
     let on = false;
@@ -223,9 +207,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       if (raw) anchor = Number.parseInt(raw, 10) || null;
     } catch {}
 
-    /* تتبّع خفيف للموضع أثناء القراءة في الغمر (كل 600ms كحد أقصى) —
-       لا حفظ خارج الغمر: المستمع يعيش مع الصفحة بعد الاستعادة فحارس
-       الفئة يمنع كتابة مرساة لعارضٍ خرج من الوضع أصلًا */
     let lastSave = 0;
     const onSaveScroll = () => {
       if (!document.body.classList.contains("immersion")) return;
@@ -238,7 +219,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
     };
     window.addEventListener("scroll", onSaveScroll, { passive: true });
 
-    /* إعادة الإرساء بعد اكتمال قياسات الخط النهائية */
     let alive = true;
     void (async () => {
       try {
@@ -262,7 +242,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   if (immersed) {
     return (
       <>
-        {/* إشعار التفعيل — كبسولة عائمة هادئة أعلى الشاشة لثانيتين */}
         {readerToast && (
           <div className="fixed left-1/2 top-5 z-60 -translate-x-1/2 animate-fade-in">
             <p
@@ -279,8 +258,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           </div>
         )}
 
-        {/* زر الخروج — كبسولة واضحة مثبتة أعلى الشاشة (فصل هندسي كامل عن
-            كبسولة التحكم الصوتي المثبتة أسفلها)، بمساحة لمس مريحة ≥ 48px */}
         <button
           onClick={exitImmersion}
           className="fixed left-5 top-5 z-50 min-h-[48px] rounded-full border px-5 py-2.5 text-xs font-bold shadow-lift transition-all hover:scale-105 active:scale-95 sm:text-sm"
@@ -309,8 +286,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
       >
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex flex-col leading-tight" onClick={() => setDrawerOpen(false)}>
-            {/* العلامة الميكروية — الكشيدة النحاسية جزء عضوي من كتابة العنوان
-                في موضع الهوية الرئيسي حصريًا، بحجم محسوب لا يزدحم الهيدر */}
             <span className="flex items-center gap-1.5">
               <BrandMark size={17} />
               <span className="font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
@@ -322,79 +297,122 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             </span>
           </Link>
 
-          {/* تنقل سطح المكتب — يختفي تمامًا على الهواتف */}
+          {/* تنقل سطح المكتب — مع تمييز واضح للصفحة النشطة ودعم الضغط والمرور لقائمة الأقسام */}
           <nav className="hidden items-center gap-1 text-sm md:flex">
             <Link
               href="/"
-              className="rounded-full px-3 py-2 transition-colors hover:bg-(--accent-soft)"
-              style={{ color: pathname === "/" ? "var(--accent-strong)" : "var(--ink)" }}
+              aria-current={isHomeActive ? "page" : undefined}
+              className={`rounded-full px-3.5 py-1.5 transition-colors hover:bg-(--accent-soft) ${
+                isHomeActive ? "font-bold" : ""
+              }`}
+              style={{
+                background: isHomeActive ? "var(--accent-soft)" : "transparent",
+                color: isHomeActive ? "var(--accent-strong)" : "var(--ink)",
+              }}
             >
               الرئيسية
             </Link>
 
             <div
+              ref={sectionsRef}
               className="relative"
               onMouseEnter={() => setSectionsOpen(true)}
               onMouseLeave={() => setSectionsOpen(false)}
             >
               <button
-                className="rounded-full px-3 py-2 transition-colors hover:bg-(--accent-soft)"
-                style={{ color: "var(--ink)" }}
+                type="button"
+                onClick={() => setSectionsOpen((v) => !v)}
+                className={`flex cursor-pointer items-center gap-1 rounded-full px-3.5 py-1.5 transition-colors hover:bg-(--accent-soft) ${
+                  isSectionActive ? "font-bold" : ""
+                }`}
+                style={{
+                  background: isSectionActive ? "var(--accent-soft)" : "transparent",
+                  color: isSectionActive ? "var(--accent-strong)" : "var(--ink)",
+                }}
                 aria-haspopup="true"
                 aria-expanded={sectionsOpen}
               >
                 الأقسام
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transition-transform duration-200 ${sectionsOpen ? "rotate-180" : ""}`}
+                  aria-hidden
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </button>
               {sectionsOpen && (
                 <div
-                  className="absolute right-0 top-full w-72 rounded-2xl border p-2 shadow-lift animate-fade-in"
-                  style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+                  className="absolute right-0 top-full pt-1.5 w-72 z-50"
                 >
-                  {sections.map((s) => (
-                    <Link
-                      key={s.slug}
-                      href={`/section/${encodeURIComponent(s.slug)}`}
-                      className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
-                      onClick={() => setSectionsOpen(false)}
-                    >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="font-semibold" style={{ color: "var(--ink)" }}>
-                          {s.name}
-                        </span>
-                        {typeof s.count === "number" && s.count > 0 && (
-                          <span
-                            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                            style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                          >
-                            {s.count}
+                  <div
+                    className="rounded-2xl border p-2 shadow-lift animate-fade-in"
+                    style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+                  >
+                    {sections.map((s) => {
+                      const activeSec = pathname === `/section/${s.slug}` || pathname === `/section/${encodeURIComponent(s.slug)}`;
+                      return (
+                        <Link
+                          key={s.slug}
+                          href={`/section/${encodeURIComponent(s.slug)}`}
+                          className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
+                          style={{
+                            background: activeSec ? "var(--accent-soft)" : undefined,
+                          }}
+                          onClick={() => setSectionsOpen(false)}
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span
+                              className="font-semibold"
+                              style={{ color: activeSec ? "var(--accent-strong)" : "var(--ink)" }}
+                            >
+                              {s.name}
+                            </span>
+                            {typeof s.count === "number" && s.count > 0 && (
+                              <span
+                                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                              >
+                                {s.count}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                      {s.description && (
-                        <span className="mt-0.5 block text-xs" style={{ color: "var(--ink-muted)" }}>
-                          {s.description}
-                        </span>
-                      )}
-                    </Link>
-                  ))}
+                          {s.description && (
+                            <span className="mt-0.5 block text-xs" style={{ color: "var(--ink-muted)" }}>
+                              {s.description}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
 
             <Link
               href="/about"
-              className="rounded-full px-3 py-2 transition-colors hover:bg-(--accent-soft)"
-              style={{ color: pathname === "/about" ? "var(--accent-strong)" : "var(--ink)" }}
+              aria-current={isAboutActive ? "page" : undefined}
+              className={`rounded-full px-3.5 py-1.5 transition-colors hover:bg-(--accent-soft) ${
+                isAboutActive ? "font-bold" : ""
+              }`}
+              style={{
+                background: isAboutActive ? "var(--accent-soft)" : "transparent",
+                color: isAboutActive ? "var(--accent-strong)" : "var(--ink)",
+              }}
             >
               عن المنصة
             </Link>
 
-            {/* البحث الفكري الفوري — زر بالهيدر + اختيار Cmd+K عالمي.
-                hostDialog: هذه النسخة (سطح المكتب) ترسم النافذة عبر البوابة
-                حصريًا — نسخة الهاتف أدناه أزرار فقط كي لا تتراكب نافذتان */}
             <SearchPalette hostDialog />
 
-            {/* وضع القراءة المركزة — داخل صفحات المقالات حصريًا */}
             {isArticlePage && (
               <button
                 onClick={enterImmersion}
@@ -412,7 +430,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
 
             <ThemeToggle className="p-2" />
 
-            {/* جرس الإشعارات — بجانب صورة الحساب (للحاسوب والتابلت) */}
             <NotificationBell />
 
             <AccountMenu />
@@ -440,14 +457,12 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
         </div>
       </header>
 
-      {/* درج التنقل المتنقل — ينزلق من اليسار موافقًا لموضع زر الهمبرجر،
-          مع بقاء محاذاة النصوص والروابط لليمين (RTL) */}
+      {/* درج التنقل المتنقل */}
       <div
         className={`fixed inset-0 z-55 md:hidden ${drawerOpen ? "" : "pointer-events-none"}`}
         aria-hidden={!drawerOpen}
         inert={!drawerOpen}
       >
-        {/* الطبقة المعتمة */}
         <div
           onClick={() => setDrawerOpen(false)}
           className={`absolute inset-0 bg-black/45 backdrop-blur-xs transition-opacity duration-300 ${
@@ -455,8 +470,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           }`}
         />
 
-        {/* الهمبرجر المتحوّل — يقف فوق الدرّج والطبقة المعتمة في موضع زر الفتح نفسه:
-            نفس النقر يحوّله إلى ✕ ويعيد تكوينه عند الإغلاق (تحوّل ☰ ⇄ ✕ انسيابي) */}
         <button
           onClick={() => setDrawerOpen(false)}
           aria-label={drawerOpen ? "إغلاق القائمة" : "فتح قائمة التنقل"}
@@ -476,7 +489,6 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           <MorphBurger open={drawerOpen} />
         </button>
 
-        {/* الدرجة الجانبية — مثبتة على اليسار (left-0) وتنزلق من نفس جهة الزر */}
         <aside
           className={`absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col shadow-lift transition-transform duration-300 ease-fluid ${
             drawerOpen ? "translate-x-0" : "-translate-x-full"
@@ -485,13 +497,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
           role="dialog"
           aria-label="قائمة التنقل"
         >
-          {/* في RTL يجب أن يستقر اللوجو عند «بداية» السطر (يمين الشاشة) —
-              بعيدًا تمامًا عن زر ✕ العائم المثبّت في أقصى اليسار (left-3)
-              حيث كان justify-end يدفعه إلى اليسار فيسقط تحت الزر */}
           <div className="flex items-center justify-start border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
-            {/* زر الإغلاق صار هو نفسه الهمبرجر المتحوّل — عائم فوق الدرّج في أقصى
-                اليسار (موضع زر الفتح نفسه)، واللوجو والشعار في المقابل الآمن
-                من الرأس: مسافة فاصلة كاملة بلا أي تراكب */}
             <div>
               <p className="flex items-center gap-1.5 font-ui font-bold" style={{ color: "var(--ink)" }}>
                 <BrandMark size={16} />
@@ -503,53 +509,62 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             </div>
           </div>
 
-          {/* روابط التنقل — أهداف لمس مريحة للإبهام */}
           <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
             <Link
               href="/"
               onClick={() => setDrawerOpen(false)}
               className="flex items-center justify-between rounded-2xl px-4 py-3.5 text-base font-semibold transition-colors active:bg-(--accent-soft)"
-              style={{ color: pathname === "/" ? "var(--accent-strong)" : "var(--ink)" }}
+              style={{
+                background: isHomeActive ? "var(--accent-soft)" : undefined,
+                color: isHomeActive ? "var(--accent-strong)" : "var(--ink)",
+              }}
             >
               الرئيسية
-              <span aria-hidden style={{ color: "var(--border)" }}>←</span>
+              <span aria-hidden style={{ color: isHomeActive ? "var(--accent-strong)" : "var(--border)" }}>←</span>
             </Link>
 
-            {/* بند الإشعارات البارز — داخل الدرج حصريًا على الهواتف
-                تفاديًا للتزاحم في الهيدر العلوي وكسر التصميم */}
             <DrawerNotifications />
 
             <p className="mb-2 mt-5 px-4 text-xs font-bold" style={{ color: "var(--ink-muted)" }}>
               الأقسام
             </p>
             <div className="space-y-1">
-              {sections.map((s) => (
-                <Link
-                  key={s.slug}
-                  href={`/section/${encodeURIComponent(s.slug)}`}
-                  onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 transition-colors active:bg-(--accent-soft)"
-                >
-                  <span className="min-w-0">
-                    <span className="block font-semibold" style={{ color: "var(--ink)" }}>
-                      {s.name}
+              {sections.map((s) => {
+                const activeSec = pathname === `/section/${s.slug}` || pathname === `/section/${encodeURIComponent(s.slug)}`;
+                return (
+                  <Link
+                    key={s.slug}
+                    href={`/section/${encodeURIComponent(s.slug)}`}
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 transition-colors active:bg-(--accent-soft)"
+                    style={{
+                      background: activeSec ? "var(--accent-soft)" : undefined,
+                    }}
+                  >
+                    <span className="min-w-0">
+                      <span
+                        className="block font-semibold"
+                        style={{ color: activeSec ? "var(--accent-strong)" : "var(--ink)" }}
+                      >
+                        {s.name}
+                      </span>
+                      {s.description && (
+                        <span className="mt-0.5 block text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
+                          {s.description}
+                        </span>
+                      )}
                     </span>
-                    {s.description && (
-                      <span className="mt-0.5 block text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
-                        {s.description}
+                    {typeof s.count === "number" && s.count > 0 && (
+                      <span
+                        className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                      >
+                        {s.count}
                       </span>
                     )}
-                  </span>
-                  {typeof s.count === "number" && s.count > 0 && (
-                    <span
-                      className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
-                      style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                    >
-                      {s.count}
-                    </span>
-                  )}
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
 
             <p className="mb-2 mt-5 px-4 text-xs font-bold" style={{ color: "var(--ink-muted)" }}>
@@ -561,22 +576,27 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
                 { href: "/saved", label: "قراءاتي المحفوظة" },
                 { href: "/profile", label: "ملفي ورصيد أثري" },
                 { href: "/contact", label: "اتصل بنا" },
-              ].map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-between rounded-2xl px-4 py-3.5 font-semibold transition-colors active:bg-(--accent-soft)"
-                  style={{ color: pathname === l.href ? "var(--accent-strong)" : "var(--ink)" }}
-                >
-                  {l.label}
-                  <span aria-hidden style={{ color: "var(--border)" }}>←</span>
-                </Link>
-              ))}
+              ].map((l) => {
+                const activeLink = pathname === l.href;
+                return (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex items-center justify-between rounded-2xl px-4 py-3.5 font-semibold transition-colors active:bg-(--accent-soft)"
+                    style={{
+                      background: activeLink ? "var(--accent-soft)" : undefined,
+                      color: activeLink ? "var(--accent-strong)" : "var(--ink)",
+                    }}
+                  >
+                    {l.label}
+                    <span aria-hidden style={{ color: activeLink ? "var(--accent-strong)" : "var(--border)" }}>←</span>
+                  </Link>
+                );
+              })}
             </div>
           </nav>
 
-          {/* وضع القراءة المركزة — داخل الدرج في صفحات المقالات حصريًا */}
           {isArticlePage && (
             <div className="border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
               <button

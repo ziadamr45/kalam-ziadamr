@@ -59,7 +59,7 @@ export function FirstVisitHint({
   const [stepIdx, setStepIdx] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
-  const storageKey = mode === "tour" ? `kalam_tour_${id}_v3` : `kalam_hint_${id}_v2`;
+  const storageKey = mode === "tour" ? `kalam_tour_${id}_v4` : `kalam_hint_${id}_v2`;
 
   const resolvedSteps = useMemo<HintStep[]>(
     () =>
@@ -121,11 +121,23 @@ export function FirstVisitHint({
       if (shouldScroll) {
         try {
           if (isFixedElement(el)) {
-            if (window.scrollY > 80) {
+            /* عناصر الهيدر العلوي فقط تعيد الصفحة للأعلى لتظهر؛
+               أما الشريط السفلي المثبت فيبقى في موضعه دون قفز للأعلى */
+            const inTopHeader = Boolean(el.closest("header")) || el.getBoundingClientRect().top < 120;
+            if (inTopHeader && window.scrollY > 80) {
               window.scrollTo({ top: 0, behavior: "smooth" });
             }
           } else {
-            el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+            const box = el.getBoundingClientRect();
+            const vh = window.innerHeight || 800;
+            /* العناصر الطويلة جدًا (كجسم المقال) نمرر لبدايتها بدل منتصفها حتى لا نقفز لنصف المقال */
+            if (box.height > vh * 0.65) {
+              if (box.top < 60 || box.top > vh * 0.6) {
+                el.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+              }
+            } else {
+              el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+            }
           }
         } catch {}
       }
@@ -135,11 +147,20 @@ export function FirstVisitHint({
           setRect(null);
           return;
         }
-        setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+        const vh = window.innerHeight || 800;
+        /* تقليم ارتفاع الإطار للعناصر الطويلة جدًا ليبقى أنيقًا داخل الشاشة */
+        const clampedTop = Math.max(8, r.top);
+        const clampedHeight = Math.min(r.height, vh - clampedTop - 88);
+        setRect({
+          top: r.height > vh * 0.65 ? clampedTop : r.top,
+          left: r.left,
+          width: r.width,
+          height: r.height > vh * 0.65 ? Math.max(120, clampedHeight) : r.height,
+        });
       };
       update();
       if (shouldScroll) {
-        const t = setTimeout(update, 350);
+        const t = setTimeout(update, 360);
         return () => clearTimeout(t);
       }
     },

@@ -76,8 +76,8 @@ export default async function HomePage() {
             },
             {
               selector: "[data-tour='account-avatar']",
-              title: "حسابك وأثرك",
-              text: "ومن هنا تدخل إلى ملفك الشخصي ومحفوظاتك وإعداداتك وتتابع رصيد أثرك.",
+              title: "تسجيل الدخول وحسابك",
+              text: "من هنا تسجّل دخولك بحساب جوجل بضغطة واحدة لحفظ المقالات، والمشاركة في الحوار، ومتابعة رصيد أثرك وإعداداتك.",
             },
           ]}
         />
@@ -158,8 +158,6 @@ export default async function HomePage() {
           </h2>
           <div id="sections-grid" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {sections.map((s) => {
-              /* الهوية الديناميكية للقسم — اللون والأيقونة من لوحة التحكم:
-                 في الوضع الداكن يُفتّح اللون تلقائيًا عبر CSS color-mix حتى لا يبهت على #131c2e */
               const customColor = s.color || "#a16a1f";
               const hasCustom = Boolean(s.color);
               return (
@@ -224,7 +222,6 @@ export default async function HomePage() {
           </div>
         </section>
       </main>
-      {/* كبسولة تفعيل الإشعارات الذكية — الرئيسية فقط، ممنوعة في المقالات */}
       <PushPromptCapsule />
       <SiteFooter />
     </>

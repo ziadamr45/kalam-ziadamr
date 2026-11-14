@@ -445,6 +445,7 @@ export function ArticleReader({
             <button
               type="button"
               onClick={() => window.print()}
+              data-tour="pdf-btn"
               className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}
               title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
@@ -527,8 +528,18 @@ export function ArticleReader({
           },
           {
             selector: "[data-tour='save-btn']",
-            title: "الحفظ والاقتباس",
-            text: "من هنا تحفظ المقال في حسابك أو على جهازك بدون إنترنت، أو تصمّم بطاقة اقتباس أو نسخة PDF.",
+            title: "حفظ المقال",
+            text: "من هنا تحفظ المقال في حسابك للمزامنة بين أجهزتك، أو تحفظه على هذا الجهاز للقراءة بدون إنترنت.",
+          },
+          {
+            selector: "[data-tour='pdf-btn']",
+            title: "طباعة أو حفظ PDF",
+            text: "من هنا تحفظ المقال كملف PDF منسّق وجاهز للقراءة أو الطباعة في أي وقت.",
+          },
+          {
+            selector: "[data-tour='quote-btn']",
+            title: "اقتباس ومشاركة",
+            text: "من هنا تصمّم بطاقة اقتباس مصوّرة بهوية المنصة لمشاركتها مباشرة.",
           },
           {
             selector: "[data-tour='discuss-trigger']",
@@ -580,8 +591,7 @@ export function ArticleReader({
       </div>
 
       <Suspense fallback={null}>
-        <SearchJump version={syncKey} />
-      </Suspense>
+        <SearchJump version={syncKey} />\n      </Suspense>
 
       <div id="article-end-marker" className="h-1" aria-hidden />
     </div>

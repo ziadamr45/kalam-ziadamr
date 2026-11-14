@@ -62,7 +62,14 @@ export function AccountMenu() {
   }, [open]);
 
   if (status === "loading" && !cached) {
-    return <span className="inline-block h-7 w-7 animate-pulse rounded-full" style={{ background: "var(--border)" }} aria-hidden />;
+    return (
+      <span
+        data-tour="account-avatar"
+        className="inline-block h-7 w-7 animate-pulse rounded-full"
+        style={{ background: "var(--border)" }}
+        aria-hidden
+      />
+    );
   }
 
   if (status === "unauthenticated" || (!session?.user && !cached)) {
@@ -70,6 +77,7 @@ export function AccountMenu() {
       <Link
         href={`/auth/login?callback=${encodeURIComponent(pathname || "/")}`}
         title="تسجيل الدخول بحساب Google"
+        data-tour="account-avatar"
         className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold transition-all hover:scale-105"
         style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
       >
@@ -83,8 +91,6 @@ export function AccountMenu() {
 
   return (
     <div className="relative" ref={menuRef}>
-      {/* زر اللمس يحافظ على 44px للموبايل بينما الدائرة المرئية ثابتة 28×28px
-          لتتناسق مع أيقونات البحث والوضع الليلي والقائمة */}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="true"
