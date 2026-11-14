@@ -12,12 +12,33 @@ export type HintStep = {
 
 type Rect = { top: number; left: number; width: number; height: number };
 
+/** البحث عن أول عنصر ظاهر فعليًا يطابق الـ selector (لتجاوز النسخ المخفية بين الهاتف والحاسوب) */
+function findVisibleTarget(selector: string): HTMLElement | null {
+  const nodes = document.querySelectorAll<HTMLElement>(selector);
+  for (const el of nodes) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return el;
+  }
+  return null;
+}
+
+/** التحقق إن كان العنصر أو أحد أسلافه مثبّتًا (position: fixed) */
+function isFixedElement(el: HTMLElement): boolean {
+  let curr: HTMLElement | null = el;
+  while (curr && curr !== document.body) {
+    const pos = window.getComputedStyle(curr).position;
+    if (pos === "fixed") return true;
+    curr = curr.parentElement;
+  }
+  return false;
+}
+
 /**
  * دليل التلميحات الذكية المزدوج:
  * 1. الوضع الثابت (`mode="inline"`): بطاقة إرشادية هادئة في موضعها للميزات البسيطة.
  * 2. الوضع التفاعلي الموجه (`mode="tour"`): جولة خطوة بخطوة تنتقل مع القارئ
- *    بين العناصر الفعلية (`selector`) مع تمرير سلس وإطار تسليط ضوء نحاسي،
- *    دون تعتيم مزعج للشاشة.
+ *    بين العناصر الفعلية الظاهرة (`selector`) مع تمرير سلس وإطار تسليط ضوء نحاسي،
+ *    وعودة هادئة لأعلى الصفحة عند الانتهاء.
  */
 export function FirstVisitHint({
   id,
@@ -73,7 +94,12 @@ export function FirstVisitHint({
     try {
       window.localStorage.setItem(storageKey, "1");
     } catch {}
-  }, [storageKey]);
+    if (mode === "tour" && typeof window !== "undefined" && window.scrollY > 80) {
+      try {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch {}
+    }
+  }, [storageKey, mode]);
 
   const measureTarget = useCallback(
     (shouldScroll: boolean) => {
@@ -83,9 +109,8 @@ export function FirstVisitHint({
         setRect(null);
         return;
       }
-      const el = document.querySelector(step.selector) as HTMLElement | null;
-      const initialRect = el?.getBoundingClientRect();
-      if (!el || !initialRect || (initialRect.width === 0 && initialRect.height === 0)) {
+      const el = findVisibleTarget(step.selector);
+      if (!el) {
         if (stepIdx < resolvedSteps.length - 1) {
           setStepIdx((i) => i + 1);
         } else {
@@ -95,7 +120,13 @@ export function FirstVisitHint({
       }
       if (shouldScroll) {
         try {
-          el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+          if (isFixedElement(el)) {
+            if (window.scrollY > 80) {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          } else {
+            el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+          }
         } catch {}
       }
       const update = () => {
@@ -108,7 +139,7 @@ export function FirstVisitHint({
       };
       update();
       if (shouldScroll) {
-        const t = setTimeout(update, 320);
+        const t = setTimeout(update, 350);
         return () => clearTimeout(t);
       }
     },
