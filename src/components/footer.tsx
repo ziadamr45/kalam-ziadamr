@@ -119,10 +119,10 @@ export function Footer({
   const platformGroup = socials.filter((s) => !DEV_SOCIAL_KEYS.has(s.key));
   const devGroup = socials.filter((s) => DEV_SOCIAL_KEYS.has(s.key));
 
-  /* جلب نص التذييل المُدار من لوحة التحكم — بعد الرسم الأول حتى لا نكسر الترطيب */
+  /* جلب نص التذييل المُدار من لوحة التحكم — يستفيد من كاش المتصفح والحافة */
   useEffect(() => {
     let alive = true;
-    fetch("/api/public-config", { cache: "no-store" })
+    fetch("/api/public-config")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (alive && d?.FOOTER_TEXT) setFooterText(d.FOOTER_TEXT);
