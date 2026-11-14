@@ -11,7 +11,7 @@ type ChatMessage = { role: "user" | "model"; text: string };
 /**
  * عارض ماركداون غني لردود المحاور:
  * عناوين (##)، جداول (| ... |)، اقتباسات (> )، قوائم نقطية ومرقمة،
- * عريض (**)، مائل (*)، ووسوم بارزة (`...`).
+ * عريض (**)، مائل (*)، وسوم (`...`)، وروابط قابلة للضغط ([نص](url) أو https:// أو mailto:).
  */
 function MiniMarkdown({ text }: { text: string }) {
   const nodes: React.ReactNode[] = [];
@@ -21,35 +21,86 @@ function MiniMarkdown({ text }: { text: string }) {
   let quoteLines: string[] = [];
   let tableRows: string[][] = [];
 
+  const renderLinksAndText = (chunk: string, keyPrefix: string): React.ReactNode[] => {
+    const pattern = /(\[[^\]]+\]\((?:https?:\/\/|mailto:)[^\s)]+\)|https?:\/\/[^\s<>()]+|mailto:[^\s<>()]+)/g;
+    const parts = chunk.split(pattern);
+    return parts.filter(Boolean).map((part, idx) => {
+      const mdMatch = part.match(/^\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)$/);
+      if (mdMatch) {
+        const [, label, href] = mdMatch;
+        return (
+          <a
+            key={`${keyPrefix}-lnk-${idx}`}
+            href={href}
+            target={href.startsWith("mailto:") ? undefined : "_blank"}
+            rel={href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
+            className="font-bold underline decoration-2 underline-offset-4 break-words hover:opacity-80"
+            style={{ color: "var(--accent-strong)" }}
+          >
+            {label}
+          </a>
+        );
+      }
+      if (/^(https?:\/\/|mailto:)/.test(part)) {
+        const cleanUrl = part.replace(/[.,،؛:!?؟)]+$/, "");
+        const trailing = part.slice(cleanUrl.length);
+        return (
+          <span key={`${keyPrefix}-url-${idx}`}>
+            <a
+              href={cleanUrl}
+              target={cleanUrl.startsWith("mailto:") ? undefined : "_blank"}
+              rel={cleanUrl.startsWith("mailto:") ? undefined : "noopener noreferrer"}
+              dir="ltr"
+              className="font-semibold underline underline-offset-4 break-all hover:opacity-80"
+              style={{ color: "var(--accent-strong)" }}
+            >
+              {cleanUrl}
+            </a>
+            {trailing}
+          </span>
+        );
+      }
+      return <span key={`${keyPrefix}-txt-${idx}`}>{part}</span>;
+    });
+  };
+
   const inline = (s: string, k: string): React.ReactNode[] =>
     s
       .split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g)
       .filter((p) => p !== "")
       .map((p, i) => {
         if (p.startsWith("**") && p.endsWith("**")) {
-          return <strong key={`${k}-${i}`} className="font-bold">{p.slice(2, -2)}</strong>;
+          return (
+            <strong key={`${k}-${i}`} className="font-bold">
+              {renderLinksAndText(p.slice(2, -2), `${k}-b-${i}`)}
+            </strong>
+          );
         }
         if (p.startsWith("*") && p.endsWith("*") && p.length > 2) {
-          return <em key={`${k}-${i}`} className="italic">{p.slice(1, -1)}</em>;
+          return (
+            <em key={`${k}-${i}`} className="italic">
+              {renderLinksAndText(p.slice(1, -1), `${k}-em-${i}`)}
+            </em>
+          );
         }
         if (p.startsWith("`") && p.endsWith("`") && p.length > 2) {
           return (
             <code
               key={`${k}-${i}`}
-              className="rounded-md px-1.5 py-0.5 text-[12px] font-semibold"
+              className="rounded-md px-1.5 py-0.5 text-[12px] font-semibold break-words"
               style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
             >
               {p.slice(1, -1)}
             </code>
           );
         }
-        return <span key={`${k}-${i}`}>{p}</span>;
+        return <span key={`${k}-${i}`}>{renderLinksAndText(p, `${k}-r-${i}`)}</span>;
       });
 
   const flushList = () => {
     if (bullets.length === 0) return;
     const items = bullets.map((b, i) => (
-      <li key={i} className="leading-7">{inline(b, `li${nodes.length}-${i}`)}</li>
+      <li key={i} className="leading-7 break-words [overflow-wrap:anywhere]">{inline(b, `li${nodes.length}-${i}`)}</li>
     ));
     const Tag = ordered ? "ol" : "ul";
     nodes.push(
@@ -65,7 +116,7 @@ function MiniMarkdown({ text }: { text: string }) {
     nodes.push(
       <blockquote
         key={`q-${nodes.length}`}
-        className="rounded-xl border-r-3 px-3.5 py-2 text-[13px] leading-7"
+        className="rounded-xl border-r-3 px-3.5 py-2 text-[13px] leading-7 break-words [overflow-wrap:anywhere]"
         style={{
           borderColor: "var(--accent)",
           background: "var(--surface)",
@@ -123,7 +174,7 @@ function MiniMarkdown({ text }: { text: string }) {
       </span>
     ));
     nodes.push(
-      <p key={`p-${nodes.length}`} className="leading-7">{content}</p>,
+      <p key={`p-${nodes.length}`} className="leading-7 break-words [overflow-wrap:anywhere]">{content}</p>,
     );
     para = [];
   };
@@ -155,7 +206,7 @@ function MiniMarkdown({ text }: { text: string }) {
       nodes.push(
         <p
           key={`h-${nodes.length}`}
-          className="mt-1 border-b pb-1 text-[13px] font-bold"
+          className="mt-1 border-b pb-1 text-[13px] font-bold break-words"
           style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
         >
           {inline(heading[2], `h${nodes.length}`)}
@@ -185,7 +236,7 @@ function MiniMarkdown({ text }: { text: string }) {
   }
   flushAll();
 
-  return <div className="space-y-2.5">{nodes}</div>;
+  return <div className="space-y-2.5 overflow-hidden">{nodes}</div>;
 }
 
 const HISTORY_KEY = (articleId: string) => `kalam_discuss_${articleId}`;
@@ -198,6 +249,7 @@ export function DiscussCompanion({
   articleTitle: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [cfgBadge, setCfgBadge] = useState("مساعد ذكاء اصطناعي");
   const [cfgOpening, setCfgOpening] = useState(
     "أنا هنا لأحاورك حول الأفكار الواردة في هذا المقال ومساعدتك في تحليلها واستخراج أبعادها.",
@@ -329,6 +381,7 @@ export function DiscussCompanion({
 
   const plainOf = (t: string) =>
     t
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
       .replace(/^#{1,3}\s+/gm, "")
       .replace(/\*\*([^*]+)\*\*/g, "$1")
       .replace(/^\s*[-*•]\s+/gm, "• ")
@@ -503,9 +556,9 @@ export function DiscussCompanion({
         />
 
         <aside
-          className={`absolute inset-y-0 left-0 flex w-full max-w-md flex-col shadow-2xl transition-transform duration-300 ease-out ${
-            ready ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`absolute inset-y-0 left-0 flex w-full flex-col shadow-2xl transition-all duration-300 ease-out ${
+            fullscreen ? "max-w-full" : "max-w-md"
+          } ${ready ? "translate-x-0" : "-translate-x-full"}`}
           style={{ background: "var(--surface)" }}
         >
           <header
@@ -537,7 +590,7 @@ export function DiscussCompanion({
                 {articleTitle}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {impactNote && (
                 <span
                   className="hidden rounded-full px-3 py-1 text-[11px] font-bold sm:inline"
@@ -577,6 +630,31 @@ export function DiscussCompanion({
                   </span>
                 )
               )}
+              {/* زر ملء الشاشة للتابلت والكمبيوتر (الهاتف يملأ الشاشة افتراضيًا) */}
+              <button
+                type="button"
+                onClick={() => setFullscreen((f) => !f)}
+                aria-label={fullscreen ? "تصغير نافذة النقاش" : "توسيع نافذة النقاش لملء الشاشة"}
+                title={fullscreen ? "الوضع الجانبي" : "ملء الشاشة"}
+                className="hidden rounded-full p-2 transition-colors hover:bg-(--accent-soft) sm:inline-flex"
+                style={{ color: fullscreen ? "var(--accent-strong)" : "var(--ink-muted)" }}
+              >
+                {fullscreen ? (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <polyline points="4 14 10 14 10 20" />
+                    <polyline points="20 10 14 10 14 4" />
+                    <line x1="14" y1="10" x2="21" y2="3" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </svg>
+                ) : (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <polyline points="15 3 21 3 21 9" />
+                    <polyline points="9 21 3 21 3 15" />
+                    <line x1="21" y1="3" x2="14" y2="10" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </svg>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={closeDrawer}
@@ -591,209 +669,213 @@ export function DiscussCompanion({
             </div>
           </header>
 
-          <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
-            <FirstVisitHint
-              id="ai-discuss"
-              steps={[
-                {
-                  title: "حوار في صلب المقال",
-                  text: "اطرح أي سؤال أو فكرة حول هذا المقال، وسيجيبك المحاور من مضمون المقال ورؤية كاتبه.",
-                },
-                {
-                  title: "يتحدث بلغتك ولهجتك",
-                  text: "اكتب بالعربية الفصحى أو باللهجة المصرية أو بالإنجليزية، وسيتجاوب معك المحاور بالأسلوب نفسه.",
-                },
-              ]}
-            />
+          <div ref={listRef} className="flex-1 overflow-y-auto p-3.5 sm:p-4" aria-live="polite">
+            <div className={`space-y-4 ${fullscreen ? "mx-auto max-w-3xl" : ""}`}>
+              <FirstVisitHint
+                id="ai-discuss"
+                steps={[
+                  {
+                    title: "حوار في صلب المقال",
+                    text: "اطرح أي سؤال أو فكرة حول هذا المقال، وسيجيبك المحاور من مضمون المقال ورؤية كاتبه.",
+                  },
+                  {
+                    title: "يتحدث بلغتك ولهجتك",
+                    text: "اكتب بالعربية الفصحى أو باللهجة المصرية أو بالإنجليزية، وسيتجاوب معك المحاور بالأسلوب نفسه.",
+                  },
+                ]}
+              />
 
-            <div className="flex justify-start">
-              <div
-                className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-7"
-                style={{ background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }}
-              >
-                {cfgOpening}
-              </div>
-            </div>
-
-            {messages.length === 0 && (
-              <div
-                className="mt-2 rounded-2xl border border-dashed p-5 text-center text-sm leading-8"
-                style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
-              >
-                اسأل عن أي فكرة في المقال — سأحاورك بفكر الكاتب نفسه.
-                <br />
-                النقاش محصور بهذا المقال وحده.
-              </div>
-            )}
-
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className="max-w-[85%]">
-                  <div
-                    onClick={() => setActiveIdx(activeIdx === i ? null : i)}
-                    className={`cursor-pointer rounded-2xl px-4 py-3 text-sm leading-7 ${
-                      m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
-                    }`}
-                    style={
-                      m.role === "user"
-                        ? { background: "var(--accent)", color: "#fff" }
-                        : { background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }
-                    }
-                    title="اضغط لإظهار الإجراءات"
-                  >
-                    {m.role === "model" ? <MiniMarkdown text={m.text} /> : m.text}
-                  </div>
-                  {activeIdx === i && !sending && (
-                    <div
-                      className={`mt-1 flex items-center gap-3 text-[11px] font-bold ${
-                        m.role === "user" ? "justify-end" : ""
-                      }`}
-                    >
-                      {m.role === "model" ? (
-                        <button
-                          type="button"
-                          onClick={() => copyMessage(i)}
-                          className="flex items-center gap-1 transition-colors hover:opacity-80"
-                          style={{ color: copiedIdx === i ? "var(--accent-strong)" : "var(--ink-muted)" }}
-                        >
-                          {copiedIdx === i ? (
-                            <>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M20 6 9 17l-5-5" />
-                              </svg>
-                              نُسخ الرد
-                            </>
-                          ) : (
-                            <>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <rect x="9" y="9" width="13" height="13" rx="2" />
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                              </svg>
-                              نسخ الرد
-                            </>
-                          )}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEdit(i)}
-                          className="flex items-center gap-1 transition-colors hover:opacity-80"
-                          style={{ color: "var(--ink-muted)" }}
-                          title="عدّل رسالتك — يُقصّ الحوار بعد هذه الرسالة وتُحسب من رصيدك كرسالة جديدة"
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                          </svg>
-                          تعديل
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {editing === i && (
-                    <p className="mt-1 text-[10px] font-semibold leading-4" style={{ color: "#D97706" }}>
-                      وضع التعديل — أرسل النص الجديد وسيُحذف ما بعد هذه الرسالة
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {sending && (
               <div className="flex justify-start">
                 <div
-                  className="flex items-center gap-1.5 rounded-2xl rounded-tr-sm px-4 py-3.5"
-                  style={{ background: "var(--bg-soft)", border: "1px solid var(--border)" }}
-                  aria-label="المحاور يفكر"
+                  className="w-fit max-w-[92%] overflow-hidden whitespace-pre-wrap rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-7 break-words [overflow-wrap:anywhere]"
+                  style={{ background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }}
                 >
-                  <span className="kalam-dot" />
-                  <span className="kalam-dot kalam-dot-mid" />
-                  <span className="kalam-dot kalam-dot-end" />
+                  {cfgOpening}
                 </div>
               </div>
-            )}
 
-            {exhausted && !unlimited && (
-              <p
-                className="rounded-2xl border border-dashed p-4 text-center text-xs leading-7"
-                style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
-              >
-                لقد استوفيت الحد المخصص لنقاش هذا المقال ({arabicNum(limit - Math.max(remaining ?? 0, 0))}/{arabicNum(limit)}).
-                <br />
-                تفضل بزيارة مقال آخر لفتح نقاش جديد — شكرًا لحوارك الراقي.
-              </p>
-            )}
+              {messages.length === 0 && (
+                <div
+                  className="mt-2 rounded-2xl border border-dashed p-5 text-center text-sm leading-8"
+                  style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+                >
+                  اسأل عن أي فكرة في المقال — سأحاورك بفكر الكاتب نفسه.
+                  <br />
+                  النقاش محصور بهذا المقال وحده.
+                </div>
+              )}
 
-            {error && (
-              <p className="text-center text-xs font-semibold" style={{ color: "#DC2626" }} role="alert">
-                {error}
-              </p>
-            )}
+              {messages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className="min-w-0 max-w-[92%]">
+                    <div
+                      onClick={() => setActiveIdx(activeIdx === i ? null : i)}
+                      className={`w-fit max-w-full cursor-pointer overflow-hidden rounded-2xl px-4 py-3 text-sm leading-7 break-words [overflow-wrap:anywhere] ${
+                        m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
+                      }`}
+                      style={
+                        m.role === "user"
+                          ? { background: "var(--accent)", color: "#fff" }
+                          : { background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }
+                      }
+                      title="اضغط لإظهار الإجراءات"
+                    >
+                      {m.role === "model" ? <MiniMarkdown text={m.text} /> : m.text}
+                    </div>
+                    {activeIdx === i && !sending && (
+                      <div
+                        className={`mt-1 flex items-center gap-3 text-[11px] font-bold ${
+                          m.role === "user" ? "justify-end" : ""
+                        }`}
+                      >
+                        {m.role === "model" ? (
+                          <button
+                            type="button"
+                            onClick={() => copyMessage(i)}
+                            className="flex items-center gap-1 transition-colors hover:opacity-80"
+                            style={{ color: copiedIdx === i ? "var(--accent-strong)" : "var(--ink-muted)" }}
+                          >
+                            {copiedIdx === i ? (
+                              <>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                  <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                                نُسخ الرد
+                              </>
+                            ) : (
+                              <>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                </svg>
+                                نسخ الرد
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(i)}
+                            className="flex items-center gap-1 transition-colors hover:opacity-80"
+                            style={{ color: "var(--ink-muted)" }}
+                            title="عدّل رسالتك — يُقصّ الحوار بعد هذه الرسالة وتُحسب من رصيدك كرسالة جديدة"
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                            </svg>
+                            تعديل
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {editing === i && (
+                      <p className="mt-1 text-[10px] font-semibold leading-4" style={{ color: "#D97706" }}>
+                        وضع التعديل — أرسل النص الجديد وسيُحذف ما بعد هذه الرسالة
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {sending && (
+                <div className="flex justify-start">
+                  <div
+                    className="flex items-center gap-1.5 rounded-2xl rounded-tr-sm px-4 py-3.5"
+                    style={{ background: "var(--bg-soft)", border: "1px solid var(--border)" }}
+                    aria-label="المحاور يفكر"
+                  >
+                    <span className="kalam-dot" />
+                    <span className="kalam-dot kalam-dot-mid" />
+                    <span className="kalam-dot kalam-dot-end" />
+                  </div>
+                </div>
+              )}
+
+              {exhausted && !unlimited && (
+                <p
+                  className="rounded-2xl border border-dashed p-4 text-center text-xs leading-7"
+                  style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+                >
+                  لقد استوفيت الحد المخصص لنقاش هذا المقال ({arabicNum(limit - Math.max(remaining ?? 0, 0))}/{arabicNum(limit)}).
+                  <br />
+                  تفضل بزيارة مقال آخر لفتح نقاش جديد — شكرًا لحوارك الراقي.
+                </p>
+              )}
+
+              {error && (
+                <p className="text-center text-xs font-semibold" style={{ color: "#DC2626" }} role="alert">
+                  {error}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="border-t p-3" style={{ borderColor: "var(--border)" }}>
-            {editing !== null && (
-              <div
-                className="mb-2 flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold"
-                style={{
-                  borderColor: "rgba(245,158,11,0.4)",
-                  background: "rgba(245,158,11,0.08)",
-                  color: "#D97706",
-                }}
-              >
-                <span>أنت تعدّل رسالة سابقة — إرسالها يحذف ما بعدها وتُحسب من رصيدك كرسالة جديدة</span>
+            <div className={fullscreen ? "mx-auto max-w-3xl" : ""}>
+              {editing !== null && (
+                <div
+                  className="mb-2 flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold"
+                  style={{
+                    borderColor: "rgba(245,158,11,0.4)",
+                    background: "rgba(245,158,11,0.08)",
+                    color: "#D97706",
+                  }}
+                >
+                  <span>أنت تعدّل رسالة سابقة — إرسالها يحذف ما بعدها وتُحسب من رصيدك كرسالة جديدة</span>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="shrink-0 font-bold underline underline-offset-2"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              )}
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    setError("");
+                  }}
+                  onKeyDown={onInputKey}
+                  rows={1}
+                  disabled={exhausted || sending}
+                  maxLength={1200}
+                  placeholder={
+                    exhausted
+                      ? "انتهت حصة النقاش لهذا المقال"
+                      : editing !== null
+                        ? "عدّل رسالتك ثم أرسل.."
+                        : "اسأل أو ناقش بهدوء واحترام.."
+                  }
+                  className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent) disabled:opacity-50"
+                  style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+                />
                 <button
                   type="button"
-                  onClick={cancelEdit}
-                  className="shrink-0 font-bold underline underline-offset-2"
+                  onClick={send}
+                  disabled={exhausted || sending || !input.trim()}
+                  aria-label="إرسال الرسالة"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-soft transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+                  style={{ background: "var(--accent)", color: "#fff" }}
                 >
-                  إلغاء
+                  {sending ? (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden className="animate-spin">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="-scale-x-100">
+                      <path d="m22 2-7 20-4-9-9-4Z" />
+                    </svg>
+                  )}
                 </button>
               </div>
-            )}
-            <div className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={onInputKey}
-                rows={1}
-                disabled={exhausted || sending}
-                maxLength={1200}
-                placeholder={
-                  exhausted
-                    ? "انتهت حصة النقاش لهذا المقال"
-                    : editing !== null
-                      ? "عدّل رسالتك ثم أرسل.."
-                      : "اسأل أو ناقش بهدوء واحترام.."
-                }
-                className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent) disabled:opacity-50"
-                style={{ borderColor: "var(--border)", color: "var(--ink)" }}
-              />
-              <button
-                type="button"
-                onClick={send}
-                disabled={exhausted || sending || !input.trim()}
-                aria-label="إرسال الرسالة"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-soft transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
-                style={{ background: "var(--accent)", color: "#fff" }}
-              >
-                {sending ? (
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden className="animate-spin">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="-scale-x-100">
-                    <path d="m22 2-7 20-4-9-9-4Z" />
-                  </svg>
-                )}
-              </button>
+              <p className="select-none py-1.5 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                {cfgDisclaimer}
+              </p>
             </div>
-            <p className="select-none py-1.5 text-center text-xs text-zinc-500 dark:text-zinc-400">
-              {cfgDisclaimer}
-            </p>
           </div>
         </aside>
       </div>
