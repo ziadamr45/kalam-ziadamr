@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
@@ -130,37 +131,33 @@ export default async function HomePage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {sections.map((s) => {
               /* الهوية الديناميكية للقسم — اللون والأيقونة من لوحة التحكم:
-                 شريط جانبي + غسق لوني خافت جدًا + أيقونة في شارة ملونة،
-                 بلمسة هادئة تحافظ على روح المنصة بلا ألوان صارخة */
+                 في الوضع الداكن يُفتّح اللون تلقائيًا عبر CSS color-mix حتى لا يبهت على #131c2e */
               const customColor = s.color || "#a16a1f";
               const hasCustom = Boolean(s.color);
               return (
                 <Link
                   key={s.slug}
                   href={`/section/${s.slug}`}
-                  className="group relative overflow-hidden rounded-2xl border p-5 shadow-soft transition-all duration-500 ease-fluid hover:-translate-y-1 hover:shadow-lift"
-                  style={{
-                    background: hasCustom
-                      ? `linear-gradient(to bottom-left, ${customColor}0d, var(--surface) 60%)`
-                      : "var(--surface)",
-                    borderColor: hasCustom ? `${customColor}2e` : "var(--border)",
-                    borderRightColor: hasCustom ? customColor : undefined,
-                    borderRightWidth: hasCustom ? "4px" : undefined,
-                  }}
+                  className={`group relative overflow-hidden rounded-2xl border p-5 shadow-soft transition-all duration-500 ease-fluid hover:-translate-y-1 hover:shadow-lift ${hasCustom ? "section-card-custom" : ""}`}
+                  style={
+                    hasCustom
+                      ? ({ "--sec-color": customColor } as CSSProperties)
+                      : { background: "var(--surface)", borderColor: "var(--border)" }
+                  }
                 >
                   <div className="flex items-center gap-2.5">
                     {s.icon && (
                       <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg"
-                        style={{ backgroundColor: hasCustom ? `${customColor}15` : "var(--accent-soft)" }}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg ${hasCustom ? "section-card-icon" : ""}`}
+                        style={hasCustom ? undefined : { backgroundColor: "var(--accent-soft)" }}
                         aria-hidden
                       >
                         {s.icon}
                       </span>
                     )}
                     <h3
-                      className="font-ui text-lg font-bold transition-colors"
-                      style={{ color: hasCustom ? customColor : "var(--ink)" }}
+                      className={`font-ui text-lg font-bold transition-colors ${hasCustom ? "section-card-title" : ""}`}
+                      style={hasCustom ? undefined : { color: "var(--ink)" }}
                     >
                       {s.name}
                     </h3>

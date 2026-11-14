@@ -6,6 +6,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 
+const AVATAR_CACHE_KEY = "kalam_avatar_cache";
+type CachedAvatar = { name?: string | null; image?: string | null; email?: string | null };
+
 function LoginIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -20,7 +23,34 @@ export function AccountMenu() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [cached, setCached] = useState<CachedAvatar | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(AVATAR_CACHE_KEY);
+      if (raw) setCached(JSON.parse(raw) as CachedAvatar);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      const next: CachedAvatar = {
+        name: session.user.name ?? null,
+        image: session.user.image ?? null,
+        email: session.user.email ?? null,
+      };
+      setCached(next);
+      try {
+        window.localStorage.setItem(AVATAR_CACHE_KEY, JSON.stringify(next));
+      } catch {}
+    } else if (status === "unauthenticated") {
+      setCached(null);
+      try {
+        window.localStorage.removeItem(AVATAR_CACHE_KEY);
+      } catch {}
+    }
+  }, [status, session?.user]);
 
   useEffect(() => {
     if (!open) return;
@@ -31,11 +61,11 @@ export function AccountMenu() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
-  if (status === "loading") {
+  if (status === "loading" && !cached) {
     return <span className="inline-block h-7 w-7 animate-pulse rounded-full" style={{ background: "var(--border)" }} aria-hidden />;
   }
 
-  if (status === "unauthenticated" || !session?.user) {
+  if (status === "unauthenticated" || (!session?.user && !cached)) {
     return (
       <Link
         href={`/auth/login?callback=${encodeURIComponent(pathname || "/")}`}
@@ -49,7 +79,7 @@ export function AccountMenu() {
     );
   }
 
-  const u = session.user;
+  const u = session?.user ?? cached!;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -140,6 +170,7 @@ export function AccountMenu() {
               onClick={async () => {
                 try {
                   window.localStorage.removeItem("kalam_was_logged_in");
+                  window.localStorage.removeItem(AVATAR_CACHE_KEY);
                 } catch {}
                 await signOut({ redirectTo: "/" });
               }}

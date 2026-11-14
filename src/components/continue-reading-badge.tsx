@@ -45,11 +45,12 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(lsKey(slug));
-      if (!raw) return;
-      const saved = JSON.parse(raw) as SavedProgress;
-      maxMilestone.current = { pct: saved.pct ?? 0, scrollY: saved.scrollY ?? 0 };
-      if (saved.pct >= 5 && saved.pct <= 95 && Date.now() - (saved.at ?? 0) < 90 * 24 * 3600 * 1000) {
-        setResume(saved);
+      if (raw) {
+        const saved = JSON.parse(raw) as SavedProgress;
+        maxMilestone.current = { pct: saved.pct ?? 0, scrollY: saved.scrollY ?? 0 };
+        if (saved.pct >= 5 && saved.pct <= 95 && Date.now() - (saved.at ?? 0) < 90 * 24 * 3600 * 1000) {
+          setResume(saved);
+        }
       }
     } catch {}
 

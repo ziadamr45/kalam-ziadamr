@@ -122,6 +122,32 @@
   --shadow-color: 0 0 0;
 }
 
+/* كروت الأقسام الملوّنة — متكيفة تلقائيًا مع الوضع الداكن */
+.section-card-custom {
+  background: linear-gradient(to bottom-left, color-mix(in srgb, var(--sec-color) 6%, transparent), var(--surface) 60%);
+  border-color: color-mix(in srgb, var(--sec-color) 20%, transparent);
+  border-right-width: 4px;
+  border-right-color: var(--sec-color);
+}
+.section-card-custom .section-card-icon {
+  background-color: color-mix(in srgb, var(--sec-color) 10%, transparent);
+}
+.section-card-custom .section-card-title {
+  color: var(--sec-color);
+}
+[data-theme="dark"] .section-card-custom {
+  --sec-lit: color-mix(in srgb, var(--sec-color) 62%, #f8fafc);
+  background: linear-gradient(to bottom-left, color-mix(in srgb, var(--sec-lit) 12%, transparent), var(--surface) 65%);
+  border-color: color-mix(in srgb, var(--sec-lit) 26%, transparent);
+  border-right-color: var(--sec-lit);
+}
+[data-theme="dark"] .section-card-custom .section-card-icon {
+  background-color: color-mix(in srgb, var(--sec-lit) 16%, transparent);
+}
+[data-theme="dark"] .section-card-custom .section-card-title {
+  color: var(--sec-lit);
+}
+
 html {
   scroll-behavior: smooth;
   color-scheme: light;
