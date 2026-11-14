@@ -306,25 +306,25 @@ export function ArticleReader({
   return (
     <div className={`relative ${tashkeelAllowed ? "tashkeel-ok" : ""}`}>
       <div
-        className="page-chrome no-print fixed bottom-0 left-0 right-0 z-40 border-t px-3 py-2 backdrop-blur-md"
+        className="page-chrome no-print fixed bottom-0 left-0 right-0 z-40 border-t px-2 py-2 backdrop-blur-md sm:px-3"
         style={{
           background: "color-mix(in srgb, var(--bg) 90%, transparent)",
           borderColor: "var(--border)",
         }}
       >
-        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1 sm:gap-3">
+        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-0.5 sm:gap-3">
           {tashkeelAllowed && (
             <button
               onClick={toggleTashkeel}
               role="switch"
               aria-checked={tashkeel}
-              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:px-2"
+              className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
               title="تبديل النص المشكول بالحركات الكاملة"
             >
-              <span className="tashkeel-toggle-label text-xs font-medium">
+              <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
                 تشكيل
               </span>
-              <span className="tashkeel-toggle-track relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors duration-300">
+              <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
                 <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
               </span>
             </button>
@@ -333,7 +333,7 @@ export function ArticleReader({
           <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
             <button
               onClick={() => setShowSummary((v) => !v)}
-              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-1.5 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
             >
               <span className="sm:hidden">المختصر</span>
@@ -345,11 +345,11 @@ export function ArticleReader({
                 onClick={() => setSaveMenuOpen((v) => !v)}
                 aria-expanded={saveMenuOpen}
                 aria-haspopup="menu"
-                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
+                className={`min-h-11 whitespace-nowrap rounded-full px-1.5 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
                 style={{ color: anySaved ? "var(--accent-strong)" : "var(--ink-muted)" }}
                 title="خيارات الحفظ: في حسابك متزامنًا، أو على هذا الجهاز دون إنترنت"
               >
-                <span className="sm:hidden">{anySaved ? "محفوظ ✓" : "حفظ"}</span>
+                <span className="sm:hidden">{anySaved ? "محفوظ" : "حفظ"}</span>
                 <span className="hidden sm:inline">{anySaved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
               </button>
 
@@ -428,7 +428,7 @@ export function ArticleReader({
             <button
               type="button"
               onClick={() => window.print()}
-              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-1.5 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}
               title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
             >

@@ -30,10 +30,6 @@ import { getSiteConfig } from "@/lib/site-config";
 import { formatArabicDate } from "@/lib/utils";
 import { formatReadingTime } from "@/lib/readingTime";
 
-/**
- * ISR — توليد ثابت تدريجي بكاش طويل (ساعة) يُحدّث لحظيًا عند أي تعديل إداري
- * عبر On-Demand Revalidation من لوحة التحكم.
- */
 export const revalidate = 3600;
 
 export async function generateStaticParams() {
@@ -170,7 +166,7 @@ export default async function ArticlePage({
           </div>
 
           {article.section && (
-            <div className="page-chrome mb-6 text-center">
+            <div className="page-chrome mb-3 text-center sm:mb-5">
               <Link
                 href={`/section/${article.section.slug}`}
                 prefetch={true}
@@ -184,19 +180,19 @@ export default async function ArticlePage({
 
           <header className="page-chrome text-center">
             <h1
-              className="font-body text-3xl font-bold leading-[1.9] sm:text-4xl sm:leading-[1.9]"
+              className="font-body text-3xl font-bold leading-[1.55] sm:text-4xl sm:leading-[1.85]"
               style={{ color: "var(--ink)" }}
             >
               {article.title}
             </h1>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:mt-5" style={{ color: "var(--ink-muted)" }}>
               <span>فريق كلام له لازمة</span>
               <span aria-hidden>·</span>
               <span>{formatArabicDate(article.publishedAt)}</span>
               <span aria-hidden>·</span>
               <span>مدة القراءة المتوقعة: {formatReadingTime(article.readingTimeSec)}</span>
             </div>
-            <div className="mx-auto mt-6 h-[3px] w-16 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
+            <div className="mx-auto mt-5 h-[3px] w-16 rounded-full sm:mt-6" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
           </header>
 
           <ArticleReader
