@@ -163,71 +163,83 @@ export function OnboardingExperience() {
   const firstName = (session?.user?.name || "").trim().split(/\s+/)[0] || "";
 
   return (
-    <div className="fixed inset-0 z-90 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="ترحيب بالعضو الجديد">
+    <div className="fixed inset-0 z-90 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-label="ترحيب بالعضو الجديد">
       {/* خلفية هادئة ناعمة — الضغط عليها يمشي بالقارئ بحريته ويختم التجربة */}
       <div className="absolute inset-0 bg-zinc-950/55 backdrop-blur-sm animate-fade-in" onClick={() => void finish()} />
 
+      {/* البطاقة مقيّدة بارتفاع الشاشة الفعلي (dvh) — المتن يتمرر بسلاسة وزر البدء مثبت أسفلها:
+          لا قص علوي ولا سفلي ولا حبس تمرير على أي مقاس موبايل */}
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-3xl border shadow-lift animate-fade-in"
+        className="relative flex max-h-[calc(100dvh_-_1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border shadow-lift animate-fade-in sm:max-h-[calc(100dvh_-_2rem)]"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
         {/* الإطار الذهبي الداخلي الناعم — توقيع الهوية */}
-        <div className="pointer-events-none absolute inset-2.5 rounded-3xl" style={{ border: "1px solid var(--accent-soft)" }} aria-hidden />
+        <div className="pointer-events-none absolute inset-2.5 z-10 rounded-3xl" style={{ border: "1px solid var(--accent-soft)" }} aria-hidden />
 
-        <div className="relative px-6 pb-7 pt-9 text-center sm:px-9">
-          {/* شعار الريشة */}
-          <div
-            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl"
-            style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-            aria-hidden
-          >
-            <FeatherMark />
+        {/* المنطقة الوسطى المتمررة — كل المحتوى ما عدا زر البدء */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-7 sm:px-9 sm:pb-6 sm:pt-9">
+          <div className="text-center">
+            {/* شعار الريشة — مصغّرة قليلًا على الموبايل */}
+            <div
+              className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-3xl sm:mb-4 sm:h-16 sm:w-16"
+              style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+              aria-hidden
+            >
+              <FeatherMark />
+            </div>
+
+            <p className="font-ui text-[11px] font-bold tracking-wide" style={{ color: "var(--accent-strong)" }}>
+              كلام له لازمة
+            </p>
+            <h2 className="font-body mt-2 text-xl font-bold leading-8 sm:text-2xl sm:leading-9" style={{ color: "var(--ink)" }}>
+              {firstName ? `أهلًا بك يا ${firstName}` : "أهلًا بك بين أهل الكلمة"}
+            </h2>
+            <p className="mx-auto mt-2.5 max-w-md text-xs leading-6 sm:mt-3 sm:text-[13px] sm:leading-7" style={{ color: "var(--ink-muted)" }}>
+              منصة فكرية عربية نزن فيها الكلمة بميزان الأثر — وهذه أركانها الثلاثة في لمحة واحدة، ثم أنت حرّك بنا كما تحب.
+            </p>
           </div>
 
-          <p className="font-ui text-[11px] font-bold tracking-wide" style={{ color: "var(--accent-strong)" }}>
-            كلام له لازمة
-          </p>
-          <h2 className="font-body mt-2 text-2xl font-bold leading-9" style={{ color: "var(--ink)" }}>
-            {firstName ? `أهلًا بك يا ${firstName}` : "أهلًا بك بين أهل الكلمة"}
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-[13px] leading-7" style={{ color: "var(--ink-muted)" }}>
-            منصة فكرية عربية نزن فيها الكلمة بميزان الأثر — وهذه أركانها الثلاثة في لمحة واحدة، ثم أنت حرّك بنا كما تحب.
-          </p>
-
-          {/* الأركان الثلاثة — شبكة مريحة في لمحة واحدة */}
-          <div className="mt-6 grid gap-3 text-right sm:grid-cols-3">
+          {/* الأركان الثلاثة — على الموبايل الأيقونة بجانب النص أفقيًا لتقليل الطول */}
+          <div className="mt-5 grid gap-2.5 text-right sm:mt-6 sm:grid-cols-3 sm:gap-3">
             {cards.map((c) => (
               <div
                 key={c.title}
-                className="rounded-2xl border p-4"
+                className="rounded-2xl border p-3.5 sm:p-4"
                 style={{ background: "var(--bg-soft)", borderColor: "var(--border)" }}
               >
-                <span
-                  className="flex h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                  aria-hidden
-                >
-                  {c.icon}
-                </span>
-                <p className="mt-3 text-xs font-bold" style={{ color: "var(--ink)" }}>
-                  {c.title}
-                </p>
-                <p className="mt-1.5 text-[11px] leading-6" style={{ color: "var(--ink-muted)" }}>
-                  {c.body}
-                </p>
+                <div className="flex items-start gap-3 sm:block">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10"
+                    style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                    aria-hidden
+                  >
+                    {c.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold" style={{ color: "var(--ink)" }}>
+                      {c.title}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-6 sm:mt-1.5" style={{ color: "var(--ink-muted)" }}>
+                      {c.body}
+                    </p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
+        </div>
 
+        {/* زر البدء — مثبت أسفل البطاقة ظاهرًا دائمًا مهما طال المتن */}
+        <div className="shrink-0 border-t px-5 pb-4 pt-3.5 sm:px-9 sm:pb-5 sm:pt-4" style={{ borderColor: "var(--border)" }}>
           {/* زر واحد فخم — بلا تخطي ولا خطوات ولا إجبار */}
           <button
             onClick={() => void finish()}
-            className="mt-7 w-full rounded-full px-6 py-3.5 text-sm font-bold text-white transition-transform active:scale-[0.98]"
+            className="w-full rounded-full px-6 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98] sm:py-3.5"
             style={{ background: "var(--accent)" }}
           >
             ابدأ رحلتك الفكرية
           </button>
-          <p className="mt-3 text-[10px]" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-2.5 text-center text-[10px]" style={{ color: "var(--ink-muted)" }}>
             القراءة والتصفح بحرّيتك — والهيدر ومحرك البحث ينتظرانك متى احتجتهما.
           </p>
         </div>

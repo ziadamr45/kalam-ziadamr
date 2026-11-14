@@ -90,7 +90,7 @@ export function AuthGateModal() {
       aria-label="انضم لمجتمع الفكر والأثر"
     >
       <div
-        className="w-full max-w-md rounded-3xl border p-6 shadow-lift animate-fade-in sm:p-8"
+        className="max-h-[calc(100dvh_-_2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-3xl border p-6 shadow-lift animate-fade-in sm:p-8"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
         {/* شعار مصغر */}

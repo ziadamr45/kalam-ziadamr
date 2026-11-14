@@ -953,7 +953,7 @@ export function QuoteGenerator({
             onClick={() => setOpen(false)}
           >
             <div
-              className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl border p-5 shadow-lift"
+              className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-3xl border p-5 shadow-lift"
               style={{ background: "var(--surface)", borderColor: "var(--border)" }}
               onClick={(e) => e.stopPropagation()}
             >

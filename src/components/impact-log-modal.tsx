@@ -100,7 +100,7 @@ export function ImpactLogModal({ open, onClose }: { open: boolean; onClose: () =
       <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
 
       <div
-        className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border shadow-lift animate-fade-in sm:rounded-3xl"
+        className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border shadow-lift animate-fade-in sm:rounded-3xl"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
         {/* رأس النافذة */}

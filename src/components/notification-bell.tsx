@@ -205,7 +205,7 @@ export function NotificationDetailModal({
       {/* لوحة متمركزة حرفيًا (top/left 1/2 + translate) ببنية عمودية صارمة:
           رأس وتذييل ثابتان (shrink-0) والمتن يتمرر وحده (flex-1) داخل سقف 80vh */}
       <div
-        className="fixed top-1/2 left-1/2 flex max-h-[80vh] w-[90vw] -translate-x-1/2 -translate-y-1/2 animate-fade-in flex-col overflow-hidden rounded-2xl border shadow-lift sm:max-w-md md:max-w-lg lg:max-w-xl"
+        className="fixed top-1/2 left-1/2 flex max-h-[80dvh] w-[90vw] -translate-x-1/2 -translate-y-1/2 animate-fade-in flex-col overflow-hidden rounded-2xl border shadow-lift sm:max-w-md md:max-w-lg lg:max-w-xl"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >

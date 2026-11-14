@@ -140,13 +140,13 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
           <div className="fixed inset-0 z-95 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={request.title}>
             <div className="absolute inset-0 bg-zinc-950/62 backdrop-blur-sm animate-fade-in" onClick={() => settle(false)} />
             <div
-              className="relative w-full max-w-sm overflow-hidden rounded-3xl border shadow-lift animate-fade-in"
+              className="relative flex max-h-[calc(100dvh_-_2rem)] w-full max-w-sm flex-col overflow-hidden rounded-3xl border shadow-lift animate-fade-in"
               style={{ background: "var(--surface)", borderColor: "var(--border)" }}
             >
               {/* إطار ذهبي داخلي ناعم — توقيع الهوية */}
               <div className="pointer-events-none absolute inset-2 rounded-3xl" style={{ border: "1px solid var(--accent-soft)" }} aria-hidden />
 
-              <div className="relative px-7 pb-6 pt-8 text-center">
+              <div className="relative flex-1 overflow-y-auto overscroll-contain px-7 pb-6 pt-8 text-center">
                 <div
                   className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
                   style={{
