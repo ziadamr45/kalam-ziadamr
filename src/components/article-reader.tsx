@@ -313,7 +313,7 @@ export function ArticleReader({
           borderColor: "var(--border)",
         }}
       >
-        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1.5 sm:gap-3">
+        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1.5 sm:justify-center sm:gap-2">
           {tashkeelAllowed && (
             <>
               <button
@@ -330,11 +330,11 @@ export function ArticleReader({
                   <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
                 </span>
               </button>
-              <span className="h-4 w-px shrink-0 sm:hidden" style={{ background: "var(--border)" }} aria-hidden />
+              <span className="h-4 w-px shrink-0" style={{ background: "var(--border)" }} aria-hidden />
             </>
           )}
 
-          <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-start sm:gap-1">
+          <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-center sm:gap-1">
             <button
               onClick={() => setShowSummary((v) => !v)}
               className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
@@ -522,11 +522,11 @@ export function ArticleReader({
             loading="eager"
           />
           <div
-            className="no-print pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-2.5 py-1 backdrop-blur-xs"
+            className="pointer-events-none absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 backdrop-blur-xs"
             aria-hidden
           >
-            <BrandMark size={13} />
-            <span className="font-ui text-[11px] font-bold text-white/90">
+            <BrandMark size={11} />
+            <span className="font-ui text-[10px] font-bold text-white/90">
               كلام له لازمة
             </span>
           </div>

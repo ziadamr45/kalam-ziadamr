@@ -37,6 +37,24 @@ type PublicComment = {
   dislikes: number;
 };
 
+function MiniSpinner({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      className="animate-spin motion-reduce:animate-none shrink-0"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
 /** ختم التوثيق الرسمي — بلون تصنيف الحساب (ذهبي للمؤسس، كحلي للنخبة، زيتي للكتاب، فيروزي للعائلة) */
 function VerifiedSeal({ color, title }: { color: string; title: string }) {
   return (
@@ -86,6 +104,7 @@ export function CommentsSection({
   const [reportFor, setReportFor] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
   const [customReason, setCustomReason] = useState("");
+  const [reportBusy, setReportBusy] = useState<string | null>(null);
   const [reportSent, setReportSent] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [impactNote, setImpactNote] = useState<string>("");
@@ -94,7 +113,7 @@ export function CommentsSection({
   /* فخ الروبوتات — حقل مخفي عن البشر تمامًا، البوتات الملئة لكل الحقول ستملؤه */
   const [honey, setHoney] = useState("");
 
-  /* التصويت — أصواتي تُجلب من الخادم بعد الرسم الأولي (الصفحة ISR ثابتة) */
+  /* التصويت — الأعداد الحية وأصواتي تُجلب من الخادم بعد الرسم الأولي (الصفحة ISR ثابتة) */
   const [myVotes, setMyVotes] = useState<Record<string, "LIKE" | "DISLIKE">>({});
   const [voteCounts, setVoteCounts] = useState<Record<string, { likes: number; dislikes: number }>>(
     () => Object.fromEntries(initialComments.map((c) => [c.id, { likes: c.likes, dislikes: c.dislikes }])),
@@ -121,6 +140,7 @@ export function CommentsSection({
 
   /* التثبيت الذاتي — يُنفذ في الخادم بعد فحص الصلاحية مرة أخرى */
   const togglePin = async (commentId: string, pin: boolean) => {
+    if (pinBusy) return;
     setPinBusy(commentId);
     try {
       const res = await fetch(`/api/comments/${commentId}/pin`, {
@@ -131,21 +151,30 @@ export function CommentsSection({
       if (res.ok) {
         /* إعادة تحميل خفيفة للصفحة تعكس الترتيب الجديد من الخادم */
         window.location.reload();
+        return;
       }
-    } finally {
-      setPinBusy(null);
+    } catch {
+      /* صامت */
     }
+    setPinBusy(null);
   };
 
-  /* أصواتي على تعليقات هذا المقال */
+  /* جلب الأعداد الحية للتفاعلات وأصواتي (يعمل للزائر والمسجل لكسر جمود كاش ISR) */
   useEffect(() => {
-    if (!loggedIn) {
-      setMyVotes({});
-      return;
-    }
-    fetch(`/api/comments/votes?articleId=${encodeURIComponent(articleId)}`)
+    fetch(`/api/comments/votes?articleId=${encodeURIComponent(articleId)}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => setMyVotes(d?.myVotes ?? {}))
+      .then((d) => {
+        if (d?.myVotes) setMyVotes(d.myVotes);
+        if (d?.counts && typeof d.counts === "object") {
+          setVoteCounts((prev) => {
+            const next = { ...prev };
+            for (const [id, c] of Object.entries(d.counts as Record<string, { likes: number; dislikes: number }>)) {
+              next[id] = c;
+            }
+            return next;
+          });
+        }
+      })
       .catch(() => {});
   }, [articleId, loggedIn]);
 
@@ -195,12 +224,14 @@ export function CommentsSection({
   };
 
   const sendReport = async (commentId: string) => {
+    if (reportBusy) return;
     setReportError(null);
     /* «سبب آخر» إلزامي الوصف — نفحص قبل الإرسال */
     if (reportReason === CUSTOM_REASON && customReason.trim().length < 5) {
       setReportError("صف المخالفة بدقة في الحقل المخصص — الوصف إلزامي.");
       return;
     }
+    setReportBusy(commentId);
     try {
       const res = await fetch("/api/comments/report", {
         method: "POST",
@@ -223,6 +254,8 @@ export function CommentsSection({
       setCustomReason("");
     } catch {
       setReportError("تعذر إرسال الإبلاغ — تحقق من اتصالك.");
+    } finally {
+      setReportBusy(null);
     }
   };
 
@@ -239,15 +272,46 @@ export function CommentsSection({
     [],
   );
 
-  /* التصويت على تعليق — الزائر يُستقبَل بردّ هادئ يوجهه للبوابة */
+  /* التصويت على تعليق — تحديث فوري متفائل (0ms) + مطابقة مع الخادم */
   const vote = async (commentId: string, value: "LIKE" | "DISLIKE") => {
-    /* بوابة المصادقة: التصويت للأعضاء — نافذة دخول ذكية تحتفظ بنية التفاعل */
     if (!loggedIn) {
       requestAuth({ kind: "vote-comment" });
       return;
     }
+    if (voteBusy === commentId) return;
+
+    const prevVotes = myVotes;
+    const prevCounts = voteCounts;
+    const oldVote = myVotes[commentId] ?? null;
+    const oldCounts = voteCounts[commentId] ?? { likes: 0, dislikes: 0 };
+
+    // تحديث متفائل فوري في الواجهة
+    let nextVote: "LIKE" | "DISLIKE" | null = value;
+    let nextLikes = oldCounts.likes;
+    let nextDislikes = oldCounts.dislikes;
+    if (oldVote === value) {
+      nextVote = null;
+      if (value === "LIKE") nextLikes = Math.max(0, nextLikes - 1);
+      else nextDislikes = Math.max(0, nextDislikes - 1);
+    } else {
+      if (oldVote === "LIKE") nextLikes = Math.max(0, nextLikes - 1);
+      if (oldVote === "DISLIKE") nextDislikes = Math.max(0, nextDislikes - 1);
+      if (value === "LIKE") nextLikes += 1;
+      else nextDislikes += 1;
+    }
+
+    setMyVotes((curr) => {
+      const copy = { ...curr };
+      if (nextVote) copy[commentId] = nextVote;
+      else delete copy[commentId];
+      return copy;
+    });
+    setVoteCounts((curr) => ({
+      ...curr,
+      [commentId]: { likes: nextLikes, dislikes: nextDislikes },
+    }));
     setVoteBusy(commentId);
-    const prev = { myVotes, voteCounts };
+
     try {
       const res = await fetch(`/api/comments/${commentId}/vote`, {
         method: "POST",
@@ -256,30 +320,34 @@ export function CommentsSection({
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
+        setMyVotes(prevVotes);
+        setVoteCounts(prevCounts);
         setVoteNotice("سجّل الدخول أولًا لتفعيل التفاعل.");
         window.setTimeout(() => setVoteNotice(null), 6000);
         return;
       }
       if (!res.ok) {
+        setMyVotes(prevVotes);
+        setVoteCounts(prevCounts);
         setVoteNotice(data?.error ?? "تعذر التصويت — جرّب مرة أخرى.");
         window.setTimeout(() => setVoteNotice(null), 6000);
         return;
       }
-      /* التحديث المتفائل المؤكد من رد الخادم */
-      setMyVotes((prevVotes) => {
-        const next = { ...prevVotes };
+      setMyVotes((curr) => {
+        const next = { ...curr };
         if (data.myVote) next[commentId] = data.myVote;
         else delete next[commentId];
         return next;
       });
-      setVoteCounts((prevCounts) => ({
-        ...prevCounts,
-        [commentId]: { likes: data.likes ?? 0, dislikes: data.dislikes ?? 0 },
+      setVoteCounts((curr) => ({
+        ...curr,
+        [commentId]: { likes: data.likes ?? nextLikes, dislikes: data.dislikes ?? nextDislikes },
       }));
     } catch {
+      setMyVotes(prevVotes);
+      setVoteCounts(prevCounts);
       setVoteNotice("تعذر التصويت — تحقق من اتصالك.");
       window.setTimeout(() => setVoteNotice(null), 6000);
-      void prev; // استعادة غير ضرورية — الخادم هو المرجع دائمًا
     } finally {
       setVoteBusy(null);
     }
@@ -350,9 +418,10 @@ export function CommentsSection({
             <button
               type="submit"
               disabled={status === "sending" || status === "blocked" || !content.trim()}
-              className="rounded-full px-5 py-2.5 text-sm font-bold shadow-soft transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+              className="flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold shadow-soft transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
               style={{ background: "var(--accent)", color: "#fff" }}
             >
+              {status === "sending" && <MiniSpinner size={14} />}
               {status === "sending" ? "جارٍ الإرسال.." : "أرسل"}
             </button>
           </div>
@@ -566,12 +635,12 @@ export function CommentsSection({
                 {c.content}
               </p>
 
-              {/* شريط التفاعل — إعجاب/عدم إعجاب بعدادات وألوان تعكس اختيارك */}
-              <div className="mt-3 flex items-center gap-1.5">
+              {/* شريط التفاعل — إعجاب/عدم إعجاب بعدادات حية + سبينر عند التثبيت أو الانتظار */}
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={() => vote(c.id, "LIKE")}
                   disabled={voteBusy === c.id}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-75"
                   style={
                     myVote === "LIKE"
                       ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
@@ -581,13 +650,17 @@ export function CommentsSection({
                   aria-label="أبدى إعجابي بهذا التعليق"
                   aria-pressed={myVote === "LIKE"}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "LIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                  {voteBusy === c.id ? (
+                    <MiniSpinner size={13} />
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "LIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                  )}
                   <span>{counts.likes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.likes) : "إعجاب"}</span>
                 </button>
                 <button
                   onClick={() => vote(c.id, "DISLIKE")}
                   disabled={voteBusy === c.id}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-75"
                   style={
                     myVote === "DISLIKE"
                       ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" }
@@ -597,7 +670,11 @@ export function CommentsSection({
                   aria-label="أبدى عدم إعجابي بهذا التعليق"
                   aria-pressed={myVote === "DISLIKE"}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                  {voteBusy === c.id ? (
+                    <MiniSpinner size={13} />
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                  )}
                   <span>{counts.dislikes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.dislikes) : "لم يعجبني"}</span>
                 </button>
                 {/* التثبيت الذاتي — زر يظهر على تعليقك فقط عند امتلاكك الصلاحية */}
@@ -605,7 +682,7 @@ export function CommentsSection({
                   <button
                     onClick={() => togglePin(c.id, !c.selfPinned)}
                     disabled={pinBusy === c.id}
-                    className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-75"
                     style={
                       c.selfPinned
                         ? { background: c.authorAccent ?? "var(--accent)", color: "#fff", borderColor: c.authorAccent ?? "var(--accent)" }
@@ -613,8 +690,17 @@ export function CommentsSection({
                     }
                     title={c.selfPinned ? "فك التثبيت" : "ثبّت تعليقك أعلى النقاش"}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l5 5-1.4 1.4-1-1-4.2 4.2.6 4.6-1.4 1.4-3.5-3.5L6 19.4 4.6 18l4.3-4.1-3.5-3.5L6.8 9l4.6.6L15.6 5.4l-1-1L16 3z" /></svg>
-                    {c.selfPinned ? "مثبَّت" : "تثبيت"}
+                    {pinBusy === c.id ? (
+                      <>
+                        <MiniSpinner size={13} />
+                        <span>{c.selfPinned ? "جارٍ الفك…" : "جارٍ التثبيت…"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l5 5-1.4 1.4-1-1-4.2 4.2.6 4.6-1.4 1.4-3.5-3.5L6 19.4 4.6 18l4.3-4.1-3.5-3.5L6.8 9l4.6.6L15.6 5.4l-1-1L16 3z" /></svg>
+                        <span>{c.selfPinned ? "مثبَّت" : "تثبيت"}</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -628,11 +714,12 @@ export function CommentsSection({
                     {REPORT_REASONS.map((r) => (
                       <button
                         key={r}
+                        disabled={reportBusy === c.id}
                         onClick={() => {
                           setReportReason(r);
                           setReportError(null);
                         }}
-                        className="rounded-full border px-3 py-1.5 text-xs transition-all"
+                        className="rounded-full border px-3 py-1.5 text-xs transition-all disabled:opacity-60"
                         style={
                           reportReason === r
                             ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
@@ -676,10 +763,12 @@ export function CommentsSection({
                   />
                   <button
                     onClick={() => sendReport(c.id)}
-                    className="mt-2 rounded-full px-4 py-2 text-xs font-bold"
+                    disabled={reportBusy === c.id}
+                    className="mt-2 flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-opacity disabled:opacity-75"
                     style={{ background: "var(--accent)", color: "#fff" }}
                   >
-                    إرسال الإبلاغ
+                    {reportBusy === c.id && <MiniSpinner size={12} />}
+                    {reportBusy === c.id ? "جارٍ الإرسال…" : "إرسال الإبلاغ"}
                   </button>
                 </div>
               )}
