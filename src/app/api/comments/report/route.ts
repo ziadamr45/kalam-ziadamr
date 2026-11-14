@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, rateLimitDurable, requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
         meta: { ip, path: "/api/comments/report" },
       });
 
-    return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true });
     }
 
     /* السبب من القائمة المعتمدة حصرًا — لا نصوص حرة في خانة السبب */
@@ -77,13 +78,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const comment = await prisma.comment.findUnique({
-      where: { id: commentId },
-      select: { id: true, article: { select: { title: true, slug: true } } },
-    });
+    const [comment, session] = await Promise.all([
+      prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { id: true, article: { select: { title: true, slug: true } } },
+      }),
+      auth().catch(() => null),
+    ]);
     if (!comment) {
       return NextResponse.json({ error: "التعليق غير موجود" }, { status: 404 });
     }
+
+    const reporterUserId = session?.user?.id ?? null;
+    const reporterEmail = session?.user?.email ?? null;
 
     await prisma.$transaction([
       prisma.commentReport.create({
@@ -92,6 +99,8 @@ export async function POST(request: Request) {
           reason,
           details: customDetail || null,
           reporterFp: fp || null,
+          reporterUserId,
+          reporterEmail,
         },
       }),
       prisma.comment.update({
@@ -112,15 +121,14 @@ export async function POST(request: Request) {
       });
     }
 
-
-      /* حدث سيادة: بلاغ جديد على تعليق — لوحة الأدمن + رنين هادئ لهواتف الإدارة */
+    /* حدث سيادة: بلاغ جديد على تعليق — لوحة الأدمن + رنين هادئ لهواتف الإدارة */
     void dispatchAdminEvent({
       type: "ADMIN_COMMENT_REPORTED",
       title: `بلاغ جديد عن تعليق في مقال: ${(comment.article?.title ?? "بدون عنوان").slice(0, 80)}`,
       message: `السبب: ${reason}${customDetail ? ` — ${customDetail.slice(0, 100)}` : ""}`,
       link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments?flagged=1`,
       pushTag: "comment-reported",
-      metadata: { commentId, reason, articleSlug: comment.article?.slug ?? null },
+      metadata: { commentId, reason, reporterEmail, articleSlug: comment.article?.slug ?? null },
     });
 
     return NextResponse.json({ ok: true });
