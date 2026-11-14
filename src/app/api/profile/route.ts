@@ -73,6 +73,30 @@ export async function PUT(request: Request) {
         if (!/^https:\/\//.test(img) || img.length > 500) {
           return NextResponse.json({ error: "رابط صورة غير صالح" }, { status: 400 });
         }
+        /* قفل النطاقات: رابط صورة القارئ يُقبل من Cloudinary (رفع المنصة) أو
+           Google (صورة الحساب) حصرًا — أي نطاق خارجي مرفوض؛ إذ يمكن لرابط
+           خارجي حر أن يكون IP Logger يسرق عناوين زوار المنصة عند عرض
+           التعليقات والملفات */
+        let imgHost = "";
+        try {
+          imgHost = new URL(img).hostname.toLowerCase();
+        } catch {
+          return NextResponse.json({ error: "رابط صورة غير صالح" }, { status: 400 });
+        }
+        const allowedHosts = ["res.cloudinary.com", "lh3.googleusercontent.com"];
+        if (!allowedHosts.includes(imgHost)) {
+          return NextResponse.json(
+            { error: "صورة الملف الشخصي تُقبل من رفع المنصة (Cloudinary) أو صورة Google فقط" },
+            { status: 400 },
+          );
+        }
+        /* رابط Cloudinary يجب أن يعود لمجلدات سحابة المنصة نفسها لا لسحابة غريبة */
+        if (imgHost === "res.cloudinary.com") {
+          const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+          if (cloud && !img.includes(`/${cloud}/`)) {
+            return NextResponse.json({ error: "رابط الصورة ليس من سحابة المنصة" }, { status: 400 });
+          }
+        }
         data.customImage = img;
       }
     }

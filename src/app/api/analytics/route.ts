@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { rateLimit, requestIp } from "@/lib/rate-limit";
+import { rateLimit, rateLimitDurable, requestIp } from "@/lib/rate-limit";
 
 /**
  * تتبع التحليلات: زيارات، إكمال قراءة، مدة بقاء، مشاركات
@@ -8,9 +8,14 @@ import { rateLimit, requestIp } from "@/lib/rate-limit";
  */
 export async function POST(request: Request) {
   try {
-    /* حصة سخية لكل IP (60/دقيقة) — أداة تحليل لا تُغرق القاعدة أبدًا؛
+    /* درع مزدوج لكل IP (60/دقيقة): ذاكرة النسخة فوريًا + عدّاد دائم عابر
+       للنسخ عبر RequestLog يغلق ما تفلته الموجات المتوازية على نسخ
+       Serverless متعددة — فلا إغراق لقاعدة Neon بأحداث مصطنعة؛
        التجاوز يُردّ بصمت تام (ok:false) بلا أي أثر على تجربة الزائر */
-    if (!rateLimit(`analytics:${requestIp(request)}`, 60, 60_000).ok) {
+    const ip = requestIp(request);
+    const mem = rateLimit(`analytics:${ip}`, 60, 60_000);
+    const durable = await rateLimitDurable({ path: "/api/analytics", ip, limit: 60, windowMs: 60_000 });
+    if (!mem.ok || !durable.ok) {
       return NextResponse.json({ ok: false });
     }
 

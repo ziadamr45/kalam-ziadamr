@@ -3,14 +3,26 @@ import { prisma } from "@/lib/prisma";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { pushAdmins } from "@/lib/push";
 import { recordServerError } from "@/lib/error-alert";
+import { rateLimit, logSecurityEvent } from "@/lib/rate-limit";
 
 /**
  * رسائل صفحة «اتصل بنا» — تُخزن في قاعدة البيانات
  * وتظهر مباشرة في لوحة تحكم الأدمن مع إشعار في السجل.
+ *
+ * درع الإغراق (الإطلاق الجماهيري): الحد الذاكري لكل نسخة lambda لا يكفي —
+ * الموجات المتوازية توزع على نسخ متعددة فيفلت السبام. لذا أُضيف حد دائم
+ * يعدّ رسائل هذا الـIP الفعلية من قاعدة البيانات نفسها (ContactMessage)
+ * خلال الساعة، مع تحقق صيغة البريد — فلا إغراق للقاعدة ولا إشعارات
+ * أدمن عبر Serverless instances متعددة.
  */
 
 const recentIps = new Map<string, number>();
 const RATE_MS = 45_000;
+/* الحد الدائم: 6 رسائل كحد أقصى لكل IP في الساعة */
+const HOURLY_LIMIT = 6;
+
+/* صيغة بريد عمليّة صارمة بما يكفي للرد — لا تقبل عناوين مشوهة */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export async function POST(request: Request) {
   try {
@@ -42,7 +54,16 @@ export async function POST(request: Request) {
       );
     }
 
-    /* حد بسيط للإرسال من نفس الـ IP */
+    /* بريد اختياري — إن جاء فلا بد أن يكون بريدًا صحيحًا */
+    const email = body.email?.trim().slice(0, 120) || null;
+    if (email && !EMAIL_RE.test(email)) {
+      return NextResponse.json(
+        { error: "البريد الإلكتروني غير صالح — اتركه فارغًا أو اكتب بريدًا صحيحًا للرد" },
+        { status: 400 },
+      );
+    }
+
+    /* حد النسخة الفوري من نفس الـ IP */
     const ip = getClientIp(request);
     const now = Date.now();
     const last = recentIps.get(ip ?? "?") ?? 0;
@@ -53,10 +74,28 @@ export async function POST(request: Request) {
       );
     }
 
+    /* الحد الدائم العابر للنسخ — عدّاد الرسائل الفعلية لهذا IP في الساعة */
+    const ipKey = ip ?? "unknown";
+    const hourlyUsed = await prisma.contactMessage.count({
+      where: { ip, createdAt: { gte: new Date(now - 60 * 60_000) } },
+    });
+    if (hourlyUsed >= HOURLY_LIMIT) {
+      logSecurityEvent({
+        type: "RATE_LIMIT",
+        message: `إغراق محتمل على /api/contact من ${ip} (${hourlyUsed} رسالة/ساعة)`,
+        meta: { ip, path: "/api/contact" },
+        severity: "WARN",
+      });
+      return NextResponse.json(
+        { error: "وصلت حد الرسائل لهذه الساعة — شكرًا لتفهمك" },
+        { status: 429 },
+      );
+    }
+
     const msg = await prisma.contactMessage.create({
       data: {
         name: name.slice(0, 80),
-        email: body.email?.trim().slice(0, 120) || null,
+        email,
         subject: body.subject?.trim().slice(0, 120) || null,
         body: messageBody.slice(0, 3000),
         ip,

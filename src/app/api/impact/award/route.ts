@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { awardImpact, requiredReadSeconds, AwardResult } from "@/lib/impact";
 import { logEvent, getClientIp } from "@/lib/audit";
 import { recordServerError } from "@/lib/error-alert";
+import { rateLimit, logSecurityEvent } from "@/lib/rate-limit";
 
 /**
  * ============================================================
@@ -30,8 +31,19 @@ export async function POST(request: Request) {
       articleId?: string;
       dwellSeconds?: number;
       scrollPercent?: number;
-      userTurns?: number;
     };
+
+    /* درع الإغراق: المنح يلامس القاعدة قراءةً وكتابةً — حد صارم لكل مستخدم+IP
+       يحمي Neon من الإغراق الآلي ويقيد محاولات طبخ النقاط */
+    const clientIp = getClientIp(request);
+    if (!rateLimit(`impact:${userId}:${clientIp}`, 15, 60_000).ok) {
+      logSecurityEvent({
+        type: "RATE_LIMIT",
+        message: `إغراق محتمل على منح الأثر من ${session.user.email ?? userId}`,
+        meta: { ip: clientIp, userId, path: "/api/impact/award" },
+      });
+      return NextResponse.json({ error: "طلبات كثيرة على رصيد الأثر — مهّل قليلًا ثم أعد" }, { status: 429 });
+    }
 
     const { actionType, articleId } = body;
     if (!actionType || !articleId) {
@@ -85,7 +97,15 @@ export async function POST(request: Request) {
       });
     } else if (actionType === "AI_DISCUSS") {
       /* ==================== النقاش الفكري العميق +1 ==================== */
-      const turns = Math.max(0, Math.floor(Number(body.userTurns) || 0));
+      /* التحقق من الخادم حصريًا: عدد أدوار المحاورة الفعلية يُقرأ من
+         AiDiscussionUsage في قاعدة البيانات — قيمة userTurns المرسلة من
+         المتصفح قابلة للتزوير كليًا وكانت تسمح بطبخ نقاط الرصيد بلا نقاش
+         حقيقي أبدًا */
+      const usage = await prisma.aiDiscussionUsage.findUnique({
+        where: { userId_articleId: { userId, articleId } },
+        select: { messageCount: true },
+      });
+      const turns = usage?.messageCount ?? 0;
       if (turns < 3) {
         return NextResponse.json(
           { awarded: false, reason: "INVALID", message: "النقاش العميق يتطلب حوارًا مثمرًا لا سؤالًا عابرًا" },

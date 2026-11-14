@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { recordServerError } from "@/lib/error-alert";
+import { secretMatches } from "@/lib/secure-compare";
 
 /**
  * إعادة التحقق الفوري (On-Demand ISR)
@@ -8,8 +9,8 @@ import { recordServerError } from "@/lib/error-alert";
  * + إبطال وسوم الكاش (site-config) لحظة تعديل التكوين السيادي
  */
 export async function POST(request: Request) {
-  const secret = request.headers.get("x-revalidate-secret");
-  if (!secret || secret !== process.env.REVALIDATE_SECRET) {
+  /* مقارنة ثابتة الزمن — سد هجمات التوقيت على سر إعادة التحقق */
+  if (!secretMatches(request.headers.get("x-revalidate-secret"), process.env.REVALIDATE_SECRET)) {
     return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   }
 

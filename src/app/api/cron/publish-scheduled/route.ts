@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { dispatchBroadcast } from "@/lib/notifications/dispatcher";
+import { secretMatches } from "@/lib/secure-compare";
 
 /**
  * مهمة Vercel Cron الأصلية — النشر المجدول التلقائي (المحور الثاني).
@@ -28,7 +29,8 @@ export async function GET(request: Request) {
     authHeader?.replace(/^Bearer\s+/i, "") ||
     new URL(request.url).searchParams.get("secret");
 
-  if (!process.env.CRON_SECRET || !secret || secret !== process.env.CRON_SECRET) {
+  /* مقارنة ثابتة الزمن — سد هجمات التوقيت على سر الـCron */
+  if (!secretMatches(secret, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   }
 
