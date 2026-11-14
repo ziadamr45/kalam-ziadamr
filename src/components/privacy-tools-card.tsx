@@ -5,11 +5,7 @@ import { useRouter } from "next/navigation";
 import { useDialogs } from "@/components/ui/dialogs";
 
 /**
- * أدوات الخصوصية والتجربة — تبويب «الإعدادات والتفضيلات»:
- * - مسح سجل البحث الخاص بالحساب (وعد الخصوصية: سجلك بيدك وحدك).
- * - إعادة عرض بطاقة الترحيب لمن يريد مشاهدتها من جديد.
- * كل التأكيدات والنتائج عبر نظام النوافذ الموحد — لا نوافذ متصفح إطلاقًا.
- */
+ * أدوات الخصوصية والتجربة — تبويب «الإعدادات والتفضيلات»:\n * - مسح سجل البحث الخاص بالحساب (وعد الخصوصية: سجلك بيدك وحدك).\n * - إعادة عرض بطاقة الترحيب فورًا دون إعادة تحميل الصفحة.\n */
 
 export function PrivacyToolsCard() {
   const router = useRouter();
@@ -40,7 +36,7 @@ export function PrivacyToolsCard() {
   const replayTour = async () => {
     const ok = await confirm({
       title: "إعادة عرض الترحيب",
-      body: "ستظهر بطاقة الترحيب الفخمة من جديد فورًا في هذه الصفحة. هل تريد المتابعة؟",
+      body: "ستظهر بطاقة الترحيب من جديد مباشرةً في هذه الصفحة. هل تريد المتابعة؟",
       confirmLabel: "نعم، اعرضها",
     });
     if (!ok) return;
@@ -48,10 +44,10 @@ export function PrivacyToolsCard() {
     try {
       const res = await fetch("/api/onboarding", { method: "DELETE" });
       if (!res.ok) throw new Error("تعذر تجهيز الترحيب — جرّب مرة أخرى");
-      /* إعادة تحميل كاملة كي يعيد فحص الأهلية من قاعدة البيانات وتظهر فورًا */
-      window.location.reload();
+      window.dispatchEvent(new Event("kalam:replay-onboarding"));
     } catch (err) {
       toast(err instanceof Error ? err.message : "تعذر الاتصال بالخادم", "error");
+    } finally {
       setBusy(null);
     }
   };
@@ -65,7 +61,7 @@ export function PrivacyToolsCard() {
         الخصوصية والتجربة
       </h2>
       <p className="mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
-        سجلك وذكرياتك التجريبية بيدك وحدك — امسح ما تريد وعدِ ما تحب.
+        سجلك وتجربتك بيدك وحدك — امسح ما تريد وأعِد عرض الترحيب متى أحببت.
       </p>
 
       <div className="mt-4 space-y-3">
@@ -94,7 +90,7 @@ export function PrivacyToolsCard() {
               بطاقة الترحيب
             </p>
             <p className="mt-0.5 text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-              اشتاقت إليها؟ أعِد عرض بطاقة الترحيب الفخمة كأول مرة.
+              أعِد عرض بطاقة الترحيب التعريفية بالمنصة متى شئت.
             </p>
           </div>
           <button

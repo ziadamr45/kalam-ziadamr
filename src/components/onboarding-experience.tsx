@@ -1,27 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
 import { useSession } from "next-auth/react";
 
 /**
- * ============================================================
- * بطاقة الترحيب الفخمة — تجربة تهيئة واحدة هادية للأعضاء الجدد
- * ============================================================
- * تصميم هوية «كلام له لازمة»: ورق كريمي، إطار ذهبي ناعم، وشعار
- * الريشة. شاشة واحدة مريحة تعرض أركان المنصة في لمحة — بلا تظليم
- * للشاشة، وبلا جولة إجبارية تشاور على الزراير، وبلا حبس للقارئ:
- * زر واحد «ابدأ رحلتك الفكرية» يختم التجربة، وضغطة خارج البطاقة
- * أو Escape يمشي بها بحرية تامة.
- *
- * أمان SSR صارم: المكوّن لا يرسم شيئًا قبل الترطيب وحسم الجلسة
- * وفحص الحقل الحي (hasCompletedOnboarding) — لا تضارب ترطيب ولا وميض.
- * النصوص والعتبة حية من التكوين السيادي (SiteConfig).
+ * بطاقة الترحيب الفخمة — تجربة تهيئة واحدة هادئة للأعضاء الجدد.
+ * - لا تُختم بالضغط العرضي على الخلفية، بل بزر «ابدأ رحلتك الفكرية» أو زر الإغلاق أو Escape.
+ * - تستمع لحدث `kalam:replay-onboarding` لتُعرض فورًا دون إعادة تحميل الصفحة.
  */
 
 type WelcomeCard = { icon: React.ReactNode; title: string; body: string };
 
-/* أيقونات الأركان الثلاثة — خط رفيع بلون الذهب */
 function BookSoundIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -60,8 +49,6 @@ function FeatherMark({ size = 26 }: { size?: number }) {
   );
 }
 
-/** نصوص الأركان الافتراضية — التكوين السيادي يعيد كتابتها عند وجوده،
-    والعتبة الحية تُستبدل موضع «350» في الركن الثالث إن لم يُقدَّم نص مخصص */
 function buildCards(
   cfg: { title: string; text: string }[],
   threshold: number,
@@ -70,7 +57,7 @@ function buildCards(
     {
       icon: <BookSoundIcon />,
       title: "اقرأ واستمع بالتشكيل",
-      body: "قراءة متأنية واستماع بصوت مسموع يشرح النص، مع التشكيل الحرفي الكامل بضغطة واحدة متى شئت.",
+      body: "قراءة متأنية واستماع بصوت مسموع للنص، مع التشكيل الحرفي الكامل بضغطة واحدة متى شئت.",
     },
     {
       icon: <DialogueIcon />,
@@ -93,49 +80,60 @@ function buildCards(
 export function OnboardingExperience() {
   const { data: session, status } = useSession();
   const [stage, setStage] = useState<"idle" | "checking" | "ready">("idle");
-  /* التكوين السيادي: نصوص الأركان الحية + مفتاح التشغيل + العتبة الحية */
   const [cfgCards, setCfgCards] = useState<{ title: string; text: string }[]>([]);
   const [cfgEnabled, setCfgEnabled] = useState(true);
   const [cfgThreshold, setCfgThreshold] = useState(350);
   const finishingRef = useRef(false);
+  const userId = session?.user?.id ?? null;
 
-  /* ================= فحص أهلية الترحيب (حقل قاعدة البيانات الحي) ================= */
-  useEffect(() => {
-    if (status !== "authenticated") return;
+  const checkEligibility = useCallback(() => {
     let alive = true;
     setStage("checking");
     Promise.all([
       fetch("/api/onboarding").then((r) => r.json()).catch(() => ({})),
       fetch("/api/public-config").then((r) => r.json()).catch(() => ({})),
-    ])
-      .then(([ob, cfg]) => {
-        if (!alive) return;
-        const c = cfg as {
-          ONBOARDING_ENABLED?: boolean;
-          ONBOARDING_SLIDES?: { title: string; text: string }[];
-          IMPACT_ELDERS_THRESHOLD?: number;
-        };
-        if (c && Array.isArray(c.ONBOARDING_SLIDES) && c.ONBOARDING_SLIDES.length > 0) {
-          setCfgCards(c.ONBOARDING_SLIDES.slice(0, 3));
-        }
-        if (typeof c?.IMPACT_ELDERS_THRESHOLD === "number" && c.IMPACT_ELDERS_THRESHOLD > 0) {
-          setCfgThreshold(c.IMPACT_ELDERS_THRESHOLD);
-        }
-        if (c && c.ONBOARDING_ENABLED === false) {
-          setCfgEnabled(false);
-          setStage("idle");
-          return;
-        }
-        setCfgEnabled(true);
-        const d = ob as { needed?: boolean };
-        setStage(d.needed ? "ready" : "idle");
-      });
+    ]).then(([ob, cfg]) => {
+      if (!alive) return;
+      const c = cfg as {
+        ONBOARDING_ENABLED?: boolean;
+        ONBOARDING_SLIDES?: { title: string; text: string }[];
+        IMPACT_ELDERS_THRESHOLD?: number;
+      };
+      if (c && Array.isArray(c.ONBOARDING_SLIDES) && c.ONBOARDING_SLIDES.length > 0) {
+        setCfgCards(c.ONBOARDING_SLIDES.slice(0, 3));
+      }
+      if (typeof c?.IMPACT_ELDERS_THRESHOLD === "number" && c.IMPACT_ELDERS_THRESHOLD > 0) {
+        setCfgThreshold(c.IMPACT_ELDERS_THRESHOLD);
+      }
+      if (c && c.ONBOARDING_ENABLED === false) {
+        setCfgEnabled(false);
+        setStage("idle");
+        return;
+      }
+      setCfgEnabled(true);
+      const d = ob as { needed?: boolean };
+      setStage(d.needed ? "ready" : "idle");
+    });
     return () => {
       alive = false;
     };
-  }, [status]);
+  }, []);
 
-  /* ================= الختم — الإغلاق بأي طريقة يختم نهائيًا ================= */
+  useEffect(() => {
+    if (status !== "authenticated" || !userId) return;
+    return checkEligibility();
+  }, [status, userId, checkEligibility]);
+
+  /* عرض فوري عند طلب إعادة الترحيب من الإعدادات دون إعادة تحميل */
+  useEffect(() => {
+    const onReplay = () => {
+      setCfgEnabled(true);
+      setStage("ready");
+    };
+    window.addEventListener("kalam:replay-onboarding", onReplay);
+    return () => window.removeEventListener("kalam:replay-onboarding", onReplay);
+  }, []);
+
   const finish = useCallback(async () => {
     if (finishingRef.current) return;
     finishingRef.current = true;
@@ -146,7 +144,6 @@ export function OnboardingExperience() {
     finishingRef.current = false;
   }, []);
 
-  /* Escape يمشي بالقارئ بحرية — لا حبس ولا إجبار */
   useEffect(() => {
     if (stage !== "ready") return;
     const onKey = (e: KeyboardEvent) => {
@@ -156,7 +153,6 @@ export function OnboardingExperience() {
     return () => document.removeEventListener("keydown", onKey);
   }, [stage, finish]);
 
-  /* ================= لا شيء يُرسم قبل الحسم — أمان SSR ================= */
   if (stage !== "ready" || !cfgEnabled) return null;
 
   const cards = buildCards(cfgCards, cfgThreshold);
@@ -164,22 +160,28 @@ export function OnboardingExperience() {
 
   return (
     <div className="fixed inset-0 z-90 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-label="ترحيب بالعضو الجديد">
-      {/* خلفية هادئة ناعمة — الضغط عليها يمشي بالقارئ بحريته ويختم التجربة */}
-      <div className="absolute inset-0 bg-zinc-950/55 backdrop-blur-sm animate-fade-in" onClick={() => void finish()} />
+      <div className="absolute inset-0 bg-zinc-950/55 backdrop-blur-sm animate-fade-in" />
 
-      {/* البطاقة مقيّدة بارتفاع الشاشة الفعلي (dvh) — المتن يتمرر بسلاسة وزر البدء مثبت أسفلها:
-          لا قص علوي ولا سفلي ولا حبس تمرير على أي مقاس موبايل */}
       <div
         className="relative flex max-h-[calc(100dvh_-_1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border shadow-lift animate-fade-in sm:max-h-[calc(100dvh_-_2rem)]"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
-        {/* الإطار الذهبي الداخلي الناعم — توقيع الهوية */}
         <div className="pointer-events-none absolute inset-2.5 z-10 rounded-3xl" style={{ border: "1px solid var(--accent-soft)" }} aria-hidden />
 
-        {/* المنطقة الوسطى المتمررة — كل المحتوى ما عدا زر البدء */}
+        <button
+          type="button"
+          onClick={() => void finish()}
+          aria-label="إغلاق الترحيب"
+          className="absolute left-4 top-4 z-20 rounded-full p-2 transition-colors hover:bg-(--accent-soft)"
+          style={{ color: "var(--ink-muted)" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-7 sm:px-9 sm:pb-6 sm:pt-9">
           <div className="text-center">
-            {/* شعار الريشة — مصغّرة قليلًا على الموبايل */}
             <div
               className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-3xl sm:mb-4 sm:h-16 sm:w-16"
               style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
@@ -195,11 +197,10 @@ export function OnboardingExperience() {
               {firstName ? `أهلًا بك يا ${firstName}` : "أهلًا بك بين أهل الكلمة"}
             </h2>
             <p className="mx-auto mt-2.5 max-w-md text-xs leading-6 sm:mt-3 sm:text-[13px] sm:leading-7" style={{ color: "var(--ink-muted)" }}>
-              منصة فكرية عربية نزن فيها الكلمة بميزان الأثر — وهذه أركانها الثلاثة في لمحة واحدة، ثم أنت حرّك بنا كما تحب.
+              منصة فكرية عربية نزن فيها الكلمة بميزان الأثر — وهذه أركانها الثلاثة في لمحة واحدة، ثم انطلق بحرّيتك كما تحب.
             </p>
           </div>
 
-          {/* الأركان الثلاثة — على الموبايل الأيقونة بجانب النص أفقيًا لتقليل الطول */}
           <div className="mt-5 grid gap-2.5 text-right sm:mt-6 sm:grid-cols-3 sm:gap-3">
             {cards.map((c) => (
               <div
@@ -229,9 +230,7 @@ export function OnboardingExperience() {
           </div>
         </div>
 
-        {/* زر البدء — مثبت أسفل البطاقة ظاهرًا دائمًا مهما طال المتن */}
         <div className="shrink-0 border-t px-5 pb-4 pt-3.5 sm:px-9 sm:pb-5 sm:pt-4" style={{ borderColor: "var(--border)" }}>
-          {/* زر واحد فخم — بلا تخطي ولا خطوات ولا إجبار */}
           <button
             onClick={() => void finish()}
             className="w-full rounded-full px-6 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98] sm:py-3.5"
@@ -240,7 +239,7 @@ export function OnboardingExperience() {
             ابدأ رحلتك الفكرية
           </button>
           <p className="mt-2.5 text-center text-[10px]" style={{ color: "var(--ink-muted)" }}>
-            القراءة والتصفح بحرّيتك — والهيدر ومحرك البحث ينتظرانك متى احتجتهما.
+            ستظهر لك تلميحات خفيفة عند دخول أي ميزة لأول مرة فقط، دون إزعاج.
           </p>
         </div>
       </div>

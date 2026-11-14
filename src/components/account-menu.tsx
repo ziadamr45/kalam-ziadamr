@@ -20,7 +20,7 @@ function LoginIcon() {
 /**
  * منطقة الحساب في الهيدر:
  * - زائر → زر «دخول» (يعود للصفحة نفسها بعد الدخول)
- * - مسجّل → صورته + قائمة (حسابي، قراءاتي، خروج)
+ * - مسجّل → صورته + قائمة واضحة متطابقة مع تبويبات الحساب
  */
 export function AccountMenu() {
   const { data: session, status } = useSession();
@@ -67,11 +67,6 @@ export function AccountMenu() {
         aria-expanded={open}
         title={u.name || "حسابي"}
         data-tour="account-avatar"
-        /* محاذاة رأسية صريحة: flex + items-center + justify-center + self-center
-           تقتل فجوة سطر الأساس (baseline descender) التي كانت ترفع الصورة ~2px.
-           h-8 w-8 (32px): درجة أصغر من جرس الإشعارات (36px) كي تتوازن مع
-           أيقونات الجرس والثيم والبحث — الصورة تملأ الدائرة فتبدو أثقل بصريًا،
-           وإطار خفيف بنسبة أعمق يحفظ وضوح الدائرة عند الحجم الأصغر */
         className="flex h-8 w-8 items-center justify-center self-center overflow-hidden rounded-full border transition-all duration-300 hover:scale-110"
         style={{
           borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.35)",
@@ -84,9 +79,6 @@ export function AccountMenu() {
             width={32}
             height={32}
             referrerPolicy="no-referrer"
-            /* h-full/w-full بدل مقاس ثابت: على اللمس (موبايل/تابلت) يكبّر globals.css
-               الزر نفسه إلى 44px فكانت الصورة 36px تظهر مربعة داخل الدائرة —
-               بملء الزر تُقص دائمًا دائرة كاملة من أي مصدر (جوجل أو مرفوعة) وبأي مقاس */
             className="block h-full w-full object-cover"
           />
         ) : (
@@ -119,7 +111,7 @@ export function AccountMenu() {
               className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
               style={{ color: "var(--ink)" }}
             >
-              ملفي ورصيد أثري
+              ملفي الشخصي
             </Link>
             <Link
               href="/saved"
@@ -129,25 +121,31 @@ export function AccountMenu() {
             >
               قراءاتي المحفوظة
             </Link>
-            {/* الإعدادات والأمان بضغطة واحدة — تعديل الهوية والأجهزة والخصوصية بلا لفّ الصفحة */}
             <Link
               href="/profile?tab=settings"
               onClick={() => setOpen(false)}
               className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
               style={{ color: "var(--ink)" }}
             >
-              الإعدادات والأمان
+              الإعدادات والتفضيلات
             </Link>
+            <Link
+              href="/profile?tab=security"
+              onClick={() => setOpen(false)}
+              className="block rounded-xl px-3 py-2 transition-colors hover:bg-(--accent-soft)"
+              style={{ color: "var(--ink)" }}
+            >
+              الأمان والجلسات
+            </Link>
+            <div className="my-1 h-px" style={{ background: "var(--border)" }} aria-hidden />
             <button
               onClick={async () => {
-                /* الخروج الطبيعي يمسح مؤشر الدخول أولًا — كي لا يعتبره
-                   حارس مراقبة الجلسة إبطالًا مفاجئًا ويطلق إنذارًا كاذبًا */
                 try {
                   window.localStorage.removeItem("kalam_was_logged_in");
                 } catch {}
                 await signOut({ redirectTo: "/" });
               }}
-              className="mt-1 block w-full rounded-xl px-3 py-2 text-right transition-colors hover:bg-(--accent-soft)"
+              className="block w-full rounded-xl px-3 py-2 text-right transition-colors hover:bg-(--accent-soft)"
               style={{ color: "#b4443c" }}
             >
               تسجيل الخروج
