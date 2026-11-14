@@ -56,15 +56,12 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
               aria-hidden
             >
               <path
-                d="M95 30 L67 43 Q56 48.5 62 58 L75 76 Q82 88 68 88 L29 88"
-                stroke="currentColor"
-                strokeWidth="10.5"
-                strokeLinecap="butt"
-                strokeLinejoin="round"
+                d="M98 25 L98 37 L67 51 Q64 52.5 66 55 L82 81 Q87 95 72 95 L28 95 L28 84 L69 84 Q72 84 70 81 L55 56 Q49 44 61 39 Z"
+                fill="currentColor"
                 className="kalam-loader-kaf"
               />
               <path
-                d="M81 116 L47 116"
+                d="M81 118 L47 118"
                 pathLength={100}
                 stroke="currentColor"
                 strokeWidth="4.4"
