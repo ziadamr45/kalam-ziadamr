@@ -38,12 +38,13 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
             }}
             aria-hidden
           />
-          {/* الشعار المتجهي الخفيف للمنصة — وميض هادئ لحرف الكاف + رسم الخط أسفله عبر GPU فقط */}
+          {/* الشعار المتجهي الخفيف للمنصة — يتكيف تلقائيًا مع الوضع الفاتح والداكن */}
           <div
             className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-[26%] border shadow-lift sm:h-28 sm:w-28 md:h-32 md:w-32 [@media(max-height:500px)]:h-16 [@media(max-height:500px)]:w-16"
             style={{
-              background: "#0D1626",
+              background: "var(--surface)",
               borderColor: "var(--border)",
+              color: "var(--accent)",
             }}
             role="img"
             aria-label="كلام له لازمة"
@@ -57,14 +58,14 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
               <g className="kalam-loader-kaf">
                 <path
                   d="M92 22 L92 66 Q92 84 70 84 L40 84 Q25 84 24 70"
-                  stroke="#D9A441"
+                  stroke="currentColor"
                   strokeWidth="10.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
                 <path
                   d="M63 36 C53 36 49 44 57 47 C64 50 58 59 47 59"
-                  stroke="#D9A441"
+                  stroke="currentColor"
                   strokeWidth="7.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -73,7 +74,7 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
               <path
                 d="M94 103 L34 103"
                 pathLength={100}
-                stroke="#D9A441"
+                stroke="currentColor"
                 strokeWidth="9"
                 strokeLinecap="round"
                 className="kalam-loader-line"
