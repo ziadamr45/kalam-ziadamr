@@ -7,7 +7,7 @@ import { recordServerError } from "@/lib/error-alert";
 
 /**
  * واجهة الأجهزة المتصلة — صفحة الملف الشخصي:
- *  GET    — قائمة أجهزة الحساب (الأحدث نشاطًا أولًا) + بصمة الجهاز الحالي للتمييز الأخضر.
+ *  GET    — قائمة أجهزة الحساب (الجهاز الحالي أولًا دائمًا، ثم الأحدث نشاطًا) + بصمة الجهاز الحالي للتمييز الأخضر.
  *           كل استدعاء نبض حي: يوثّق جهاز هذا الطلب تلقائيًا إن لم يوجد (تحديث متصفح
  *           يغيّر البصمة) ويحدّث آخر نشاطه وآخر عنوانه — فلا يُقدَّم التاريخ قديمًا.
  *  DELETE — إبطال جلسة جهاز بعينه ({ deviceHash }): حذف سجله من قاعدة البيانات
@@ -58,7 +58,7 @@ export async function GET() {
       /* نبض فاشل لا يعطّل عرض القائمة أبدًا */
     }
 
-    const devices = await prisma.userDevice.findMany({
+    const rawDevices = await prisma.userDevice.findMany({
       where: { userId },
       orderBy: { lastActiveAt: "desc" },
       select: {
@@ -72,6 +72,13 @@ export async function GET() {
         lastActiveAt: true,
         createdAt: true,
       },
+    });
+
+    /* وضع الجهاز الحالي في رأس القائمة دائمًا */
+    const devices = [...rawDevices].sort((a, b) => {
+      if (a.deviceHash === currentDeviceHash) return -1;
+      if (b.deviceHash === currentDeviceHash) return 1;
+      return 0;
     });
 
     return NextResponse.json({ devices, currentDeviceHash, sessionDeviceHash, requestDeviceHash });

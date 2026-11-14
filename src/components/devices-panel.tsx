@@ -6,7 +6,7 @@ import { useDialogs } from "@/components/ui/dialogs";
 
 /**
  * لوحة «الأجهزة المتصلة» — إدارة جلسات الحساب من صفحة الملف الشخصي:
- * - قائمة كل الهواتف والمتصفحات التي دخلت إلى الحساب (الأحدث نشاطًا أولًا).
+ * - قائمة كل الهواتف والمتصفحات التي دخلت إلى الحساب (الجهاز الحالي أولًا دائمًا، ثم الأحدث نشاطًا).
  * - تمييز الجهاز الحالي بعلامة خضراء «هذا الجهاز».
  * - زر «تسجيل الخروج من هذا الجهاز» لكل جهاز آخر: يحذف سجله من قاعدة
  *   البيانات فتموت جلسته فورًا (بوابة الجلسة تقارن البصمة كل طلب).
@@ -74,8 +74,14 @@ export function DevicesPanel() {
       const res = await fetch("/api/profile/devices", { cache: "no-store" });
       if (res.status === 401) return;
       const data = (await res.json()) as { devices: DeviceRow[]; currentDeviceHash: string | null };
-      setDevices(data.devices ?? []);
-      setCurrentHash(data.currentDeviceHash ?? null);
+      const cur = data.currentDeviceHash ?? null;
+      const list = [...(data.devices ?? [])].sort((a, b) => {
+        if (a.deviceHash === cur) return -1;
+        if (b.deviceHash === cur) return 1;
+        return 0;
+      });
+      setDevices(list);
+      setCurrentHash(cur);
     } catch {
       /* شبكة متقطعة */
     } finally {
