@@ -69,6 +69,13 @@ const SCREENSHOTS: MetadataRoute.Manifest["screenshots"] = [
     label: "صفحة المقال — تشكيل حرفي متقن ومشغل تلاوة صوتي متزامن",
   },
   {
+    src: "/screenshots/mobile-companion.png?v=2",
+    sizes: "1080x2400",
+    type: "image/png",
+    form_factor: "narrow",
+    label: "حوار فكري رصين مع المقال عبر المحاور الذكي",
+  },
+  {
     src: "/screenshots/mobile-dark.png?v=2",
     sizes: "1080x2400",
     type: "image/png",
@@ -95,6 +102,13 @@ const SCREENSHOTS: MetadataRoute.Manifest["screenshots"] = [
     type: "image/png",
     form_factor: "wide",
     label: "المنصة على الشاشات الكبيرة — واجهة رئيسية فخمة",
+  },
+  {
+    src: "/screenshots/desktop-companion.png?v=2",
+    sizes: "1920x1080",
+    type: "image/png",
+    form_factor: "wide",
+    label: "محاورة المقال فكريًا مع المحاور الذكي على شاشة الحاسوب",
   },
   {
     src: "/screenshots/desktop-article.png?v=2",
