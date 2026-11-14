@@ -13,7 +13,7 @@ import {
   saveOfflineArticle,
   isArticleSaved,
 } from "@/lib/indexeddb";
-import { parseBlocks, blockWordCount, blockPlainWords, type Block } from "@/lib/content-blocks";
+import { parseBlocks, blockWordCount, blockPlainWords } from "@/lib/content-blocks";
 import { stripDiacritics } from "@/lib/utils";
 import type { OfflineArticle } from "@/types/offline";
 
@@ -480,8 +480,21 @@ export function ArticleReader({
 
       <FirstVisitHint
         id="article-tools"
-        text="من الشريط السفلي يمكنك تفعيل التشكيل الكامل، أو حفظ المقال في مكتبتك، أو طباعته وتوليد بطاقات اقتباس."
         className="mt-6"
+        steps={[
+          {
+            title: "التشكيل والقراءة السريعة",
+            text: "من مفتاح «تشكيل» في الشريط السفلي يمكنك إظهار الحركات الكاملة أو إخفاؤها بضغطة واحدة دون أن تفقد موضع قراءتك.",
+          },
+          {
+            title: "المختصر والحفظ والاقتباس",
+            text: "من الشريط نفسه يمكنك قراءة المختصر المفيد، أو حفظ المقال في حسابك أو على جهازك، أو تصميم بطاقة اقتباس جاهزة للمشاركة.",
+          },
+          {
+            title: "المحاور الذكي في أسفل المقال",
+            text: "بعد القراءة، جرّب زر «ناقش أفكار المقال» أسفل الصفحة للحوار حول مضمون المقال بلغتك ولهجتك.",
+          },
+        ]}
       />
 
       {article.coverImage && (

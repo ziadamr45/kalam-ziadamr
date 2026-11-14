@@ -49,7 +49,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     redirect("/auth/login?callback=/profile");
   }
 
-  /* جلب السجل والتعليقات في التبويب الرئيسي فقط لتسريع فتح الإعدادات والأمان */
   const [user, logs, comments] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
@@ -351,8 +350,17 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <FirstVisitHint
             id="profile-settings"
-            text="من هنا يمكنك تخصيص اسمك وصورتك والتحكم في تفضيلات القراءة والإشعارات والخصوصية."
             className="mb-4"
+            steps={[
+              {
+                title: "هويتك وإشعاراتك",
+                text: "من هنا يمكنك تخصيص اسمك وصورتك ونبذتك، وتحديد الإشعارات التي تصلك.",
+              },
+              {
+                title: "تفضيلات القراءة والخصوصية",
+                text: "في الأسفل يمكنك ضبط التشكيل الافتراضي، ومسح سجل البحث، أو إعادة عرض بطاقة الترحيب في أي وقت.",
+              },
+            ]}
           />
           <ProfileEditor
             googleName={user.name}

@@ -8,23 +8,43 @@ import { getVisitorFingerprint } from "@/lib/fingerprint";
 
 type ChatMessage = { role: "user" | "model"; text: string };
 
+/**
+ * عارض ماركداون غني لردود المحاور:
+ * عناوين (##)، جداول (| ... |)، اقتباسات (> )، قوائم نقطية ومرقمة،
+ * عريض (**)، مائل (*)، ووسوم بارزة (`...`).
+ */
 function MiniMarkdown({ text }: { text: string }) {
   const nodes: React.ReactNode[] = [];
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   let bullets: string[] = [];
   let ordered = false;
+  let quoteLines: string[] = [];
+  let tableRows: string[][] = [];
 
   const inline = (s: string, k: string): React.ReactNode[] =>
     s
-      .split(/(\*\*[^*]+\*\*)/g)
+      .split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g)
       .filter((p) => p !== "")
-      .map((p, i) =>
-        p.startsWith("**") && p.endsWith("**") ? (
-          <strong key={`${k}-${i}`} className="font-bold">{p.slice(2, -2)}</strong>
-        ) : (
-          <span key={`${k}-${i}`}>{p}</span>
-        ),
-      );
+      .map((p, i) => {
+        if (p.startsWith("**") && p.endsWith("**")) {
+          return <strong key={`${k}-${i}`} className="font-bold">{p.slice(2, -2)}</strong>;
+        }
+        if (p.startsWith("*") && p.endsWith("*") && p.length > 2) {
+          return <em key={`${k}-${i}`} className="italic">{p.slice(1, -1)}</em>;
+        }
+        if (p.startsWith("`") && p.endsWith("`") && p.length > 2) {
+          return (
+            <code
+              key={`${k}-${i}`}
+              className="rounded-md px-1.5 py-0.5 text-[12px] font-semibold"
+              style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+            >
+              {p.slice(1, -1)}
+            </code>
+          );
+        }
+        return <span key={`${k}-${i}`}>{p}</span>;
+      });
 
   const flushList = () => {
     if (bullets.length === 0) return;
@@ -38,6 +58,59 @@ function MiniMarkdown({ text }: { text: string }) {
       </Tag>,
     );
     bullets = [];
+  };
+
+  const flushQuote = () => {
+    if (quoteLines.length === 0) return;
+    nodes.push(
+      <blockquote
+        key={`q-${nodes.length}`}
+        className="rounded-xl border-r-3 px-3.5 py-2 text-[13px] leading-7"
+        style={{
+          borderColor: "var(--accent)",
+          background: "var(--surface)",
+          color: "var(--ink-muted)",
+        }}
+      >
+        {quoteLines.map((ql, i) => (
+          <p key={i}>{inline(ql, `q${nodes.length}-${i}`)}</p>
+        ))}
+      </blockquote>,
+    );
+    quoteLines = [];
+  };
+
+  const flushTable = () => {
+    if (tableRows.length === 0) return;
+    const header = tableRows[0];
+    const body = tableRows.slice(1);
+    nodes.push(
+      <div key={`tbl-${nodes.length}`} className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+        <table className="w-full border-collapse text-right text-xs">
+          <thead>
+            <tr style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}>
+              {header.map((cell, ci) => (
+                <th key={ci} className="border-b px-3 py-2 font-bold" style={{ borderColor: "var(--border)" }}>
+                  {inline(cell, `th${nodes.length}-${ci}`)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, ri) => (
+              <tr key={ri} style={{ background: ri % 2 === 1 ? "var(--surface)" : "transparent" }}>
+                {row.map((cell, ci) => (
+                  <td key={ci} className="border-t px-3 py-2 leading-6" style={{ borderColor: "var(--border)" }}>
+                    {inline(cell, `td${nodes.length}-${ri}-${ci}`)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>,
+    );
+    tableRows = [];
   };
 
   let para: string[] = [];
@@ -55,14 +128,30 @@ function MiniMarkdown({ text }: { text: string }) {
     para = [];
   };
 
+  const flushAll = () => {
+    flushList();
+    flushQuote();
+    flushTable();
+    flushPara();
+  };
+
   for (const raw of lines) {
     const line = raw.trimEnd();
     const heading = line.match(/^(#{1,3})\s+(.*)$/);
+    const quote = line.match(/^>\s?(.*)$/);
     const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
     const numItem = line.match(/^\s*\d+[.)]\s+(.*)$/);
-    if (heading) {
+    const isTableLine = line.trim().startsWith("|") && line.trim().endsWith("|");
+
+    if (isTableLine) {
       flushList();
+      flushQuote();
       flushPara();
+      const cells = line.trim().slice(1, -1).split("|").map((c) => c.trim());
+      const isSeparator = cells.every((c) => /^:?-{2,}:?$/.test(c));
+      if (!isSeparator) tableRows.push(cells);
+    } else if (heading) {
+      flushAll();
       nodes.push(
         <p
           key={`h-${nodes.length}`}
@@ -72,23 +161,31 @@ function MiniMarkdown({ text }: { text: string }) {
           {inline(heading[2], `h${nodes.length}`)}
         </p>,
       );
+    } else if (quote) {
+      flushList();
+      flushTable();
+      flushPara();
+      quoteLines.push(quote[1]);
     } else if (bullet || numItem) {
+      flushQuote();
+      flushTable();
       flushPara();
       const isNum = Boolean(numItem);
       if (bullets.length > 0 && ordered !== isNum) flushList();
       ordered = isNum;
       bullets.push((bullet ?? numItem)![1]);
     } else if (line.trim() === "") {
-      flushList();
-      flushPara();
+      flushAll();
     } else {
+      flushList();
+      flushQuote();
+      flushTable();
       para.push(line);
     }
   }
-  flushList();
-  flushPara();
+  flushAll();
 
-  return <div className="space-y-2">{nodes}</div>;
+  return <div className="space-y-2.5">{nodes}</div>;
 }
 
 const HISTORY_KEY = (articleId: string) => `kalam_discuss_${articleId}`;
@@ -497,7 +594,16 @@ export function DiscussCompanion({
           <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
             <FirstVisitHint
               id="ai-discuss"
-              text="اسأل المحاور عن أي فكرة في هذا المقال أو ناقشها بحرّية؛ إجاباته تنطلق من مضمون المقال نفسه."
+              steps={[
+                {
+                  title: "حوار في صلب المقال",
+                  text: "اطرح أي سؤال أو فكرة حول هذا المقال، وسيجيبك المحاور من مضمون المقال ورؤية كاتبه.",
+                },
+                {
+                  title: "يتحدث بلغتك ولهجتك",
+                  text: "اكتب بالعربية الفصحى أو باللهجة المصرية أو بالإنجليزية، وسيتجاوب معك المحاور بالأسلوب نفسه.",
+                },
+              ]}
             />
 
             <div className="flex justify-start">
