@@ -68,11 +68,20 @@ export async function POST(request: Request) {
     }
 
     if (type === "complete" && body.viewId) {
-      await prisma.pageView.update({
-        where: { id: body.viewId },
-        data: { completed: true, readSeconds: body.readSeconds ?? null },
-      }).catch(() => {});
-      if (body.articleId) {
+      /* التحقق من وجود سجل الزيارة غير المكتمل أولًا — يمنع تضخيم العداد
+         بمعرفات وهمية أو تكرار الإرسال لنفس الزيارة */
+      const updated = await prisma.pageView
+        .updateMany({
+          where: {
+            id: body.viewId,
+            completed: false,
+            ...(body.articleId ? { articleId: body.articleId } : {}),
+          },
+          data: { completed: true, readSeconds: body.readSeconds ?? null },
+        })
+        .catch(() => ({ count: 0 }));
+
+      if (updated.count > 0 && body.articleId) {
         await prisma.article.update({
           where: { id: body.articleId },
           data: { completedReads: { increment: 1 } },
@@ -82,7 +91,7 @@ export async function POST(request: Request) {
     }
 
     if (type === "dwell" && body.viewId) {
-      await prisma.pageView.update({
+      await prisma.pageView.updateMany({
         where: { id: body.viewId },
         data: { readSeconds: body.readSeconds ?? null },
       }).catch(() => {});

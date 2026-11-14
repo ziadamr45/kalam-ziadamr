@@ -96,20 +96,26 @@ export async function POST(request: Request) {
     let myVote: number | null;
 
     if (existing && existing.value === value) {
-      /* نقرة ثانية على نفس التصويت = إلغاء */
-      await prisma.interaction.delete({ where: { id: existing.id } });
+      /* نقرة ثانية على نفس التصويت = إلغاء (idempotent ضد النقرات المتسابقة) */
+      await prisma.interaction.deleteMany({ where: { id: existing.id } });
       myVote = null;
     } else if (existing) {
-      await prisma.interaction.update({ where: { id: existing.id }, data: { value } });
+      await prisma.interaction.upsert({
+        where,
+        create: { articleId, value, userId, visitorFp: null },
+        update: { value },
+      });
       myVote = value;
     } else {
-      await prisma.interaction.create({
-        data: {
+      await prisma.interaction.upsert({
+        where,
+        create: {
           articleId,
           value,
           userId,
           visitorFp: null,
         },
+        update: { value },
       });
       myVote = value;
     }
