@@ -5,6 +5,30 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
       aria-busy="true"
       aria-label={label}
     >
+      <style>{`
+        .kalam-loader-kaf {
+          animation: kalam-kaf-glow 2.2s ease-in-out infinite;
+        }
+        .kalam-loader-line {
+          stroke-dasharray: 100;
+          stroke-dashoffset: 100;
+          animation: kalam-line-write 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
+        @keyframes kalam-kaf-glow {
+          0%, 100% { opacity: 0.72; }
+          50% { opacity: 1; }
+        }
+        @keyframes kalam-line-write {
+          0% { stroke-dashoffset: 100; opacity: 0.35; }
+          55% { stroke-dashoffset: 0; opacity: 1; }
+          82% { stroke-dashoffset: 0; opacity: 1; }
+          100% { stroke-dashoffset: -100; opacity: 0.25; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .kalam-loader-kaf { animation: none !important; opacity: 1 !important; }
+          .kalam-loader-line { animation: none !important; stroke-dashoffset: 0 !important; opacity: 1 !important; }
+        }
+      `}</style>
       <div className="flex flex-col items-center gap-6 text-center animate-fade-in [@media(max-height:500px)]:gap-3">
         <div className="relative flex items-center justify-center">
           <span
