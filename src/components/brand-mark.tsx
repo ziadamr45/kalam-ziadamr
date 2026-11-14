@@ -1,35 +1,53 @@
 /**
- * العلامة الميكروية للمنصة — الكشيدة النحاسية المستوحاة من أيقونة المنصة،
- * تندمج عضويًا مع كتابة «كلام له لازمة» في موضع العلامة التجارية فقط.
- * SVG متزامن خفيف لا يضيف أي طلب شبكة — Micro-branding بلا حشو.
+ * العلامة الميكروية الموحدة للمنصة — حرف الكاف والخط (شعار «كلام له لازمة»).
+ * SVG متزامن خفيف لا يضيف أي طلب شبكة، ويحافظ على نفس المقاسات في الهيدر والنوافذ.
  */
-export function BrandMark({ size = 18, muted = false }: { size?: number; muted?: boolean }) {
-  const copper = muted ? "var(--ink-muted)" : "var(--accent)";
+export function BrandMark({
+  size = 18,
+  muted = false,
+  inheritColor = false,
+}: {
+  size?: number;
+  muted?: boolean;
+  inheritColor?: boolean;
+}) {
+  const color = inheritColor
+    ? "currentColor"
+    : muted
+      ? "var(--ink-muted)"
+      : "var(--accent)";
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 48 48"
+      viewBox="0 0 128 128"
       fill="none"
       aria-hidden
       style={{ flexShrink: 0 }}
     >
-      {/* الكشيدة الصاعدة — ضربة الأثر */}
+      {/* جسم حرف الكاف */}
       <path
-        d="M10 34 L34 12"
-        stroke={copper}
-        strokeWidth="7"
+        d="M92 22 L92 66 Q92 84 70 84 L40 84 Q25 84 24 70"
+        stroke={color}
+        strokeWidth="10.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* شارة الكاف الداخلية */}
+      <path
+        d="M63 36 C53 36 49 44 57 47 C64 50 58 59 47 59"
+        stroke={color}
+        strokeWidth="7.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* خط اللازمة أسفل الكاف */}
+      <path
+        d="M94 103 L34 103"
+        stroke={color}
+        strokeWidth="9"
         strokeLinecap="round"
       />
-      {/* الخط القاعدي */}
-      <path
-        d="M8 41 L26 41"
-        stroke={copper}
-        strokeWidth="6"
-        strokeLinecap="round"
-      />
-      {/* نقطة اللازمة */}
-      <circle cx="36" cy="41" r="3.4" fill={copper} />
     </svg>
   );
 }
