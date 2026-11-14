@@ -1,16 +1,26 @@
 /**
  * عميل Gemini النصي — المنصة العامة (يعمل حصريًا على السيرفر).
  *
- * - النموذج الأساسي: gemini-3.5-flash-lite (سريع جدًا وبحدود استخدام واسعة تتحمل الضغط).
- * - بدائل احتياطية حديثة إن لم يتوفر الاسم أو عند التراجع الأُسّي.
+ * - التوجيه الذكي الفوري (0ms):
+ *   • الأسئلة العادية والسريعة → gemini-3.1-flash-lite (أوفر وأخف).
+ *   • الأسئلة التحليلية/العميقة → gemini-3.5-flash-lite (أقوى في المنطق).
+ * - بديل احتياطي تلقائي عبر Groq عند امتلاء الحصة (429) إذا توفر GROQ_API_KEY.
  * - لا يغادر المفتاح بيئة الخادم أبدًا.
  */
 
 import "server-only";
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
-const CHAT_CANDIDATES = [
+const LITE_FIRST = [
+  process.env.GEMINI_CHAT_MODEL,
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+].filter(Boolean) as string[];
+
+const STRONG_FIRST = [
   process.env.GEMINI_CHAT_MODEL,
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",
@@ -54,13 +64,59 @@ type GeminiResponse = {
 
 export function geminiConfigured(): boolean {
   return Boolean(
-    process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith("PLACEHOLDER"),
+    (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith("PLACEHOLDER")) ||
+      process.env.GROQ_API_KEY,
   );
 }
 
 export type ChatTurn = { role: "user" | "model"; text: string };
 
-/** استدعاء نصي واحد مع بدائل الموديلات والتراجع الأُسّي */
+async function callGroqFallback(opts: {
+  system: string;
+  turns: ChatTurn[];
+  maxOutputTokens?: number;
+  temperature?: number;
+  timeoutMs?: number;
+}): Promise<string | null> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 20_000);
+  try {
+    const res = await fetch(GROQ_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${groqKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.GROQ_CHAT_MODEL || "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: opts.system },
+          ...opts.turns.map((t) => ({
+            role: t.role === "model" ? "assistant" : "user",
+            content: t.text,
+          })),
+        ],
+        max_tokens: opts.maxOutputTokens ?? 900,
+        temperature: opts.temperature ?? 0.75,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    return json.choices?.[0]?.message?.content?.trim() || null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** استدعاء نصي واحد مع التوجيه الذكي + بدائل الموديلات + بديل Groq عند 429 */
 export async function geminiChat(opts: {
   system: string;
   turns: ChatTurn[];
@@ -68,19 +124,29 @@ export async function geminiChat(opts: {
   temperature?: number;
   jsonMode?: boolean;
   timeoutMs?: number;
+  preferStrong?: boolean;
 }): Promise<string> {
   if (!geminiConfigured()) {
     throw new GeminiError("خدمة الذكاء الاصطناعي غير مهيأة", 503);
   }
 
-  const memo = (globalThis as Record<string, unknown>)["__working_chat"] as string | undefined;
-  const models = memo ? [memo, ...CHAT_CANDIDATES.filter((m) => m !== memo)] : CHAT_CANDIDATES;
+  const hasGeminiKey = Boolean(
+    process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith("PLACEHOLDER"),
+  );
+
+  if (!hasGeminiKey) {
+    const groqOnly = await callGroqFallback(opts);
+    if (groqOnly) return groqOnly;
+    throw new GeminiError("خدمة الذكاء الاصطناعي غير مهيأة", 503);
+  }
+
+  const models = Array.from(new Set(opts.preferStrong ? STRONG_FIRST : LITE_FIRST));
   let lastErr: unknown = null;
 
   for (const model of models) {
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 30_000);
+      const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 25_000);
       try {
         const res = await fetch(`${API_ROOT}/${model}:generateContent`, {
           method: "POST",
@@ -110,8 +176,6 @@ export async function geminiChat(opts: {
           throw new GeminiError(friendlyError(res.status, raw), res.status);
         }
 
-        (globalThis as Record<string, unknown>)["__working_chat"] = model;
-
         const text = json.candidates?.[0]?.content?.parts
           ?.map((p) => p.text ?? "")
           .join("")
@@ -127,13 +191,19 @@ export async function geminiChat(opts: {
       } catch (err) {
         lastErr = err;
         const status = err instanceof GeminiError ? err.status : 0;
-        if (status === 404) break;
+        if (status === 404 || status === 429) break; // انتقال فوري للموديل التالي بلا انتظار
         if (status === 401 || status === 403) throw err;
-        if (attempt < 3) await sleep(800 * Math.pow(2, attempt - 1) + Math.random() * 300);
+        if (attempt < 2) await sleep(600 + Math.random() * 250);
       } finally {
         clearTimeout(timer);
       }
     }
+  }
+
+  /* بديل احتياطي عبر Groq إذا امتلأت حصص Gemini (429) وتوفر GROQ_API_KEY */
+  if (!opts.jsonMode && process.env.GROQ_API_KEY) {
+    const groqReply = await callGroqFallback(opts);
+    if (groqReply) return groqReply;
   }
 
   if (lastErr instanceof GeminiError) throw lastErr;

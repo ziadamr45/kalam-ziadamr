@@ -150,6 +150,12 @@ function normalizeArabic(s: string): string {
     .toLowerCase();
 }
 
+/** فحص لحظي (0ms) لتوجيه الأسئلة العميقة أو الطويلة إلى 3.5 والأسئلة العادية إلى 3.1 */
+function needsDeepReasoning(msg: string, history: ChatTurn[]): boolean {
+  if (msg.length >= 120 || history.length >= 4) return true;
+  return /(قارن|مقارن|جدول|لماذا|ليه|دليل|برهان|اثبت|اشرح|تحليل|نقد|تعارض|تناقض|ما الفرق|الفرق بين|وجهة نظر|فلسف)/i.test(msg);
+}
+
 /**
  * اختيار ذكي لمقاطع المقال:
  * - إن كان المقال قصيرًا/متوسطًا (≤ 6500 حرف) يُمرّر كاملًا بدقة.
@@ -478,6 +484,8 @@ export async function POST(request: Request) {
       contactLines,
     });
 
+    const preferStrong = needsDeepReasoning(message.trim(), history);
+
     const reply = fixNunation(
       await geminiChat({
         system,
@@ -485,6 +493,7 @@ export async function POST(request: Request) {
         maxOutputTokens: 900,
         temperature: 0.75,
         timeoutMs: 25_000,
+        preferStrong,
       }),
     );
 
