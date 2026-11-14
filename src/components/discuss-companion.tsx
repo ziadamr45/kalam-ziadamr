@@ -527,6 +527,7 @@ export function DiscussCompanion({
           ref={triggerRef}
           type="button"
           onClick={openDrawer}
+          data-tour="discuss-trigger"
           aria-haspopup="dialog"
           aria-expanded={open}
           className="group flex items-center gap-2.5 rounded-full px-6 py-3 text-sm font-bold shadow-soft transition-all hover:scale-105 focus:outline-hidden focus-visible:ring-2"
@@ -614,6 +615,7 @@ export function DiscussCompanion({
               )}
               {unlimited || (remaining !== null && remaining > 1_000_000) ? (
                 <span
+                  data-tour="discuss-quota"
                   className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
                   style={{
                     background: "rgba(245, 158, 11, 0.1)",
@@ -631,6 +633,7 @@ export function DiscussCompanion({
               ) : (
                 remaining !== null && (
                   <span
+                    data-tour="discuss-quota"
                     className="rounded-full px-3 py-1 text-[11px] font-bold tabular-nums"
                     style={{
                       background: "var(--bg-soft)",
@@ -685,14 +688,23 @@ export function DiscussCompanion({
             <div className={`space-y-4 ${fullscreen ? "mx-auto max-w-3xl" : ""}`}>
               <FirstVisitHint
                 id="ai-discuss"
+                mode="tour"
+                active={ready}
                 steps={[
                   {
-                    title: "حوار في صلب المقال",
-                    text: "اطرح أي سؤال أو فكرة حول هذا المقال، وسيجيبك المحاور من مضمون المقال ورؤية كاتبه.",
+                    selector: "[data-tour='discuss-input']",
+                    title: "من هنا تبدأ الحوار",
+                    text: "اكتب سؤالك أو فكرتك بالعربية الفصحى أو العامية أو الإنجليزية، وسيرد عليك المحاور من صلب المقال.",
                   },
                   {
-                    title: "يتحدث بلغتك ولهجتك",
-                    text: "اكتب بالعربية الفصحى أو باللهجة المصرية أو بالإنجليزية، وسيتجاوب معك المحاور بالأسلوب نفسه.",
+                    selector: "[data-tour='discuss-send']",
+                    title: "إرسال رسالتك",
+                    text: "اضغط هنا لإرسال سؤالك؛ وعلى الهاتف يضيف زر الإدخال في لوحة المفاتيح سطرًا جديدًا دون إرسال.",
+                  },
+                  {
+                    selector: "[data-tour='discuss-quota']",
+                    title: "حصتك في النقاش",
+                    text: "هنا تتابع عدد الرسائل المتبقية لك في هذا المقال — وتتوسع حصتك كلما ارتفعت رتبتك.",
                   },
                 ]}
               />
@@ -846,6 +858,7 @@ export function DiscussCompanion({
               <div className="flex items-end gap-2">
                 <textarea
                   ref={inputRef}
+                  data-tour="discuss-input"
                   value={input}
                   onChange={(e) => {
                     setInput(e.target.value);
@@ -868,6 +881,7 @@ export function DiscussCompanion({
                 />
                 <button
                   type="button"
+                  data-tour="discuss-send"
                   onClick={send}
                   disabled={exhausted || sending || !input.trim()}
                   aria-label="إرسال الرسالة"

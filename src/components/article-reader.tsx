@@ -331,6 +331,7 @@ export function ArticleReader({
                 onClick={toggleTashkeel}
                 role="switch"
                 aria-checked={tashkeel}
+                data-tour="tashkeel-btn"
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
                 title="تبديل النص المشكول بالحركات الكاملة"
               >
@@ -348,6 +349,7 @@ export function ArticleReader({
           <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-center sm:gap-1">
             <button
               onClick={() => setShowSummary((v) => !v)}
+              data-tour="summary-btn"
               className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
             >
@@ -355,7 +357,7 @@ export function ArticleReader({
               <span className="hidden sm:inline">المختصر المفيد</span>
             </button>
 
-            <div ref={saveMenuRef} className="shrink-0 sm:relative">
+            <div ref={saveMenuRef} className="shrink-0 sm:relative" data-tour="save-btn">
               <button
                 onClick={() => setSaveMenuOpen((v) => !v)}
                 aria-expanded={saveMenuOpen}
@@ -451,7 +453,7 @@ export function ArticleReader({
               <span className="hidden sm:inline">طباعة / حفظ PDF</span>
             </button>
 
-            <div className="flex min-h-11 items-center">
+            <div className="flex min-h-11 items-center" data-tour="quote-btn">
               <QuoteGenerator
                 articleId={article.id}
                 articleTitle={article.title}
@@ -506,19 +508,32 @@ export function ArticleReader({
 
       <FirstVisitHint
         id="article-tools"
-        className="mt-6"
+        mode="tour"
         steps={[
           {
-            title: "التشكيل والقراءة السريعة",
-            text: "من مفتاح «تشكيل» في الشريط السفلي يمكنك إظهار الحركات الكاملة أو إخفاؤها بضغطة واحدة دون أن تفقد موضع قراءتك.",
+            selector: "#article-body",
+            title: "من هنا تقرأ المقال",
+            text: "اقرأ النص بهدوء، وبالتمرير للأسفل يُحفظ موضع قراءتك تلقائيًا لتستأنفه في أي وقت.",
           },
           {
-            title: "المختصر والحفظ والاقتباس",
-            text: "من الشريط نفسه يمكنك قراءة المختصر المفيد، أو حفظ المقال في حسابك أو على جهازك، أو تصميم بطاقة اقتباس جاهزة للمشاركة.",
+            selector: "[data-tour='tashkeel-btn']",
+            title: "مفتاح التشكيل",
+            text: "من هنا يمكنك إظهار الحركات الكاملة أو إخفاؤها بضغطة واحدة دون أن تفقد موضع قراءتك.",
           },
           {
-            title: "المحاور الذكي في أسفل المقال",
-            text: "بعد القراءة، جرّب زر «ناقش أفكار المقال» أسفل الصفحة للحوار حول مضمون المقال بلغتك ولهجتك.",
+            selector: "[data-tour='summary-btn']",
+            title: "المختصر المفيد",
+            text: "من هنا تفتح خلاصة المقال وأهم نقاطه العملية في لمحة سريعة.",
+          },
+          {
+            selector: "[data-tour='save-btn']",
+            title: "الحفظ والاقتباس",
+            text: "من هنا تحفظ المقال في حسابك أو على جهازك بدون إنترنت، أو تصمّم بطاقة اقتباس أو نسخة PDF.",
+          },
+          {
+            selector: "[data-tour='discuss-trigger']",
+            title: "ناقش أفكار المقال",
+            text: "بعد القراءة، من هنا تفتح حوارًا ذكيًا مع المحاور الفكري لمناقشة أفكار المقال بلغتك ولهجتك.",
           },
         ]}
       />
