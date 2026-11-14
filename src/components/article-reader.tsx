@@ -591,7 +591,8 @@ export function ArticleReader({
       </div>
 
       <Suspense fallback={null}>
-        <SearchJump version={syncKey} />\n      </Suspense>
+        <SearchJump version={syncKey} />
+      </Suspense>
 
       <div id="article-end-marker" className="h-1" aria-hidden />
     </div>
