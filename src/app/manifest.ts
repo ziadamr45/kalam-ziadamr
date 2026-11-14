@@ -3,28 +3,8 @@ import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-/**
- * بيان التطبيق الديناميكي — واجهة تثبيت PWA متقدمة (Richer Install UI):
- * المتصفح يعرض نافذة استعراض شبيهة بالمتاجر الرسمية تتضمن الاسم والوصف
- * وشريط لقطات الشاشة قبل الضغط على «تثبيت». اللقطات حية من إنتاج المنصة
- * في public/screenshots/ وتُلتقط آليًا عبر scripts/capture-pwa-screenshots.py
- *
- * ديناميكية في ثلاثة أبعاد:
- *  - الأيقونات تتبع كوكي kalam_theme: الوضع الساطع (الافتراضي) يثبّت
- *    الشعار الفاتح على الورق الكريمي، والداكن يثبّت الشعار الكحلي.
- *  - اختصار «متابعة القراءة» يظهر للمسجل دخوله فقط بأحدث موضع قراءته —
- *    يشير إلى /continue الثابت (أندرويد يحدّث البيان كل بضعة أيام، فالمسار
- *    الثابت يضمن فتح أحدث موضع لحظة الضغط مهما قدم كاش الجهاز).
- *  - أي عطل في القراءة الديناميكية لا يكسر البيان أبدًا — قيم افتراضية رصينة.
- */
-
 type Shortcut = NonNullable<MetadataRoute.Manifest["shortcuts"]>[number];
 
-/* امتداد البيان بمِيز launch_handler — التركيز على نافذة التطبيق القائمة
-   بدل فتح نسخ جديدة تتزاحم مع الجلسة (Next لم يُضف الحقل لتعريفاته بعد).
-   navigate-existing لا focus-existing: الأولى تركّز النافذة القائمة وتوجّهها
-   للرابط كي تبقى الاختصارات والروابط العميقة (/continue والمشاركات) تعمل،
-   والثانية تبتلع التنقل كليًا فتكسرها */
 type ManifestWithLaunchHandler = MetadataRoute.Manifest & {
   launch_handler?: { client_mode?: string | string[] };
 };
@@ -120,7 +100,6 @@ const SCREENSHOTS: MetadataRoute.Manifest["screenshots"] = [
 ];
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  /* الأيقونة تتبع ثيم القارئ وقت التثبيت — الساطع افتراضيًا */
   let light = true;
   try {
     light = (await cookies()).get("kalam_theme")?.value !== "dark";
@@ -128,17 +107,16 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
 
   const icons: MetadataRoute.Manifest["icons"] = light
     ? [
-        { src: "/icons/icon-light-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/icons/icon-light-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/icons/icon-light-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: "/icons/icon-light-192.png?v=4", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-light-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-light-maskable-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ]
     : [
-        { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: "/icons/icon-192.png?v=4", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icons/maskable-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ];
 
-  /* اختصار المتابعة الديناميكي — للمسجل دخوله فقط (أندرويد يعرض 4 اختصارات كحد أقصى) */
   const shortcuts: Shortcut[] = [...STATIC_SHORTCUTS];
   try {
     const session = await auth();
@@ -177,8 +155,6 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     background_color: "#FDFBF7",
     theme_color: "#F8F4EC",
     categories: ["news", "education", "lifestyle"],
-    /* التركيز على نافذة التطبيق القائمة وتوجيهها بدل نسخة جديدة —
-       يمنع تزاوج نافذتين وقت رجوع Google من تسجيل الدخول (سباق PWA) */
     launch_handler: { client_mode: "navigate-existing" },
     shortcuts,
     icons,
