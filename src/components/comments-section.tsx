@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { analyzeComment } from "@/lib/moderation";
@@ -118,7 +118,7 @@ export function CommentsSection({
   const [voteCounts, setVoteCounts] = useState<Record<string, { likes: number; dislikes: number }>>(
     () => Object.fromEntries(initialComments.map((c) => [c.id, { likes: c.likes, dislikes: c.dislikes }])),
   );
-  const [voteBusy, setVoteBusy] = useState<string | null>(null);
+  const voteSeqRef = useRef<Record<string, number>>({});
   const [voteNotice, setVoteNotice] = useState<string | null>(null);
 
   const loggedIn = (isLoggedIn ?? true) && Boolean(session?.user);
@@ -272,30 +272,29 @@ export function CommentsSection({
     [],
   );
 
-  /* التصويت على تعليق — تحديث فوري متفائل (0ms) + مطابقة مع الخادم */
+  /* التصويت على تعليق — تحديث لحظي فوري (0ms) بلا تعطيل ولا انتظار، ومزامنة صامتة بالخلفية */
   const vote = async (commentId: string, value: "LIKE" | "DISLIKE") => {
     if (!loggedIn) {
       requestAuth({ kind: "vote-comment" });
       return;
     }
-    if (voteBusy === commentId) return;
 
-    const prevVotes = myVotes;
-    const prevCounts = voteCounts;
-    const oldVote = myVotes[commentId] ?? null;
-    const oldCounts = voteCounts[commentId] ?? { likes: 0, dislikes: 0 };
+    const seq = (voteSeqRef.current[commentId] ?? 0) + 1;
+    voteSeqRef.current[commentId] = seq;
 
-    // تحديث متفائل فوري في الواجهة
+    const prevVote = myVotes[commentId] ?? null;
+    const prevCounts = voteCounts[commentId] ?? { likes: 0, dislikes: 0 };
+
     let nextVote: "LIKE" | "DISLIKE" | null = value;
-    let nextLikes = oldCounts.likes;
-    let nextDislikes = oldCounts.dislikes;
-    if (oldVote === value) {
+    let nextLikes = prevCounts.likes;
+    let nextDislikes = prevCounts.dislikes;
+    if (prevVote === value) {
       nextVote = null;
       if (value === "LIKE") nextLikes = Math.max(0, nextLikes - 1);
       else nextDislikes = Math.max(0, nextDislikes - 1);
     } else {
-      if (oldVote === "LIKE") nextLikes = Math.max(0, nextLikes - 1);
-      if (oldVote === "DISLIKE") nextDislikes = Math.max(0, nextDislikes - 1);
+      if (prevVote === "LIKE") nextLikes = Math.max(0, nextLikes - 1);
+      if (prevVote === "DISLIKE") nextDislikes = Math.max(0, nextDislikes - 1);
       if (value === "LIKE") nextLikes += 1;
       else nextDislikes += 1;
     }
@@ -310,7 +309,6 @@ export function CommentsSection({
       ...curr,
       [commentId]: { likes: nextLikes, dislikes: nextDislikes },
     }));
-    setVoteBusy(commentId);
 
     try {
       const res = await fetch(`/api/comments/${commentId}/vote`, {
@@ -318,17 +316,28 @@ export function CommentsSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value }),
       });
+      if (voteSeqRef.current[commentId] !== seq) return;
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
-        setMyVotes(prevVotes);
-        setVoteCounts(prevCounts);
+        setMyVotes((curr) => {
+          const copy = { ...curr };
+          if (prevVote) copy[commentId] = prevVote;
+          else delete copy[commentId];
+          return copy;
+        });
+        setVoteCounts((curr) => ({ ...curr, [commentId]: prevCounts }));
         setVoteNotice("سجّل الدخول أولًا لتفعيل التفاعل.");
         window.setTimeout(() => setVoteNotice(null), 6000);
         return;
       }
       if (!res.ok) {
-        setMyVotes(prevVotes);
-        setVoteCounts(prevCounts);
+        setMyVotes((curr) => {
+          const copy = { ...curr };
+          if (prevVote) copy[commentId] = prevVote;
+          else delete copy[commentId];
+          return copy;
+        });
+        setVoteCounts((curr) => ({ ...curr, [commentId]: prevCounts }));
         setVoteNotice(data?.error ?? "تعذر التصويت — جرّب مرة أخرى.");
         window.setTimeout(() => setVoteNotice(null), 6000);
         return;
@@ -344,12 +353,16 @@ export function CommentsSection({
         [commentId]: { likes: data.likes ?? nextLikes, dislikes: data.dislikes ?? nextDislikes },
       }));
     } catch {
-      setMyVotes(prevVotes);
-      setVoteCounts(prevCounts);
+      if (voteSeqRef.current[commentId] !== seq) return;
+      setMyVotes((curr) => {
+        const copy = { ...curr };
+        if (prevVote) copy[commentId] = prevVote;
+        else delete copy[commentId];
+        return copy;
+      });
+      setVoteCounts((curr) => ({ ...curr, [commentId]: prevCounts }));
       setVoteNotice("تعذر التصويت — تحقق من اتصالك.");
       window.setTimeout(() => setVoteNotice(null), 6000);
-    } finally {
-      setVoteBusy(null);
     }
   };
 
@@ -635,12 +648,11 @@ export function CommentsSection({
                 {c.content}
               </p>
 
-              {/* شريط التفاعل — إعجاب/عدم إعجاب بعدادات حية + سبينر عند التثبيت أو الانتظار */}
+              {/* شريط التفاعل — استجابة لحظية (0ms) بلا تعطيل ولا انتظار */}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <button
-                  onClick={() => vote(c.id, "LIKE")}
-                  disabled={voteBusy === c.id}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-75"
+                  onClick={() => void vote(c.id, "LIKE")}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
                   style={
                     myVote === "LIKE"
                       ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
@@ -650,17 +662,12 @@ export function CommentsSection({
                   aria-label="أبدى إعجابي بهذا التعليق"
                   aria-pressed={myVote === "LIKE"}
                 >
-                  {voteBusy === c.id ? (
-                    <MiniSpinner size={13} />
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "LIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
-                  )}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "LIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
                   <span>{counts.likes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.likes) : "إعجاب"}</span>
                 </button>
                 <button
-                  onClick={() => vote(c.id, "DISLIKE")}
-                  disabled={voteBusy === c.id}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-75"
+                  onClick={() => void vote(c.id, "DISLIKE")}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
                   style={
                     myVote === "DISLIKE"
                       ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" }
@@ -670,11 +677,7 @@ export function CommentsSection({
                   aria-label="أبدى عدم إعجابي بهذا التعليق"
                   aria-pressed={myVote === "DISLIKE"}
                 >
-                  {voteBusy === c.id ? (
-                    <MiniSpinner size={13} />
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
-                  )}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
                   <span>{counts.dislikes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.dislikes) : "لم يعجبني"}</span>
                 </button>
                 {/* التثبيت الذاتي — زر يظهر على تعليقك فقط عند امتلاكك الصلاحية */}

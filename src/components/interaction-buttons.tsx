@@ -7,7 +7,7 @@ import { easternDigits } from "@/lib/utils";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 
 /**
- * أزرار الإعجاب/عدم الإعجاب — تحديث تفاؤلي فوري بلا إعادة تحميل،
+ * أزرار الإعجاب/عدم الإعجاب — تحديث تفاؤلي فوري (0ms) بلا تعطيل ولا انتظار،
  * تصويت واحد لكل زائر، إلغاء التصويت بالنقر على نفس الزر.
  * الصفحة ISR ثابتة — لذا يجلب المكوّن تصويت الزائر الحالي بنفسه عبر
  * GET /api/interactions فور التركيب بدل اعتماد بيانات الخادم الثابتة.
@@ -24,7 +24,7 @@ export function InteractionSlot({
   const [likes, setLikes] = useState(initialLikes);
   const [dislikes, setDislikes] = useState(initialDislikes);
   const [myVote, setMyVote] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
+  const voteSeqRef = useRef(0);
   const { status } = useSession();
   const authed = status === "authenticated";
 
@@ -32,7 +32,7 @@ export function InteractionSlot({
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams({ articleId, fp: getVisitorFingerprint() });
-    fetch(`/api/interactions?${params.toString()}`)
+    fetch(`/api/interactions?${params.toString()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { likes?: number; dislikes?: number; myVote?: number | null } | null) => {
         if (cancelled || !data) return;
@@ -48,16 +48,16 @@ export function InteractionSlot({
 
   const vote = useCallback(
     async (value: 1 | -1) => {
-      if (busy) return;
-
       /* بوابة المصادقة: التصويت للأعضاء المسجلين — نافذة دخول ذكية تحتفظ بالنية */
       if (!authed) {
         requestAuth({ kind: "vote-article", payload: { value } });
         return;
       }
-      setBusy(true);
 
-      /* تحديث تفاؤلي فوري */
+      voteSeqRef.current += 1;
+      const seq = voteSeqRef.current;
+
+      /* تحديث تفاؤلي فوري (0ms) بلا تعطيل */
       const prev = { likes, dislikes, myVote };
       let nextLikes = likes;
       let nextDislikes = dislikes;
@@ -65,11 +65,11 @@ export function InteractionSlot({
 
       if (myVote === value) {
         nextVote = null;
-        if (value === 1) nextLikes -= 1;
-        else nextDislikes -= 1;
+        if (value === 1) nextLikes = Math.max(0, nextLikes - 1);
+        else nextDislikes = Math.max(0, nextDislikes - 1);
       } else {
-        if (myVote === 1) nextLikes -= 1;
-        if (myVote === -1) nextDislikes -= 1;
+        if (myVote === 1) nextLikes = Math.max(0, nextLikes - 1);
+        if (myVote === -1) nextDislikes = Math.max(0, nextDislikes - 1);
         if (value === 1) nextLikes += 1;
         else nextDislikes += 1;
       }
@@ -84,21 +84,21 @@ export function InteractionSlot({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ articleId, value, fp: getVisitorFingerprint() }),
         });
+        if (voteSeqRef.current !== seq) return;
         if (!res.ok) throw new Error();
         const data = (await res.json()) as { likes: number; dislikes: number; myVote: number | null };
         setLikes(data.likes);
         setDislikes(data.dislikes);
         setMyVote(data.myVote);
       } catch {
+        if (voteSeqRef.current !== seq) return;
         /* تراجع عن التفاؤل عند الفشل */
         setLikes(prev.likes);
         setDislikes(prev.dislikes);
         setMyVote(prev.myVote);
-      } finally {
-        setBusy(false);
       }
     },
-    [articleId, busy, dislikes, likes, myVote, authed],
+    [articleId, dislikes, likes, myVote, authed],
   );
 
   /* تنفيذ النية المحفوظة — عاد المستخدم من تسجيل الدخول ليصوّت تلقائيًا */
@@ -120,10 +120,9 @@ export function InteractionSlot({
   return (
     <div className="flex w-full items-center justify-center gap-3 sm:w-auto">
       <button
-        onClick={() => vote(1)}
-        disabled={busy}
+        onClick={() => void vote(1)}
         aria-pressed={myVote === 1}
-        className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-fluid hover:-translate-y-0.5 disabled:opacity-50 sm:flex-none"
+        className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-200 ease-fluid active:scale-95 hover:-translate-y-0.5 sm:flex-none"
         style={
           myVote === 1
             ? { background: "var(--accent)", borderColor: "var(--accent)", color: "#fff" }
@@ -138,10 +137,9 @@ export function InteractionSlot({
       </button>
 
       <button
-        onClick={() => vote(-1)}
-        disabled={busy}
+        onClick={() => void vote(-1)}
         aria-pressed={myVote === -1}
-        className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-fluid hover:translate-y-0.5 disabled:opacity-50 sm:flex-none"
+        className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-200 ease-fluid active:scale-95 hover:translate-y-0.5 sm:flex-none"
         style={
           myVote === -1
             ? { background: "var(--ink-muted)", borderColor: "var(--ink-muted)", color: "#fff" }

@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { useSession } from "next-auth/react";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
-import { BrandMark } from "@/components/brand-mark";
 import { QuoteGenerator } from "@/components/quote-generator";
 import { ArticleBlocks } from "@/components/markdown-blocks";
 import { FirstVisitHint } from "@/components/first-visit-hint";
@@ -19,6 +18,16 @@ import { stripDiacritics } from "@/lib/utils";
 import type { OfflineArticle } from "@/types/offline";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+const CLOUDINARY_UPLOAD_PREFIX = "https://res.cloudinary.com/e2umhdt0/image/upload/";
+const WATERMARK_TRANSFORM = "l_kalam:brand:watermark-pill,fl_relative,w_0.17,g_south_west,x_16,y_16/";
+
+function withCoverWatermark(url: string | null): string | null {
+  if (!url) return null;
+  if (!url.startsWith(CLOUDINARY_UPLOAD_PREFIX)) return url;
+  if (url.includes("l_kalam:brand:watermark-pill")) return url;
+  return `${CLOUDINARY_UPLOAD_PREFIX}${WATERMARK_TRANSFORM}${url.slice(CLOUDINARY_UPLOAD_PREFIX.length)}`;
+}
 
 type ReaderArticle = {
   id: string;
@@ -304,6 +313,8 @@ export function ArticleReader({
     return Array.from(new Set(quotes.filter((q) => q.length >= 20))).slice(0, 6);
   }, [article.content, summaryPoints]);
 
+  const watermarkedCover = useMemo(() => withCoverWatermark(article.coverImage), [article.coverImage]);
+
   return (
     <div className={`relative ${tashkeelAllowed ? "tashkeel-ok" : ""}`}>
       <div
@@ -512,24 +523,15 @@ export function ArticleReader({
         ]}
       />
 
-      {article.coverImage && (
-        <div className="print-cover page-chrome relative mt-8 overflow-hidden rounded-2xl shadow-soft">
+      {watermarkedCover && (
+        <div className="print-cover page-chrome mt-8 overflow-hidden rounded-2xl shadow-soft">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={article.coverImage}
+            src={watermarkedCover}
             alt={article.title}
             className="w-full object-cover"
             loading="eager"
           />
-          <div
-            className="pointer-events-none absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 backdrop-blur-xs"
-            aria-hidden
-          >
-            <BrandMark size={11} />
-            <span className="font-ui text-[10px] font-bold text-white/90">
-              كلام له لازمة
-            </span>
-          </div>
         </div>
       )}
 
