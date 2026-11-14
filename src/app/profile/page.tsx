@@ -129,6 +129,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       <main className="flex-1">
         <section className="mx-auto max-w-3xl px-4 pt-28 sm:px-6">
           <nav
+            data-tour="profile-tabs"
             className="flex gap-1.5 rounded-2xl border p-1.5 shadow-soft"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
             aria-label="أقسام الملف الشخصي"
@@ -156,8 +157,31 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
         {tab === "profile" && (
           <>
+        <FirstVisitHint
+          id="profile-main"
+          mode="tour"
+          steps={[
+            {
+              selector: "[data-tour='profile-tabs']",
+              title: "أقسام حسابك",
+              text: "من هنا تتنقل بين ملفك وأثرك، وإعدادات الهوية والإشعارات، والأمان والجلسات.",
+            },
+            {
+              selector: "[data-tour='profile-identity']",
+              title: "بطاقتك الفكرية",
+              text: "هنا تظهر هويتك ورتبتك الفكرية ورصيد أثرك الإجمالي.",
+            },
+            {
+              selector: "[data-tour='profile-rank']",
+              title: "رحلتك نحو أهل الكلمة",
+              text: "وهنا تتابع تقدمك للرتبة التالية وكيفية كسب نقاط الأثر.",
+            },
+          ]}
+        />
+
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <div
+            data-tour="profile-identity"
             className="flex flex-col items-center gap-6 rounded-3xl border p-8 shadow-lift sm:flex-row sm:text-right"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
           >
@@ -302,6 +326,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <div
+            data-tour="profile-rank"
             className="rounded-2xl border p-5 shadow-soft"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
           >

@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
+import { FirstVisitHint } from "@/components/first-visit-hint";
 import { getLatestArticles, getActiveSections } from "@/lib/db-queries";
 import { getSiteConfig } from "@/lib/site-config";
 import { SECTIONS } from "@/lib/sections";
@@ -54,6 +55,33 @@ export default async function HomePage() {
     <>
       <SiteHeader />
       <main className="flex-1">
+        <FirstVisitHint
+          id="home-tour"
+          mode="tour"
+          steps={[
+            {
+              selector: "[data-tour='first-article']",
+              title: "من هنا تبدأ القراءة",
+              text: "اضغط على أي مقال لقراءته بالتشكيل أو الاستماع إليه صوتيًا ومناقشة أفكاره.",
+            },
+            {
+              selector: "#sections-grid",
+              title: "أقسام المنصة",
+              text: "من هنا تتصفّح المقالات مصنّفة حسب موضوعاتها الفكرية والمعرفية.",
+            },
+            {
+              selector: "[data-tour='search-btn']",
+              title: "البحث السريع",
+              text: "من هنا تبحث في كل مقالات المنصة وعناوينها وأفكارها فورًا.",
+            },
+            {
+              selector: "[data-tour='account-avatar']",
+              title: "حسابك وأثرك",
+              text: "ومن هنا تدخل إلى ملفك الشخصي ومحفوظاتك وإعداداتك وتتابع رصيد أثرك.",
+            },
+          ]}
+        />
+
         {/* البطل — الهوية والشعار المندمج */}
         <section className="relative overflow-hidden pt-32 pb-20 text-center">
           <div
@@ -128,7 +156,7 @@ export default async function HomePage() {
           <h2 className="font-ui mb-8 text-2xl font-bold" style={{ color: "var(--ink)" }}>
             الأقسام
           </h2>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div id="sections-grid" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {sections.map((s) => {
               /* الهوية الديناميكية للقسم — اللون والأيقونة من لوحة التحكم:
                  في الوضع الداكن يُفتّح اللون تلقائيًا عبر CSS color-mix حتى لا يبهت على #131c2e */

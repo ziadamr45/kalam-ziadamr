@@ -84,12 +84,13 @@ export function FirstVisitHint({
         return;
       }
       const el = document.querySelector(step.selector) as HTMLElement | null;
-      if (!el) {
-        /* إن لم يوجد العنصر في هذه الصفحة، ننتقل تلقائيًا للخطوة التالية أو ننهي */
+      const initialRect = el?.getBoundingClientRect();
+      if (!el || !initialRect || (initialRect.width === 0 && initialRect.height === 0)) {
+        /* إن لم يوجد العنصر أو كان مخفيًا في هذا المقاس، ننتقل تلقائيًا للخطوة التالية */
         if (stepIdx < resolvedSteps.length - 1) {
           setStepIdx((i) => i + 1);
         } else {
-          setRect(null);
+          dismiss();
         }
         return;
       }
@@ -112,7 +113,7 @@ export function FirstVisitHint({
         return () => clearTimeout(t);
       }
     },
-    [visible, mode, active, resolvedSteps, stepIdx],
+    [visible, mode, active, resolvedSteps, stepIdx, dismiss],
   );
 
   useEffect(() => {
