@@ -845,7 +845,7 @@ export function QuoteGenerator({
           requestOpen();
         }}
         onClick={requestOpen}
-        className="rounded-full px-3 py-1.5 transition-all hover:bg-(--accent-soft)"
+        className="rounded-full px-1.5 py-1.5 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
         style={{ color: "var(--ink-muted)" }}
         title="حوّل أي جملة إلى بطاقة اقتباس جاهزة للمشاركة"
       >

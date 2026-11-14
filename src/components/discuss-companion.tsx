@@ -357,9 +357,16 @@ export function DiscussCompanion({
   }, []);
 
   useEffect(() => {
-    if (open && listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
+    if (!open || !listRef.current) return;
+    const last = messages[messages.length - 1];
+    if (!sending && last?.role === "model") {
+      const el = listRef.current.querySelector(`[data-msg-idx="${messages.length - 1}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
     }
+    listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, sending, open]);
 
   useEffect(() => {
@@ -711,7 +718,7 @@ export function DiscussCompanion({
               )}
 
               {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div key={i} data-msg-idx={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className="min-w-0 max-w-[92%]">
                     <div
                       onClick={() => setActiveIdx(activeIdx === i ? null : i)}
