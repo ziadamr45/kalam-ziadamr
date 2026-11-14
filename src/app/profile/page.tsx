@@ -372,21 +372,28 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
         {tab === "settings" && (
           <>
-        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
-          <FirstVisitHint
-            id="profile-settings"
-            className="mb-4"
-            steps={[
-              {
-                title: "هويتك وإشعاراتك",
-                text: "من هنا يمكنك تخصيص اسمك وصورتك ونبذتك، وتحديد الإشعارات التي تصلك.",
-              },
-              {
-                title: "تفضيلات القراءة والخصوصية",
-                text: "في الأسفل يمكنك ضبط التشكيل الافتراضي، ومسح سجل البحث، أو إعادة عرض بطاقة الترحيب في أي وقت.",
-              },
-            ]}
-          />
+        <FirstVisitHint
+          id="profile-settings"
+          mode="tour"
+          steps={[
+            {
+              selector: "[data-tour='settings-editor']",
+              title: "تخصيص هويتك وإشعاراتك",
+              text: "من هنا تعدّل اسمك وصورتك ونبذتك الفكرية وتتحكم في الإشعارات التي تصلك.",
+            },
+            {
+              selector: "[data-tour='settings-reading']",
+              title: "تفضيلات القراءة",
+              text: "من هنا تختار ما إذا كان التشكيل يظهر افتراضيًا في المقالات أم لا.",
+            },
+            {
+              selector: "[data-tour='settings-privacy']",
+              title: "الخصوصية وإعادة الجولة",
+              text: "ومن هنا تمسح سجل بحثك أو تعيد عرض بطاقة الترحيب متى شئت.",
+            },
+          ]}
+        />
+        <section data-tour="settings-editor" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <ProfileEditor
             googleName={user.name}
             googleImage={user.image}
@@ -407,11 +414,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           />
         </section>
 
-        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section data-tour="settings-reading" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <ReadingPreferencesCard />
         </section>
 
-        <section className="mx-auto mt-6 max-w-3xl px-4 pb-24 sm:px-6">
+        <section data-tour="settings-privacy" className="mx-auto mt-6 max-w-3xl px-4 pb-24 sm:px-6">
           <PrivacyToolsCard />
         </section>
           </>
@@ -566,14 +573,31 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
         {tab === "security" && (
           <>
+        <FirstVisitHint
+          id="profile-security"
+          mode="tour"
+          steps={[
+            {
+              selector: "[data-tour='security-devices']",
+              title: "إدارة الأجهزة والجلسات",
+              text: "من هنا ترى كل الأجهزة المسجلة بحسابك (وجهازك الحالي أولًا)، ويمكنك إبطال أي جلسة فورًا.",
+            },
+            {
+              selector: "[data-tour='security-danger']",
+              title: "حذف الحساب والبيانات",
+              text: "ومن هنا يمكنك حذف حسابك وجميع بياناتك نهائيًا متى أردت.",
+            },
+          ]}
+        />
         <section
+          data-tour="security-devices"
           className="mx-auto mt-6 max-w-3xl rounded-2xl border p-5 shadow-soft sm:p-6"
           style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         >
           <DevicesPanel />
         </section>
 
-        <section className="mx-auto mt-4 max-w-3xl px-4 pb-24 sm:px-6">
+        <section data-tour="security-danger" className="mx-auto mt-4 max-w-3xl px-4 pb-24 sm:px-6">
           <AccountDangerZone />
         </section>
           </>

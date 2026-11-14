@@ -38,7 +38,7 @@ export function FirstVisitHint({
   const [stepIdx, setStepIdx] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
-  const storageKey = `kalam_hint_${id}_v2`;
+  const storageKey = mode === "tour" ? `kalam_tour_${id}_v3` : `kalam_hint_${id}_v2`;
 
   const resolvedSteps = useMemo<HintStep[]>(
     () =>
@@ -86,7 +86,6 @@ export function FirstVisitHint({
       const el = document.querySelector(step.selector) as HTMLElement | null;
       const initialRect = el?.getBoundingClientRect();
       if (!el || !initialRect || (initialRect.width === 0 && initialRect.height === 0)) {
-        /* إن لم يوجد العنصر أو كان مخفيًا في هذا المقاس، ننتقل تلقائيًا للخطوة التالية */
         if (stepIdx < resolvedSteps.length - 1) {
           setStepIdx((i) => i + 1);
         } else {
@@ -141,7 +140,6 @@ export function FirstVisitHint({
   const isLast = stepIdx >= resolvedSteps.length - 1;
   const arNum = (n: number) => new Intl.NumberFormat("ar-EG").format(n);
 
-  /* ===================== الوضع التفاعلي الموجه (Spotlight Tour) ===================== */
   if (mode === "tour") {
     if (!mounted) return null;
 
@@ -264,7 +262,6 @@ export function FirstVisitHint({
     );
   }
 
-  /* ===================== الوضع الثابت الأنيق (Inline Card) ===================== */
   return (
     <div
       role="status"

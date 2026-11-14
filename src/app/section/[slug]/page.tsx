@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
+import { FirstVisitHint } from "@/components/first-visit-hint";
 import { getArticlesBySection, getActiveSections } from "@/lib/db-queries";
 import { SECTION_MAP, SECTIONS } from "@/lib/sections";
 
@@ -71,6 +72,11 @@ export default async function SectionPage({
         </section>
 
         <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
+          <FirstVisitHint
+            id="section-guide"
+            className="mb-6"
+            text="تجد هنا مقالات هذا القسم مرتبة من الأحدث؛ يمكنك حفظ أي مقال لقراءته لاحقًا أو بدون إنترنت."
+          />
           {articles.length === 0 ? (
             <div className="rounded-2xl border border-dashed p-12 text-center" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
               <p className="font-body text-lg leading-9">
