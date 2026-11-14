@@ -2,13 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { BrandMark } from "@/components/brand-mark";
 
 /**
  * ============================================================
  * نظام النوافذ والتنبيهات الموحد — هوية «كلام له لازمة»
  * ============================================================
  * ConfirmDialog بنمط Promise + Toast لحظي — مرسومان عبر createPortal
- * بورق المنصة الدافئ وذهبيها وشعار الريشة. ممنوع نهائيًا نوافذ
+ * بورق المنصة الدافئ وذهبيها وشعار الكاف. ممنوع نهائيًا نوافذ
  * المتصفح التقليدية (window.confirm / alert) — كل تأكيد وكل إشعار
  * يمر من هنا فلا يخرج القارئ من أجواء المنصة لحظة واحدة.
  */
@@ -39,16 +40,6 @@ const DialogContext = createContext<DialogContextValue>({
 
 export function useDialogs() {
   return useContext(DialogContext);
-}
-
-/* شعار الريشة — توقيع النوافذ الموحدة */
-function FeatherMark({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20.2 3.8c-5.8.4-10.5 4-12.5 9.4L3 21l7.9-4.7c5.4-2 9-6.7 9.3-12.5Z" />
-      <path d="M6.5 17.5 13 11" />
-    </svg>
-  );
 }
 
 function ToneIcon({ tone }: { tone: ToastTone }) {
@@ -155,7 +146,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                   }}
                   aria-hidden
                 >
-                  <FeatherMark />
+                  <BrandMark size={22} inheritColor />
                 </div>
                 <h3 className="font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
                   {request.title}

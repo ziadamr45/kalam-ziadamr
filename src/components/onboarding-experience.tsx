@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { BrandMark } from "@/components/brand-mark";
 
 /**
  * بطاقة الترحيب الفخمة — تجربة تهيئة واحدة هادئة للأعضاء الجدد.
@@ -36,15 +37,6 @@ function ImpactIcon() {
       <path d="M12 3v3m0 12v3M3 12h3m12 0h3" />
       <circle cx="12" cy="12" r="6.5" />
       <path d="M12 8.5l1.2 2.3 2.3 1.2-2.3 1.2L12 15.5l-1.2-2.3-2.3-1.2 2.3-1.2L12 8.5Z" />
-    </svg>
-  );
-}
-
-function FeatherMark({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20.2 3.8c-5.8.4-10.5 4-12.5 9.4L3 21l7.9-4.7c5.4-2 9-6.7 9.3-12.5Z" />
-      <path d="M6.5 17.5 13 11" />
     </svg>
   );
 }
@@ -187,7 +179,7 @@ export function OnboardingExperience() {
               style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
               aria-hidden
             >
-              <FeatherMark />
+              <BrandMark size={26} inheritColor />
             </div>
 
             <p className="font-ui text-[11px] font-bold tracking-wide" style={{ color: "var(--accent-strong)" }}>
