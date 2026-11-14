@@ -6,6 +6,7 @@ import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
 import { ArticleBlocks } from "@/components/markdown-blocks";
+import { FirstVisitHint } from "@/components/first-visit-hint";
 import SearchJump from "@/components/search-jump";
 import { trackView, trackComplete, trackDwell } from "@/lib/analytics";
 import {
@@ -16,8 +17,6 @@ import { parseBlocks, blockWordCount, blockPlainWords, type Block } from "@/lib/
 import { stripDiacritics } from "@/lib/utils";
 import type { OfflineArticle } from "@/types/offline";
 
-/* layout effect متزامن على العميل (يطبّق التفضيل قبل أول رسم بعد الترطيب
-   فيلاحق المتن المشكول الإطار الأول) وعديم الفاعلية على الخادم */
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type ReaderArticle = {
@@ -42,16 +41,9 @@ export function ArticleReader({
 }: {
   article: ReaderArticle;
   tashkeelAllowed?: boolean;
-  /** مفتاح السيادة: إظهار/إخفاء المشغل الصوتي من التكوين السيادي */
   audioEnabled?: boolean;
 }) {
-  /* تبديل التشكيل الفوري — مرهون بإذن الأدمن (عامًا + لهذا المقال) */
   const [tashkeel, setTashkeel] = useState(false);
-  /* بوابة منع الفلاش: تُرفع بعد أول تطبيق لتفضيل المستخدم، فيعود
-     التبديل اليدوي التالي لسلوكه الفوري المعتاد بمحرك تثبيت الموضع.
-     القراءة في layout effect: يُطبَّق التفضيل قبل أن يرسم المتصفح إطار
-     الترطيب الأول — فلا يُرى المجرد أبدًا (البوابة أخفته قبله) ولا يبقى
-     فراغ بعد الترطيب إطارًا زائدًا */
   const [tashkeelGateLifted, setTashkeelGateLifted] = useState(false);
   useIsomorphicLayoutEffect(() => {
     let prefOn = false;
@@ -62,24 +54,11 @@ export function ArticleReader({
     setTashkeelGateLifted(true);
   }, [tashkeelAllowed]);
 
-  /* مرساة المتن — تُقاس منها نسبة موضع القارئ قبل التبديل وبعده */
   const contentRef = useRef<HTMLDivElement | null>(null);
 
-  /* ============ محرك تثبيت موضع القراءة عند تبديل التشكيل ============
-     النص المشكول أكبر خطًا وتباعدًا من المجرد — بغير التثبيت يقفز
-     القارئ لموضع آخر بعيدًا عن فقرته. المنهجية (Relative Scroll
-     Preservation):
-       1) قبل التبديل: رصد نسبة الموضع الحالي داخل المتن
-          (المسافة المقطوعة من أعلى المتن ÷ ارتفاعه الكلي).
-       2) تبديل الوضع وإعادة البناء.
-       3) بعد اكتمال الرسم (rAF مزدوج): إعادة التمرير لنفس النسبة
-          من الأبعاد الجديدة — انتقالًا فوريًا غير ملحوظ.
-     القارئ فوق بداية المتن أو بعد نهايته لا يحتاج تثبيتًا — ما فوقه
-     ثابت الأبعاد لا يتزحلق. */
   const toggleTashkeel = useCallback(() => {
     if (!tashkeelAllowed) return;
 
-    /* 1) النسبة المئوية لموضع الشاشة داخل المتن — قبل أي تغيير */
     let progress: number | null = null;
     const el = contentRef.current;
     if (el && el.getBoundingClientRect().height > 0) {
@@ -88,8 +67,6 @@ export function ArticleReader({
       if (raw > 0 && raw < 1) progress = raw;
     }
 
-    /* 2) تبديل وضع التشكيل — مع مزامنة سمة البوابة على <html>
-        لتطابق التفضيل الجديد في التنقلات التالية داخل الموقع */
     const next = !tashkeel;
     setTashkeel(next);
     try {
@@ -98,9 +75,6 @@ export function ArticleReader({
       else document.documentElement.removeAttribute("data-tashkeel-pref");
     } catch {}
 
-    /* 3) إعادة التموضع بنفس النسبة النسبية فور اكتمال إعادة الرندرة —
-        الإطار الأول يثبّت الأبعاد الجديدة والثاني يضمن اكتمال الـ layout،
-        مع تجاوز scroll-behavior: smooth العامة انتقالًا فوريًا لا يُشتّت */
     if (progress !== null) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -111,7 +85,7 @@ export function ArticleReader({
             newRect.top + window.scrollY + newRect.height * progress!;
           const rootStyle = document.documentElement.style;
           const prevBehavior = rootStyle.scrollBehavior;
-          rootStyle.scrollBehavior = "auto"; /* إلغاء التمرير الناعم العام مؤقتًا */
+          rootStyle.scrollBehavior = "auto";
           window.scrollTo(0, targetScrollY);
           rootStyle.scrollBehavior = prevBehavior;
         });
@@ -119,13 +93,11 @@ export function ArticleReader({
     }
   }, [tashkeelAllowed, tashkeel]);
 
-  /* المختصر المفيد */
   const [showSummary, setShowSummary] = useState(false);
 
   const source = tashkeel ? article.contentWithTashkeel || article.content : article.content;
   const blocks = useMemo(() => parseBlocks(source), [source]);
 
-  /* فهرس البداية العام لكل كتلة — يمتد عبر كل الكتل حتى الآيات والأحاديث (تُقرأ لكن لا تُظلل كلمةً كلمة) */
   const wordOffsets = useMemo(() => {
     const map = new Map<string, number>();
     let acc = 0;
@@ -143,14 +115,8 @@ export function ArticleReader({
         : null,
     [article.audioWords],
   );
-  /* مفتاح إعادة مسح عناصر الكلمات في المشغل عند أي تغيير في العرض */
   const syncKey = `${article.id}:${tashkeel ? "t" : "p"}:${blocks.length}:${source.length}`;
 
-  /* ============ المواءمة الصوتية الموحدة (Normalized Audio-Word Mapping) ============
-     التوقيتات مولدة من النص المشكول، والعرض قد يكون مجردًا — المطابقة إذن
-     بالفهرس الرقمي (wordIndex) عبر تجريد الحركات من الطرفين، لا بالسلاسل
-     ولا بالأطوال: الكلمة رقم (5) في المشكول تلائم رقم (5) في المجرد تلقائيًا،
-     وحتى لو اختلفت العدّة (دمج/تفريق AI) تعيد المحاذاة الجشعة بناء السلم. */
   const audioMaps = useMemo(() => {
     if (!audioWords || audioWords.length === 0) return null;
     const audio = audioWords.map((w) => stripDiacritics(w.w));
@@ -167,10 +133,6 @@ export function ArticleReader({
       const map = new Array<number>(from.length).fill(-1);
       let j = 0;
       let matched = 0;
-      /* سقف البحث الأمامي — بلا سقف كانت كلمة شائعة فقدت موضعها المتوقع
-         (تعديل النص بعد توليد الصوت) تُمسح بها كل المصفوفة حتى آخر تكرار
-         لها في نهاية المقال فيقفز مرساة المواءمة للنهاية ويعلق التحديد
-         هناك رغم أن الصوت في أول المقال */
       const MAX_SKIP = 40;
       for (let i = 0; i < from.length; i++) {
         const a = from[i];
@@ -192,29 +154,21 @@ export function ArticleReader({
     };
     const at = align(audio, tash);
     const ap = align(audio, plain);
-    /* اختيار المصدر الأقرب لتوقيتات الصوت — التشكيل مولد منها أصلًا */
     const useTash = at.rate >= ap.rate;
-    const toDisplay = useTash ? at.map : ap.map; // فهرس الصوت ← فهرس العرض
-    const toAudio = new Array<number>((useTash ? tash : plain).length).fill(-1); // فهرس العرض ← الصوت
+    const toDisplay = useTash ? at.map : ap.map;
+    const toAudio = new Array<number>((useTash ? tash : plain).length).fill(-1);
     toDisplay.forEach((d, i) => {
       if (d >= 0 && toAudio[d] < 0) toAudio[d] = i;
     });
     return { toDisplay, toAudio, displayIsTashkeel: useTash };
   }, [audioWords, article.content, article.contentWithTashkeel]);
 
-  /* المواءمة تُستخدم دائمًا حين تتوفر كلمات الصوت — حتى على نفس مصدر التوليد؛
-     فالنص قد يكون عُدّل بعد التوليد فاختلفت العدّة، والهوية الخام (فهرس بفهرس)
-     تُراكم انحرافًا تدريجيًا يتأخر به التحديد عن الصوت — والمواءمة المحدودة
-     تعيد المحاذاة محليًا أينما اختلفت */
   const needsMap = audioMaps !== null;
 
-  /* الحفظ: منظومة مزدوجة مستقلة — مزامنة سحابية في الحساب + لقطة محلية على الجهاز،
-     ولكلٍّ منفذُه الخاص وقائمته المفهومة (لا دمج عشوائي بين القناتين) */
   const { status } = useSession();
   const loggedIn = status === "authenticated";
   const [cloudSaved, setCloudSaved] = useState(false);
   const [localSaved, setLocalSaved] = useState(false);
-  /* حالة الانشغال بالحفظ تُميّز المصدر (سحابي/محلي) ليرفع كل زر مؤشره الخاص — null = لا حفظ جارٍ */
   const [saveBusy, setSaveBusy] = useState<"cloud" | "local" | null>(null);
   const [saveMenuOpen, setSaveMenuOpen] = useState(false);
   const saveMenuRef = useRef<HTMLDivElement | null>(null);
@@ -236,7 +190,6 @@ export function ArticleReader({
     return () => { alive = false; };
   }, [article.id, status]);
 
-  /* إغلاق قائمة الحفظ عند النقر خارجها */
   useEffect(() => {
     if (!saveMenuOpen) return;
     const onDoc = (e: MouseEvent) => {
@@ -246,11 +199,9 @@ export function ArticleReader({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [saveMenuOpen]);
 
-  /* حفظ سحابي في مكتبة الحساب — يتطلب جلسة حية */
   const handleSaveCloud = useCallback(async () => {
     if (saveBusy || cloudSaved) return;
     if (!loggedIn) {
-      /* بوابة المصادقة: الحفظ السحابي للأعضاء — نافذة ذكية تحتفظ بنية الحفظ */
       requestAuth({ kind: "save" });
       return;
     }
@@ -264,9 +215,8 @@ export function ArticleReader({
       setCloudSaved(true);
     } catch {}
     setSaveBusy(null);
-  }, [article.id, article.slug, cloudSaved, saveBusy, loggedIn]);
+  }, [article.id, cloudSaved, saveBusy, loggedIn]);
 
-  /* تنفيذ النية المحفوظة — عاد المستخدم من الدخول ليُكمل الحفظ تلقائيًا */
   const saveCloudRef = useRef(handleSaveCloud);
   useEffect(() => {
     saveCloudRef.current = handleSaveCloud;
@@ -279,7 +229,6 @@ export function ArticleReader({
     [],
   );
 
-  /* حفظ لقطة محلية على هذا الجهاز — للقراءة دون اتصال */
   const handleSaveLocal = useCallback(async () => {
     if (saveBusy || localSaved) return;
     setSaveBusy("local");
@@ -302,7 +251,6 @@ export function ArticleReader({
     setSaveBusy(null);
   }, [article, localSaved, saveBusy]);
 
-  /* تتبع القراءة: زيارة، إكمال، بقاء */
   const viewIdRef = useRef<string | null>(null);
   const startRef = useRef<number>(Date.now());
   const completedRef = useRef(false);
@@ -322,7 +270,6 @@ export function ArticleReader({
     };
   }, [article.id, article.slug]);
 
-  /* الإكمال: وصول القارئ لنهاية المقال */
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -346,8 +293,6 @@ export function ArticleReader({
     [article.summary],
   );
 
-  /* اقتباسات مقترحة لمولد البطاقات: سطور الاقتباس (> ) في متن المقال
-     ثم نقاط المختصر — لتفتح للقارئ بديلًا ذكيًا عند غياب التحديد */
   const suggestedQuotes = useMemo(() => {
     const quotes: string[] = [];
     for (const line of article.content.split("\n")) {
@@ -360,15 +305,6 @@ export function ArticleReader({
 
   return (
     <div className={`relative ${tashkeelAllowed ? "tashkeel-ok" : ""}`}>
-      {/* سمة data-tashkeel-pref تُزرع من سكربت <head> في layout.tsx قبل أي
-          بكسل وتعيش على <html> عبر التنقيات الناعمة كلها — كان تُزرع من
-          سكربت داخل الشجرة هنا فلا يُنفَّذ في التنقية الناعمة (الرئيسية ←
-          مقال) فيُرى المتن مجردًا ثم يتبدل: هذا كان جذر الفلاش. البوابة
-          في CSS تخفي المجرد للمفعّل التشكيل حصرًا (.tashkeel-ok أعلاه)
-          حتى تُطبق المشكولة بعد الترطيب — لا نصٌّ يُرى مجردًا أبدًا */}
-
-      {/* شريط أدوات القراءة — مثبت أسفل الشاشة: مفتاح التشكيل مثبّت في المقدمة
-          دون انقطاع، والأزرار التنفيذية مجموعة مرنة لا تخرج عن إطار الشاشة */}
       <div
         className="page-chrome no-print fixed bottom-0 left-0 right-0 z-40 border-t px-3 py-2 backdrop-blur-md"
         style={{
@@ -377,7 +313,6 @@ export function ArticleReader({
         }}
       >
         <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1 sm:gap-3">
-          {/* مفتاح التشكيل ثابت في المقدمة (يمين الشاشة) دون زحزحة إطلاقًا */}
           {tashkeelAllowed && (
             <button
               onClick={toggleTashkeel}
@@ -386,11 +321,6 @@ export function ArticleReader({
               className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:px-2"
               title="تبديل النص المشكول بالحركات الكاملة"
             >
-              {/* شكل الزر من أصناف CSS تقودها سمة <html> المزروعة قبل أي
-                  بكسل (انظر قواعد tashkeel-toggle في globals.css) — لو
-                  بقي مربوطًا بحالة React لرُئي مطفأً ثم انزلق للتشغيل
-                  بعد الترطيب مع كل ريفريش. aria-checked يبقى من React
-                  للحالة الدلالية دون أي أثر بصري */}
               <span className="tashkeel-toggle-label text-xs font-medium">
                 تشكيل
               </span>
@@ -400,9 +330,7 @@ export function ArticleReader({
             </button>
           )}
 
-          {/* الأزرار التنفيذية — متناسقة الحجم بمسافات مرنة */}
           <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
-            {/* المختصر المفيد */}
             <button
               onClick={() => setShowSummary((v) => !v)}
               className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
@@ -412,10 +340,6 @@ export function ArticleReader({
               <span className="hidden sm:inline">المختصر المفيد</span>
             </button>
 
-            {/* حفظ — قائمة مزدوجة واضحة: سحابي في الحساب + محلي على الجهاز
-                الحاوية relative على الشاشات الكبيرة فقط؛ على التليفون تبقى
-                static ليتُرسّى المنيو المطلق إلى شريط الأدوات الثابت (position:fixed
-                عابر لعرض الشاشة) — فلا يمكن قصه مهما كان عرض الجهاز */}
             <div ref={saveMenuRef} className="shrink-0 sm:relative">
               <button
                 onClick={() => setSaveMenuOpen((v) => !v)}
@@ -429,16 +353,12 @@ export function ArticleReader({
                 <span className="hidden sm:inline">{anySaved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
               </button>
 
-              {/* التليفون: بطاقة عائمة متمددة فوق الشريط بهوامش 12px (نمط لوحة
-                  المختصر) — كاملة الظهور على كل العروض؛ التابلت/الكمبيوتر:
-                  نفس الارتساء الأصيل على الحافة اليمنى لزر حفظ كما كان */}
               {saveMenuOpen && (
                 <div
                   role="menu"
                   className="absolute bottom-full left-3 right-3 mb-2 w-auto max-w-none rounded-2xl border p-2 shadow-lift animate-fade-in sm:left-auto sm:right-0 sm:w-76 sm:max-w-[calc(100vw-2rem)]"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >
-                  {/* الخيار السحابي — مزامنة الحساب */}
                   <button
                     role="menuitem"
                     onClick={() => void handleSaveCloud()}
@@ -472,7 +392,6 @@ export function ArticleReader({
 
                   <div className="mx-2 my-1 h-px" style={{ background: "var(--border)" }} aria-hidden />
 
-                  {/* الخيار المحلي — لقطة هذا الجهاز دون اتصال */}
                   <button
                     role="menuitem"
                     onClick={() => void handleSaveLocal()}
@@ -506,10 +425,6 @@ export function ArticleReader({
               )}
             </div>
 
-            {/* طباعة / حفظ PDF — الطباعة الأصيلة للمتصفح (window.print):
-                محرك Blink/WebKit يشكّل العربية بـ HarfBuzz فيخرج النص
-                مطابقًا للشاشة 100% — صفر تفكيك نصي وصفر مكتبة وسيطة.
-                «حفظ كـ PDF» متاح مباشرة من نافذة الطباعة على كل الأنظمة */}
             <button
               type="button"
               onClick={() => window.print()}
@@ -521,7 +436,6 @@ export function ArticleReader({
               <span className="hidden sm:inline">طباعة / حفظ PDF</span>
             </button>
 
-            {/* مولد الاقتباسات */}
             <div className="flex min-h-11 items-center">
               <QuoteGenerator
                 articleId={article.id}
@@ -536,7 +450,6 @@ export function ArticleReader({
         </div>
       </div>
 
-      {/* المختصر المفيد — لوحة عائمة تنبثق فوق شريط الأدوات السفلي */}
       <div
         className={`page-chrome no-print fixed inset-x-0 bottom-[68px] z-40 px-3 transition-all duration-300 ease-fluid sm:px-6 ${
           showSummary ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
@@ -565,9 +478,12 @@ export function ArticleReader({
         </div>
       </div>
 
-      {/* صورة الغلاف — print-cover: استثناء مقصود يُبقي الغلاف في نسخة
-          الورق (PDF) رغم إخفاء عناصر الواجهة، لأن الغلاف جزء من الوثيقة
-          لا من الواجهة */}
+      <FirstVisitHint
+        id="article-tools"
+        text="من الشريط السفلي يمكنك تفعيل التشكيل الكامل، أو حفظ المقال في مكتبتك، أو طباعته وتوليد بطاقات اقتباس."
+        className="mt-6"
+      />
+
       {article.coverImage && (
         <div className="print-cover page-chrome mt-8 overflow-hidden rounded-2xl shadow-soft">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -580,7 +496,6 @@ export function ArticleReader({
         </div>
       )}
 
-      {/* المشغل الصوتي — يخضع لمفتاح التكوين السيادي AUDIO_PLAYER_ENABLED */}
       {audioEnabled && article.audioUrl && (
         <div className="page-chrome mt-8">
           <AudioPlayer
@@ -599,10 +514,6 @@ export function ArticleReader({
         </div>
       )}
 
-      {/* جسم المقال — العارض الموحد لمحرك التنسيق الموسع (كاريوكي آمن)
-          مسافة سفلية واسعة (pb-32) حتى لا تحجب الكبسولة العائمة السطور الأخيرة أبدًا
-          contentRef: مرساة محرك تثبيت موضع القراءة عند تبديل التشكيل
-          tashkeel-gate-lifted: علامة رفع بوابة منع الفلاش (انظر CSS) */}
       <div
         ref={contentRef}
         id="article-body"
@@ -614,8 +525,6 @@ export function ArticleReader({
         <ArticleBlocks blocks={blocks} offsets={wordOffsets} />
       </div>
 
-      {/* القفز البحثي — عند الوصول من نتائج البحث (?q=) يُظلّل المطابقات
-          ويقفز لأولها مع كبسولة تنقل (Suspense لطرف useSearchParams) */}
       <Suspense fallback={null}>
         <SearchJump version={syncKey} />
       </Suspense>

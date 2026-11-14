@@ -3,22 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
+import { FirstVisitHint } from "@/components/first-visit-hint";
 import { getVisitorFingerprint } from "@/lib/fingerprint";
-
-/**
- * الرفيق الفكري للمقال — «ناقش أفكار المقال»
- * زر انسيابي يفتح نافذة جانبية ناعمة (Slide-over) لتبادل الرسائل
- * دون حجب نص المقال عن عيني القارئ، مع عداد هادئ للحصة المتبقية.
- * الحصة الصارمة مفروضة من الخادم (٦ رسائل لكل قارئ في كل مقال) — الواجهة مرآة فقط.
- */
 
 type ChatMessage = { role: "user" | "model"; text: string };
 
-/**
- * عارض ماركداون مصغّر لردود المحاور — بلا أي تبعية خارجية:
- * عناوين «##»، نقاط «-»، قوائم مرقمة، وبارز **..** —
- * لأن المحاور صار يُوجّه بتنسيق ردوده، والفقاعات تعرضه للقارئ كما قُصد.
- */
 function MiniMarkdown({ text }: { text: string }) {
   const nodes: React.ReactNode[] = [];
   const lines = text.replace(/\r\n/g, "\n").split("\n");
@@ -112,7 +101,6 @@ export function DiscussCompanion({
   articleTitle: string;
 }) {
   const [open, setOpen] = useState(false);
-  /* التكوين السيادي: شارة المحاور ورسالته الافتتاحية وتنويهه الثابت */
   const [cfgBadge, setCfgBadge] = useState("مساعد ذكاء اصطناعي");
   const [cfgOpening, setCfgOpening] = useState(
     "أنا هنا لأحاورك حول الأفكار الواردة في هذا المقال ومساعدتك في تحليلها واستخراج أبعادها.",
@@ -126,13 +114,10 @@ export function DiscussCompanion({
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [limit, setLimit] = useState<number>(6);
-  /* وصول غير محدود: حاملو صلاحية unlimitedAiChat (المؤسس والرتب السيادية)
-     — لا يُعرض لهم عداد رقمي فلكي أبدًا بل شارة هوية أنيقة */
   const [unlimited, setUnlimited] = useState(false);
   const [error, setError] = useState("");
   const [exhausted, setExhausted] = useState(false);
   const [impactNote, setImpactNote] = useState("");
-  /* تفاعلات الرسائل: نسخ ردود المحاور + تعديل رسائل المستخدم (تُحسب من الحصة) */
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -143,8 +128,6 @@ export function DiscussCompanion({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const openRef = useRef(false);
 
-  /* استعادة الحوار الدائم للمقال (localStorage) — عودة القارئ تجد رسائله القديمة
-     كما تركتها في نفس المقال، والخادم يبقى الحَكَم في الحصة المتبقية */
   const restoreSession = useCallback(() => {
     try {
       const raw = localStorage.getItem(HISTORY_KEY(articleId));
@@ -168,7 +151,6 @@ export function DiscussCompanion({
     [articleId],
   );
 
-  /* جلب الحصة من الخادم عند كل فتح — مصدر الحقيقة */
   const fetchQuota = useCallback(async () => {
     try {
       const res = await fetch(
@@ -179,15 +161,12 @@ export function DiscussCompanion({
         setRemaining(data.remaining);
         setLimit(data.limit);
         setExhausted(!data.unlimited && data.remaining <= 0);
-        /* الخادم هو الحكم: علم unlimited أو أي رقم فلكي (دفاع عن
-           جلسات مخزنة قديمة) يعني وصولًا غير محدود */
         setUnlimited(data.unlimited === true || data.remaining > 1_000_000);
       }
     } catch {}
   }, [articleId]);
 
   const openDrawer = useCallback(() => {
-    /* بوابة المصادقة: محاورة المقال مع الذكاء الاصطناعي للأعضاء المسجلين حصرًا */
     if (status === "unauthenticated") {
       requestAuth({ kind: "ai-chat" });
       return;
@@ -198,7 +177,6 @@ export function DiscussCompanion({
     fetchQuota();
   }, [restoreSession, fetchQuota, status]);
 
-  /* تنفيذ النية المحفوظة — عاد المستخدم من الدخول ليفتح النقاش تلقائيًا */
   const openDrawerRef = useRef(openDrawer);
   useEffect(() => {
     openDrawerRef.current = openDrawer;
@@ -215,13 +193,10 @@ export function DiscussCompanion({
     setOpen(false);
     openRef.current = false;
     setError("");
-    /* إعادة التركيز للزر بعد الإغلاق */
     requestAnimationFrame(() => triggerRef.current?.focus());
   }, []);
 
-  /* تهيئة الهجوم على أعلى القائمة عند رسالة جديدة */
   useEffect(() => {
-    /* جلب حزمة التكوين السيادي — نصوص المحاور يحكمها الأدمن لحظيًا */
     fetch("/api/public-config")
       .then((r) => r.json())
       .then((c: { DISCUSS_BADGE?: string; DISCUSS_OPENING?: string; DISCUSS_DISCLAIMER?: string }) => {
@@ -238,7 +213,6 @@ export function DiscussCompanion({
     }
   }, [messages, sending, open]);
 
-  /* قفل تمرير الصفحة خلف الـ Drawer + إغلاق بزر Esc + تركيز حقل الكتابة */
   useEffect(() => {
     setMounted(true);
     if (!open) return;
@@ -256,7 +230,6 @@ export function DiscussCompanion({
     };
   }, [open, closeDrawer]);
 
-  /* نص صافٍ للنسخ — بلا رموز الماركداون التي تعرضها الفقاعة */
   const plainOf = (t: string) =>
     t
       .replace(/^#{1,3}\s+/gm, "")
@@ -274,8 +247,6 @@ export function DiscussCompanion({
     } catch {}
   };
 
-  /* تعديل رسالة سابقة: النص يُحمّل في الحقل، والإرسال يقصّ الحوار إلى ما قبلها —
-     تُرسل كرسالة جديدة تُخصم من الحصة وتُحدَّث قواعد البيانات لدى الخادم */
   const startEdit = (idx: number) => {
     const m = messages[idx];
     if (!m || sending) return;
@@ -300,7 +271,6 @@ export function DiscussCompanion({
     const editIndex = editing;
     setEditing(null);
     setActiveIdx(null);
-    /* التعديل: يُقصّ الحوار إلى ما قبل الرسالة المعدّلة ثم تُرسل الجديدة */
     const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
     const nextMessages: ChatMessage[] = [...baseMessages, { role: "user", text }];
     setMessages(nextMessages);
@@ -310,9 +280,6 @@ export function DiscussCompanion({
       const res = await fetch("/api/ai/discuss", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        /* سياق الحوار متعدد الأدوار: كامل السجل التراكمي (user/model) بترتيبه الزمني —
-           دون الرسالة الحالية التي تُرسل في حقل message منفصلة
-           (مطابقة لدلالة sendMessage الرسمية: history + رسالة جديدة) */
         body: JSON.stringify({
           articleId,
           message: text,
@@ -340,7 +307,6 @@ export function DiscussCompanion({
         } else {
           setError(data.error || "تعذر إرسال الرسالة — أعد المحاولة");
         }
-        /* إرجاع الرسالة لإعادة الإرسال مع المحافظة على وضع التعديل إن كان فعالًا */
         setMessages(baseMessages);
         setInput(text);
         if (editIndex !== null) setEditing(editIndex);
@@ -360,9 +326,6 @@ export function DiscussCompanion({
       }
       persistSession(finalMessages, rem);
 
-      /* ============ خطاف «النقاش الفكري العميق» +5 أثر ============
-         تُمنح مرة واحدة لكل مقال عند بلوغ الحوار ثالث رسالة مسترسلة
-         للمستخدم المسجل (حوار كامل مثمر لا سؤال عابر). */
       const userTurns = finalMessages.filter((m) => m.role === "user").length;
       if (session?.user?.id && userTurns === 3) {
         try {
@@ -397,7 +360,6 @@ export function DiscussCompanion({
 
   return (
     <>
-      {/* الزر الانسيابي الأنيق */}
       <div className="page-chrome no-print mt-8 flex justify-center">
         <button
           ref={triggerRef}
@@ -429,7 +391,6 @@ export function DiscussCompanion({
         </button>
       </div>
 
-      {/* النافذة الجانبية الناعمة */}
       <div
         className={`fixed inset-0 z-70 ${ready ? "" : "pointer-events-none"}`}
         role="dialog"
@@ -437,7 +398,6 @@ export function DiscussCompanion({
         aria-label={`نقاش فكري حول: ${articleTitle}`}
         aria-hidden={!ready}
       >
-        {/* الشفّاح الخفيف — النص يظل مقروءًا خلفه */}
         <div
           onClick={closeDrawer}
           className={`absolute inset-0 bg-black/20 transition-opacity duration-300 ${
@@ -451,7 +411,6 @@ export function DiscussCompanion({
           }`}
           style={{ background: "var(--surface)" }}
         >
-          {/* الترويسة — عنوان + شارة هوية الذكاء الاصطناعي (شفافية كاملة) */}
           <header
             className="flex items-start justify-between gap-3 border-b p-4"
             style={{ borderColor: "var(--border)" }}
@@ -492,7 +451,6 @@ export function DiscussCompanion({
                 </span>
               )}
               {unlimited || (remaining !== null && remaining > 1_000_000) ? (
-                /* شارة الوصول غير المحدود — بلا أرقام فلكية مشوهة للهيدر */
                 <span
                   className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
                   style={{
@@ -536,9 +494,12 @@ export function DiscussCompanion({
             </div>
           </header>
 
-          {/* سجل الحوار */}
           <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
-            {/* الرسالة الافتتاحية الهادئة — هوية المحاور واضحة منذ أول لحظة */}
+            <FirstVisitHint
+              id="ai-discuss"
+              text="اسأل المحاور عن أي فكرة في هذا المقال أو ناقشها بحرّية؛ إجاباته تنطلق من مضمون المقال نفسه."
+            />
+
             <div className="flex justify-start">
               <div
                 className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-7"
@@ -663,7 +624,6 @@ export function DiscussCompanion({
             )}
           </div>
 
-          {/* حقل الكتابة */}
           <div className="border-t p-3" style={{ borderColor: "var(--border)" }}>
             {editing !== null && (
               <div
@@ -725,7 +685,6 @@ export function DiscussCompanion({
                 )}
               </button>
             </div>
-            {/* شريط التنويه السفلي الثابت — هوية المحاور وأمانة الإحالة */}
             <p className="select-none py-1.5 text-center text-xs text-zinc-500 dark:text-zinc-400">
               {cfgDisclaimer}
             </p>

@@ -31,23 +31,11 @@ import { formatArabicDate } from "@/lib/utils";
 import { formatReadingTime } from "@/lib/readingTime";
 
 /**
- * ISR — توليد ثابت تدريجي بكاش سريع يُحدّث كل دقيقة (أداء فوري بلا ضغط على Neon):
- * 1) الصفحة تُخدَّم وتُعاد استخدامها لمدة 60 ثانية — زمن استجابة شبه صفري بلا
- *    استيقاظ بارد لقاعدة البيانات في كل نقرة.
- * 2) أي تعديل إداري (نشر/تعديل/حذف) يستدعي إعادة تحقق فورية On-Demand عبر
- *    جسر revalidatePublicPaths من لوحة التحكم — فلا تأخير يُذكر رغم الكاش.
- * 3) بيانات الجلسة الشخصية (تصويتي/تسجيل الدخول) انتقلت للعميل تمامًا:
- *    InteractionSlot يجلب التصويت عبر GET /api/interactions، والتعليقات
- *    ورقيب القراءة يعرفان حالة الجلسة عبر useSession — فتبقى الصفحة قابلة للكاش.
+ * ISR — توليد ثابت تدريجي بكاش طويل (ساعة) يُحدّث لحظيًا عند أي تعديل إداري
+ * عبر On-Demand Revalidation من لوحة التحكم.
  */
-export const revalidate = 60;
+export const revalidate = 3600;
 
-/**
- * توليد ثابت لصفحات كل المقالات المنشورة عند البناء — تُخدَّم مسبقًا فتُفتح
- * فور النقر في أجزاء من الثانية. المقالات الجديدة بعد النشر تُبنى عند أول
- * طلب وتُخزّن (ISR)، ثم تُعاد ترندرتها فوريًا عبر On-Demand Revalidation
- * من لوحة التحكم لحظة أي تعديل.
- */
 export async function generateStaticParams() {
   try {
     const slugs = await getPublishedSlugs();
@@ -57,10 +45,6 @@ export async function generateStaticParams() {
   }
 }
 
-/* تنظيف مختصر المقال لوصف الميتا — طي الأسطر والمسافات إلى سطر واحد
-   ثم قصّ على حد كلمة كاملة عند 165 حرفًا بعلامة حذف: الوصف في نتائج
-   البحث يُعرض سطرًا مقروءًا بدل كتلة متعددة الأسطر تُقتطع عشوائيًا.
-   النص من مختصر المقال نفسه حرفيًا — لا أي إضافة من خارجه */
 function cleanMetaText(raw: string): string {
   const one = raw.replace(/\s+/g, " ").trim();
   if (one.length <= 165) return one;
@@ -75,7 +59,6 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug: rawSlug } = await params;
-  /* فك ترميز الـ slug العربي قبل الاستعلام — مع إبقاء الخام مطابقةً احتياطية */
   const slug = safeDecodeSlug(rawSlug);
   const article = await getArticleBySlug(slug);
   if (!article) return { title: "مقال غير موجود" };
@@ -108,7 +91,6 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug: rawSlug } = await params;
-  /* فك ترميز الـ slug العربي قبل الاستعلام — مع إبقاء الخام مطابقةً احتياطية */
   const slug = safeDecodeSlug(rawSlug);
   const article = await getArticleBySlug(slug);
   if (!article) notFound();
@@ -121,17 +103,12 @@ export default async function ArticlePage({
     getCommentVoteStats(article.id),
   ]);
 
-  /* سيادة الأدمن: تعطيل التشكيل إذا عطّله عامًا أو لهذا المقال تحديدًا */
   const tashkeelAllowed =
     siteCfg.TASHKEEL_ENABLED && article.tashkeelEnabled;
 
-  /* رابط المقال الحي — يُغذّي رمز QR المتجهي في ترويسة الطباعة والتذييل الثابت */
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://kalam-ziadamr.vercel.app").replace(/\/$/, "");
   const articleFullUrl = `${siteUrl}/article/${encodeURIComponent(article.slug)}`;
 
-  /* بيانات المقال المنظمة — كل حقولها من سجل المقال نفسه
-     (تاريخا النشر والتعديل والغلاف والوصف المنظف) فهي التي تُظهر
-     للمقال تاريخًا وصورة صحيحين في نتائج البحث */
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -159,17 +136,9 @@ export default async function ArticlePage({
       <ContinueReadingBadge slug={article.slug} articleId={article.id} />
 
       <main className="flex-1">
-        {/* قالب الطباعة الأصيل — كل ما يخرج على الورق محصور هنا، ويُرسم
-            بمحرك المتصفح نفسه (HarfBuzz) فالنص مطابق للشاشة حرفيًا */}
         <article id="printable-article" className="mx-auto max-w-3xl px-4 pt-28 pb-28 sm:px-6">
-          {/* ترويسة الطباعة الرسمية — QR متجهي نقي يرسمه المتصفح (للطباعة حصريًا) */}
           <PrintMasthead url={articleFullUrl} />
 
-          {/* ورقة غلاف الوثيقة الورقية — حصرًا في نسخة الطباعة/PDF:
-              القسم + العنوان الكبير + سطر البيانات + صورة الغلاف + المختصر
-              ثم فاصل صفحة، فيبدأ المتن بورقة جديدة كالكتب الرصينة.
-              (ترويسة العنوان وصورة الغلاف الأصليتان للشاشة تخفيان في الطباعة
-              لأن هذه الورقة تحملهما بدلًا منهما) */}
           <div className="print-only print-cover-page" aria-hidden>
             {article.section && (
               <span className="print-cover-section">{article.section.name}</span>
@@ -200,7 +169,6 @@ export default async function ArticlePage({
             )}
           </div>
 
-          {/* تصنيف القسم */}
           {article.section && (
             <div className="page-chrome mb-6 text-center">
               <Link
@@ -214,7 +182,6 @@ export default async function ArticlePage({
             </div>
           )}
 
-          {/* العنوان وسطر البيانات */}
           <header className="page-chrome text-center">
             <h1
               className="font-body text-3xl font-bold leading-[1.9] sm:text-4xl sm:leading-[1.9]"
@@ -232,7 +199,6 @@ export default async function ArticlePage({
             <div className="mx-auto mt-6 h-[3px] w-16 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
           </header>
 
-          {/* القارئ التفاعلي الكامل */}
           <ArticleReader
             article={{
               id: article.id,
@@ -252,12 +218,10 @@ export default async function ArticlePage({
             audioEnabled={siteCfg.AUDIO_PLAYER_ENABLED}
           />
 
-          {/* الرفيق الفكري — ناقش أفكار المقال (بوابة خادمية + مفتاح سيادة من التكوين) */}
           {siteCfg.AI_DISCUSS_ENABLED && (
             <DiscussCompanion articleId={article.id} articleTitle={article.title} />
           )}
 
-          {/* التفاعل والمشاركة */}
           <div className="page-chrome no-print mt-10 border-t pt-8" style={{ borderColor: "var(--border)" }}>
             <p className="mb-4 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
               هل كان لهذا الكلام لازمة؟
@@ -271,13 +235,11 @@ export default async function ArticlePage({
             </div>
           </div>
 
-          {/* رقيب القراءة المتأنية — +10 أثر عند الالتزام الحقيقي بالنص (الجلسة عبر useSession) */}
           <ImpactReadTracker
             articleId={article.id}
             requiredSeconds={requiredReadSeconds(article.content)}
           />
 
-          {/* التعليقات — مع مفتاح الإيقاف الفوري (Kill Switch) من لوحة التحكم */}
           {siteCfg.COMMENTS_ENABLED ? (
             <CommentsSection
               articleId={article.id}
@@ -291,7 +253,6 @@ export default async function ArticlePage({
                 authorImage: displayAvatar(c.user),
                 authorRank: c.user?.intellectualRank ?? null,
                 isInspiring: c.isInspiring,
-                /* التوثيق الرسمي المستقل — ختم بلون التصنيف (ذهبي/كحلي/زيتي/فيروزي) */
                 authorVerified: c.user?.isVerified ?? false,
                 authorSealColor: c.user?.isVerified
                   ? verificationSealColor(c.user.verificationType)
@@ -299,16 +260,13 @@ export default async function ArticlePage({
                 authorSealLabel: c.user?.isVerified
                   ? verificationSealLabel(c.user.verificationType, c.user.verificationLabel)
                   : null,
-                /* العضوية المميزة المستقلة — كبسولة بلون شارتها الخاص */
                 authorIsVip: c.user?.isVip ?? false,
                 authorBadgeTitle: c.user?.vipBadgeTitle ?? null,
                 authorBadgeColor: c.user?.vipBadgeColor ?? null,
-                /* إطار التعليق الفخم — بلون شارة الكاتب فقط عند امتلاكه الصلاحية */
                 authorAccent:
                   c.user && hasPrivilege(c.user.vipPrivileges, "vipCommentBorder")
                     ? c.user.vipBadgeColor
                     : null,
-                /* البطاقة الفكرية الموسعة — لحاملي التوثيق */
                 authorCard:
                   c.user?.isVerified && c.user
                     ? {
@@ -330,9 +288,6 @@ export default async function ArticlePage({
               </p>
             </section>
           )}
-          {/* بطاقة الجماعة الختامية — آخر ما يقرؤه القارئ في النسخة الورقية:
-              توقيع نهاية الوثيقة كالكتب، والرابط مشتق من النطاق الرسمي
-              (لا تذييل مثبّت يتكرر فوق المتن — الهوية هنا وفي ترويسة الغلاف) */}
           <div className="print-only print-colophon" aria-hidden>
             <div className="print-colophon-ornament">✦</div>
             <p className="print-colophon-line">انتهت هذه النسخة — قراءة هادئة تكون لها لازمة</p>
@@ -341,7 +296,6 @@ export default async function ArticlePage({
           </div>
         </article>
 
-        {/* مقالات ذات صلة */}
         {related.length > 0 && (
           <section className="page-chrome no-print mx-auto max-w-5xl px-4 pb-24 sm:px-6">
             <h2 className="font-ui mb-6 text-xl font-bold" style={{ color: "var(--ink)" }}>

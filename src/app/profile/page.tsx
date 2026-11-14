@@ -11,6 +11,7 @@ import { ProfileEditor } from "@/components/profile-editor";
 import { DevicesPanel } from "@/components/devices-panel";
 import { ReadingPreferencesCard } from "@/components/reading-preferences-card";
 import { PrivacyToolsCard } from "@/components/privacy-tools-card";
+import { FirstVisitHint } from "@/components/first-visit-hint";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
 import { parsePrivileges, PRIVILEGE_LABELS, roleLabelAr } from "@/lib/vip";
@@ -41,7 +42,6 @@ const TABS: Array<{ key: string; href: string; label: string }> = [
 ];
 
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  /* التبويب من الرابط ?tab= — أي قيمة غريبة تعود للتبويب الرئيسي بأمان */
   const { tab: rawTab } = await searchParams;
   const tab = rawTab === "settings" || rawTab === "security" ? rawTab : "profile";
   const session = await auth();
@@ -49,71 +49,73 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     redirect("/auth/login?callback=/profile");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      customName: true,
-      customImage: true,
-      bio: true,
-      impactScore: true,
-      intellectualRank: true,
-      createdAt: true,
-      /* منظومة التوثيق الرسمي المستقل + العضوية المميزة — البطاقة الغنية */
-      role: true,
-      isVerified: true,
-      verifiedAt: true,
-      verificationType: true,
-      verificationLabel: true,
-      isVip: true,
-      vipBadgeTitle: true,
-      vipBadgeColor: true,
-      vipReason: true,
-      vipGrantedAt: true,
-      vipPrivileges: true,
-      extendedBio: true,
-      verifiedSocialLinks: true,
-      notificationPrefs: true,
-      _count: { select: { comments: true, savedArticles: true, interactions: true } },
-    },
-  });
+  /* جلب السجل والتعليقات في التبويب الرئيسي فقط لتسريع فتح الإعدادات والأمان */
+  const [user, logs, comments] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        customName: true,
+        customImage: true,
+        bio: true,
+        impactScore: true,
+        intellectualRank: true,
+        createdAt: true,
+        role: true,
+        isVerified: true,
+        verifiedAt: true,
+        verificationType: true,
+        verificationLabel: true,
+        isVip: true,
+        vipBadgeTitle: true,
+        vipBadgeColor: true,
+        vipReason: true,
+        vipGrantedAt: true,
+        vipPrivileges: true,
+        extendedBio: true,
+        verifiedSocialLinks: true,
+        notificationPrefs: true,
+        _count: { select: { comments: true, savedArticles: true, interactions: true } },
+      },
+    }),
+    tab === "profile"
+      ? prisma.impactLog.findMany({
+          where: { userId: session.user.id },
+          orderBy: { createdAt: "desc" },
+          take: 12,
+          select: {
+            id: true,
+            actionType: true,
+            points: true,
+            reason: true,
+            createdAt: true,
+            article: { select: { slug: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+    tab === "profile"
+      ? prisma.comment.findMany({
+          where: { userId: session.user.id },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            content: true,
+            status: true,
+            createdAt: true,
+            article: { select: { slug: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
 
   if (!user) redirect("/auth/login?callback=/profile");
 
-  const [logs, comments] = await Promise.all([
-    prisma.impactLog.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 12,
-      select: {
-        id: true,
-        actionType: true,
-        points: true,
-        reason: true,
-        createdAt: true,
-        article: { select: { slug: true, title: true } },
-      },
-    }),
-    prisma.comment.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: {
-        id: true,
-        content: true,
-        status: true,
-        createdAt: true,
-        article: { select: { slug: true, title: true } },
-      },
-    }),
-  ]);
-
   const approvedCount = comments.filter((c) => c.status === "APPROVED").length;
 
-  /* شريط التقدم نحو الرتبة التالية */
   const meta = rankMeta(user.intellectualRank);
   const idx = RANKS.findIndex((r) => r.key === meta.key);
   const next = idx >= 0 && idx < RANKS.length - 1 ? RANKS[idx + 1] : null;
@@ -126,7 +128,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     <>
       <SiteHeader />
       <main className="flex-1">
-        {/* ==================== شرائط التبويبات الثلاثة ==================== */}
         <section className="mx-auto max-w-3xl px-4 pt-28 sm:px-6">
           <nav
             className="flex gap-1.5 rounded-2xl border p-1.5 shadow-soft"
@@ -139,6 +140,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                 <Link
                   key={t.key}
                   href={t.href}
+                  prefetch={true}
                   className="flex-1 rounded-xl px-2 py-2.5 text-center text-xs font-bold transition-all"
                   style={{
                     background: active ? "var(--accent)" : "transparent",
@@ -155,7 +157,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
         {tab === "profile" && (
           <>
-        {/* ==================== بطاقة الهوية ==================== */}
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <div
             className="flex flex-col items-center gap-6 rounded-3xl border p-8 shadow-lift sm:flex-row sm:text-right"
@@ -189,7 +190,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                 <h1 className="font-body text-2xl font-bold" style={{ color: "var(--ink)" }}>
                   {displayName(user)}
                 </h1>
-                {/* علامة التوثيق الرسمية المستقلة — بلون تصنيف الحساب */}
                 {user.isVerified && (() => {
                   const sealColor = verificationSealColor(user.verificationType);
                   const sealLabel = verificationSealLabel(user.verificationType, user.verificationLabel);
@@ -211,7 +211,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                     </span>
                   );
                 })()}
-                {/* كبسولة العضوية المميزة المستقلة — بلون شارتها الخاص */}
                 {user.isVip && user.vipBadgeTitle && (
                   <span
                     className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
@@ -249,7 +248,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </div>
         </section>
 
-        {/* ==================== بطاقة المزايا الفكرية الممنوحة (العضوية المميزة) ==================== */}
         {user.isVip && (() => {
           const privs = parsePrivileges(user.vipPrivileges);
           const granted = (Object.keys(PRIVILEGE_LABELS) as (keyof typeof PRIVILEGE_LABELS)[]).filter((k) => privs[k]);
@@ -303,7 +301,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           );
         })()}
 
-        {/* ==================== شريط الرحلة نحو الرتبة التالية ==================== */}
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <div
             className="rounded-2xl border p-5 shadow-soft"
@@ -351,8 +348,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
         {tab === "settings" && (
           <>
-        {/* ==================== إعدادات الهوية ==================== */}
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <FirstVisitHint
+            id="profile-settings"
+            text="من هنا يمكنك تخصيص اسمك وصورتك والتحكم في تفضيلات القراءة والإشعارات والخصوصية."
+            className="mb-4"
+          />
           <ProfileEditor
             googleName={user.name}
             googleImage={user.image}
@@ -373,13 +374,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           />
         </section>
 
-        {/* ==================== تفضيلات القراءة الافتراضية ==================== */}
         <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
           <ReadingPreferencesCard />
         </section>
 
-        {/* ==================== الخصوصية والتجربة ==================== */}
-        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section className="mx-auto mt-6 max-w-3xl px-4 pb-24 sm:px-6">
           <PrivacyToolsCard />
         </section>
           </>
@@ -387,7 +386,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
         {tab === "profile" && (
           <>
-        {/* ==================== سجل الأثر — شفافية كاملة نقطة بنقطة ==================== */}
         {logs.length > 0 && (
           <section className="mx-auto mt-10 max-w-3xl px-4 sm:px-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -435,14 +433,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </section>
         )}
 
-        {/* ==================== قناة «أهل الكلمة» ==================== */}
         {canSendProposals(user.intellectualRank) && (
           <section className="mx-auto mt-10 max-w-3xl px-4 sm:px-6">
             <ProposalForm />
           </section>
         )}
 
-        {/* ==================== إحصاءات القارئ ==================== */}
         <section className="mx-auto mt-10 grid max-w-3xl grid-cols-3 gap-3 px-4 sm:px-6">
           {[
             { label: "تعليقاتي", value: user._count.comments },
@@ -464,8 +460,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           ))}
         </section>
 
-        {/* ==================== تعليقاتي ==================== */}
-        <section className="mx-auto mt-10 max-w-3xl px-4 sm:px-6">
+        <section className="mx-auto mt-10 max-w-3xl px-4 pb-24 sm:px-6">
           <h2 className="mb-4 font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
             تعليقاتي
           </h2>
@@ -533,13 +528,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             كل تعليق يمرّ بفلترة أخلاقية من ثلاث مستويات — {approvedCount > 0 ? `و${approvedCount} من تعليقاتك هنا منشورة` : "المراجعة تحمي مساحة الحوار للجميع"}.
           </p>
         </section>
-
           </>
         )}
 
         {tab === "security" && (
           <>
-        {/* ==================== الأجهزة المتصلة — إدارة جلسات الحساب وأمانها ==================== */}
         <section
           className="mx-auto mt-6 max-w-3xl rounded-2xl border p-5 shadow-soft sm:p-6"
           style={{ background: "var(--surface)", borderColor: "var(--border)" }}
@@ -547,14 +540,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           <DevicesPanel />
         </section>
 
-        {/* منطقة حذف الحساب — وعد سياسة الخصوصية مُطبّق حرفيًا، تحت مظلة تبويب الأمان */}
         <section className="mx-auto mt-4 max-w-3xl px-4 pb-24 sm:px-6">
           <AccountDangerZone />
         </section>
           </>
         )}
       </main>
-      {/* كبسولة تفعيل الإشعارات الذكية — صفحة الحساب من مواضع الظهور المشروعة */}
       <PushPromptCapsule />
       <SiteFooter />
     </>
