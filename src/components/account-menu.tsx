@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 
-/* أيقونة الدخول */
 function LoginIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -17,18 +16,12 @@ function LoginIcon() {
   );
 }
 
-/**
- * منطقة الحساب في الهيدر:
- * - زائر → زر «دخول» (يعود للصفحة نفسها بعد الدخول)
- * - مسجّل → صورته + قائمة واضحة متطابقة مع تبويبات الحساب
- */
 export function AccountMenu() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  /* إغلاق القائمة عند النقر خارجها */
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
@@ -39,10 +32,9 @@ export function AccountMenu() {
   }, [open]);
 
   if (status === "loading") {
-    return <span className="inline-block h-8 w-8 animate-pulse rounded-full" style={{ background: "var(--border)" }} aria-hidden />;
+    return <span className="inline-block h-7 w-7 animate-pulse rounded-full" style={{ background: "var(--border)" }} aria-hidden />;
   }
 
-  /* زائر: زر دخول يعود لنفس الصفحة */
   if (status === "unauthenticated" || !session?.user) {
     return (
       <Link
@@ -61,34 +53,40 @@ export function AccountMenu() {
 
   return (
     <div className="relative" ref={menuRef}>
+      {/* زر اللمس يحافظ على 44px للموبايل بينما الدائرة المرئية ثابتة 28×28px
+          لتتناسق مع أيقونات البحث والوضع الليلي والقائمة */}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="true"
         aria-expanded={open}
         title={u.name || "حسابي"}
         data-tour="account-avatar"
-        className="flex h-8 w-8 items-center justify-center self-center overflow-hidden rounded-full border transition-all duration-300 hover:scale-110"
-        style={{
-          borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.35)",
-        }}
+        className="flex h-8 w-8 items-center justify-center self-center rounded-full transition-all duration-300 hover:scale-110"
       >
-        {u.image ? (
-          <Image
-            src={u.image}
-            alt={u.name || "صورة الحساب"}
-            width={32}
-            height={32}
-            referrerPolicy="no-referrer"
-            className="block h-full w-full object-cover"
-          />
-        ) : (
-          <span
-            className="flex h-full w-full items-center justify-center text-sm font-bold"
-            style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-          >
-            {(u.name || "ق").trim().charAt(0)}
-          </span>
-        )}
+        <span
+          className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border"
+          style={{
+            borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.35)",
+          }}
+        >
+          {u.image ? (
+            <Image
+              src={u.image}
+              alt={u.name || "صورة الحساب"}
+              width={28}
+              height={28}
+              referrerPolicy="no-referrer"
+              className="block h-full w-full object-cover"
+            />
+          ) : (
+            <span
+              className="flex h-full w-full items-center justify-center text-xs font-bold"
+              style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+            >
+              {(u.name || "ق").trim().charAt(0)}
+            </span>
+          )}
+        </span>
       </button>
 
       {open && (

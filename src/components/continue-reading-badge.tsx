@@ -3,25 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
-/**
- * استئناف القراءة الذكي — شارة عائمة غير معطِّلة للقراءة:
- * «توقفت عند X% — متابعة القراءة».
- *
- * الحفظ مزدوج: نسخة localStorage فورية للاستجابة، ونسخة في قاعدة البيانات
- * (POST /api/progress) للمسجلين لتتزامن عبر كل أجهزتهم.
- * الشارة لا تظهر إلا عند العودة لمقال لم يكتمل (5%–95%)، وتختفي
- * لحظة الاستئناف أو بلوغ النهاية، ولا تعترض أبدًا شريط الأدوات أو الكبسولة الصوتية.
- */
-
 const lsKey = (slug: string) => `kalam_progress:${slug}`;
 
 type SavedProgress = { pct: number; scrollY: number; at: number };
 
-/**
- * حساب التقدم المحدد بحاوية المتن (Container-Bound) — نفس معادلة شريط التقدم:
- * 0% عند لمس أعلى المتن قمة النافذة، و100% عند بلوغ أسفل آخر فقرة أسفل الشاشة،
- * بلا احتساب التعليقات أو المقترحات أو الفوتر.
- */
 function calculateProgress(): number {
   const content = document.getElementById("article-body");
   if (!content) return 0;
@@ -39,29 +24,35 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
   const { status } = useSession();
   const [resume, setResume] = useState<SavedProgress | null>(null);
   const [progress, setProgress] = useState(0);
-  /* إغلاق يدوي للكبسولة لهذه الجلسة — لا يمحو موضع القراءة المحفوظ */
   const [dismissed, setDismissed] = useState(false);
+  /* تزامن مع الكبسولة الصوتية العائمة — ترتفع الشارة فوقها تلقائيًا عند تشغيل الصوت */
+  const [audioActive, setAudioActive] = useState(false);
 
   const latest = useRef({ pct: 0, scrollY: 0 });
-  /* أقصى تقدم محقق — لا تراجع أبدًا حتى لو صعد القارئ للغلاف أو العنوان */
   const maxMilestone = useRef({ pct: 0, scrollY: 0 });
   const lastSaved = useRef(0);
   const resumed = useRef(false);
 
-  /* ============ الاستعادة عند العودة ============ */
+  useEffect(() => {
+    const onAudio = (e: Event) => {
+      const active = Boolean((e as CustomEvent<{ active?: boolean }>).detail?.active);
+      setAudioActive(active);
+    };
+    window.addEventListener("kalam:audio-capsule", onAudio);
+    return () => window.removeEventListener("kalam:audio-capsule", onAudio);
+  }, []);
+
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(lsKey(slug));
       if (!raw) return;
       const saved = JSON.parse(raw) as SavedProgress;
-      /* أعلى نقطة محفوظة هي نقطة انطلاق الميلستون — لا يبدأ التقدم من الصفر */
       maxMilestone.current = { pct: saved.pct ?? 0, scrollY: saved.scrollY ?? 0 };
       if (saved.pct >= 5 && saved.pct <= 95 && Date.now() - (saved.at ?? 0) < 90 * 24 * 3600 * 1000) {
         setResume(saved);
       }
     } catch {}
 
-    /* مزامنة عبر الأجهزة: إن كان المستخدم مسجلًا فقاعدة البيانات أصدق إن كانت أحدث */
     if (status !== "authenticated") return;
     fetch(`/api/progress?articleId=${encodeURIComponent(articleId)}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -71,7 +62,6 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
           if (prev && prev.at >= (d.savedAt ?? 0)) return prev;
           return { pct: d.progress, scrollY: d.scrollY ?? 0, at: d.savedAt ?? Date.now() };
         });
-        /* قاعدة البيانات أصدق إن كانت أحدث — ترفع الميلستون لا تخفضه */
         maxMilestone.current = {
           pct: Math.max(maxMilestone.current.pct, d.progress),
           scrollY:
@@ -81,7 +71,6 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       .catch(() => {});
   }, [slug, articleId, status]);
 
-  /* ============ التتبع الحي أثناء القراءة ============ */
   useEffect(() => {
     let ticking = false;
 
@@ -92,16 +81,11 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       latest.current = { pct, scrollY: y };
       setProgress(pct);
 
-      /* تثبيت أقصى تقدم محقق (Highest Milestone Preservation):
-         savedMax = Math.max(currentProgress, previousMaxProgress) —
-         الرجوع للغلاف أو العنوان لا يمحو ما سبق (44% تبقى 44%)،
-         وموضع الاستئناف هو موضع نقطة القمة لا موضع التراجع */
       if (pct > maxMilestone.current.pct) {
         maxMilestone.current = { pct, scrollY: y };
       }
       const savedMax = maxMilestone.current;
 
-      /* بلوغ نهاية المتن يمحو موضع الاستئناف — المقال أُقرأ */
       if (pct >= 96) {
         try {
           window.localStorage.removeItem(lsKey(slug));
@@ -111,7 +95,6 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
         return;
       }
 
-      /* حفظ محلي خفيف: أقصى تقدم كل تغيّر 2% — لا نُسجل التراجع أبدًا */
       try {
         const prev = JSON.parse(window.localStorage.getItem(lsKey(slug)) ?? "null") as SavedProgress | null;
         if (!prev || Math.abs(prev.pct - savedMax.pct) >= 2 || (!resumed.current && savedMax.pct >= 5)) {
@@ -120,7 +103,6 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
         }
       } catch {}
 
-      /* مزامنة قاعدة البيانات للمسجلين — كل 20 ثانية كحد أقصى، بأقصى قيمة */
       if (status === "authenticated" && Date.now() - lastSaved.current > 20000 && savedMax.pct >= 2) {
         lastSaved.current = Date.now();
         fetch("/api/progress", {
@@ -139,7 +121,6 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       }
     };
 
-    /* حفظ أخير عند مغادرة الصفحة — بأقصى تقدم محقق لا اللحظي */
     const onLeave = () => {
       if (status !== "authenticated") return;
       const { pct, scrollY } = maxMilestone.current;
@@ -171,10 +152,11 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
 
   return (
     <>
-      {/* عدّاد التقدم الحي — يظهر داخل الشارة إن لم يكن هناك استئناف */}
       {progress > 5 && progress < 96 && !resume && (
         <div
-          className="no-print pointer-events-none fixed bottom-19 left-1/2 z-30 -translate-x-1/2 rounded-full border px-3.5 py-1.5 text-xs shadow-soft"
+          className={`no-print pointer-events-none fixed left-1/2 z-30 -translate-x-1/2 rounded-full border px-3.5 py-1.5 text-xs shadow-soft transition-all duration-300 ${
+            audioActive ? "bottom-36 sm:bottom-19" : "bottom-19"
+          }`}
           style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--ink-muted)" }}
           aria-hidden
         >
@@ -182,10 +164,11 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
         </div>
       )}
 
-      {/* كبسولة الاستئناف المنقّاة — بيان النسبة + زر إجرائي واحد دون تكرار */}
       {resume && !dismissed && (
         <div
-          className="no-print fixed bottom-16 right-4 z-30 flex items-center gap-2 rounded-full border border-amber-500/30 px-3 py-1.5 shadow-lg backdrop-blur-md animate-fade-up"
+          className={`no-print fixed right-3 z-30 flex items-center gap-2 rounded-full border border-amber-500/30 px-3 py-1.5 shadow-lg backdrop-blur-md transition-all duration-300 animate-fade-up sm:right-4 ${
+            audioActive ? "bottom-36 sm:bottom-16" : "bottom-16"
+          }`}
           style={{ background: "color-mix(in srgb, var(--surface) 95%, transparent)" }}
           role="group"
           aria-label={`استئناف القراءة من ${resume.pct} بالمئة`}
