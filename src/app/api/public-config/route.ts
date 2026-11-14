@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const bundle = await getPublicBundle();
     return NextResponse.json(bundle, {
-      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+      headers: { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
     });
   } catch {
     return NextResponse.json({ error: "تعذر جلب التكوين" }, { status: 500 });

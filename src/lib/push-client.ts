@@ -5,6 +5,41 @@
  * تُستخدم في جرس الإشعارات بالهيدر وبند الإشعارات بدرج الموبايل.
  */
 
+const PUSH_SYNC_KEY = "kalam_push_synced_v1";
+const PUSH_SYNC_TTL_MS = 24 * 60 * 60 * 1000;
+let inflightResync: Promise<void> | null = null;
+
+function markPushSynced(endpoint: string): void {
+  try {
+    localStorage.setItem(PUSH_SYNC_KEY, JSON.stringify({ endpoint, ts: Date.now() }));
+  } catch {
+    /* التخزين محجوب */
+  }
+}
+
+function clearPushSynced(): void {
+  try {
+    localStorage.removeItem(PUSH_SYNC_KEY);
+  } catch {
+    /* التخزين محجوب */
+  }
+}
+
+function isRecentlySynced(endpoint: string): boolean {
+  try {
+    const raw = localStorage.getItem(PUSH_SYNC_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { endpoint?: string; ts?: number };
+    return (
+      parsed.endpoint === endpoint &&
+      typeof parsed.ts === "number" &&
+      Date.now() - parsed.ts < PUSH_SYNC_TTL_MS
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function pushSupported(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -55,6 +90,7 @@ export async function subscribeToPush(): Promise<SubscribeResult> {
       body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
     });
     if (!res.ok) return { ok: false, reason: "failed" };
+    markPushSynced(json.endpoint);
     return { ok: true, endpoint: json.endpoint };
   } catch {
     return { ok: false, reason: "failed" };
@@ -74,6 +110,7 @@ export async function unsubscribeFromPush(): Promise<boolean> {
       }).catch(() => {});
       await sub.unsubscribe();
     }
+    clearPushSynced();
     return true;
   } catch {
     return false;
@@ -81,25 +118,32 @@ export async function unsubscribeFromPush(): Promise<boolean> {
 }
 
 /**
- * مزامنة صامتة لاشتراك قائم — تُستدعى عند فتح الموقع:
- * تُحدّث الاشتراك في القاعدة إن تجدد أو انتقل الحساب لجهاز جديد،
- * وتنظف الاشتراك الميت من المتصفح إن كان القاعدة قد حذفته.
+ * مزامنة صامتة لاشتراك قائم — محمية بحارس 24 ساعة ومنع التكرار المتزامن
+ * حتى لا تُغرق الخادم بطلبات POST متكررة عند كل تنقل أو إعادة رندر.
  */
 export async function resyncExistingSubscription(): Promise<void> {
   if (!pushSupported()) return;
-  try {
-    if (Notification.permission !== "granted") return;
-    const reg = await navigator.serviceWorker.getRegistration();
-    const sub = reg ? await reg.pushManager.getSubscription() : null;
-    if (!sub) return;
-    const json = sub.toJSON();
-    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return;
-    await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
-    }).catch(() => {});
-  } catch {
-    /* صامت */
-  }
+  if (inflightResync) return inflightResync;
+  inflightResync = (async () => {
+    try {
+      if (Notification.permission !== "granted") return;
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      if (!sub) return;
+      const json = sub.toJSON();
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return;
+      if (isRecentlySynced(json.endpoint)) return;
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+      });
+      if (res.ok) markPushSynced(json.endpoint);
+    } catch {
+      /* صامت */
+    } finally {
+      inflightResync = null;
+    }
+  })();
+  return inflightResync;
 }

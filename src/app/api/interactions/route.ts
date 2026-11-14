@@ -33,24 +33,26 @@ export async function GET(request: Request) {
     const session = await auth();
     const userId = session?.user?.id || null;
 
-    const grouped = await prisma.interaction.groupBy({
-      by: ["value"],
-      where: { articleId },
-      _count: { value: true },
-    });
+    const [grouped, mine] = await Promise.all([
+      prisma.interaction.groupBy({
+        by: ["value"],
+        where: { articleId },
+        _count: { value: true },
+      }),
+      userId || fp
+        ? prisma.interaction.findUnique({
+            where: userId
+              ? { articleId_userId: { articleId, userId } }
+              : { articleId_visitorFp: { articleId, visitorFp: fp as string } },
+            select: { value: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
     const likes = grouped.find((g) => g.value === 1)?._count.value ?? 0;
     const dislikes = grouped.find((g) => g.value === -1)?._count.value ?? 0;
 
-    let myVote: number | null = null;
-    if (userId || fp) {
-      const where = userId
-        ? { articleId_userId: { articleId, userId } }
-        : { articleId_visitorFp: { articleId, visitorFp: fp as string } };
-      const mine = await prisma.interaction.findUnique({ where, select: { value: true } });
-      myVote = mine?.value ?? null;
-    }
-
-    return NextResponse.json({ likes, dislikes, myVote });
+    return NextResponse.json({ likes, dislikes, myVote: mine?.value ?? null });
   } catch (err) {
     await recordServerError({ err, app: "PUBLIC", path: "/api/interactions", method: request.method, requestId: request.headers.get("x-kalam-rid"), url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors` });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });

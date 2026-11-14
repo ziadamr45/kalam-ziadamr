@@ -7,17 +7,10 @@ import { pushSupported, subscribeToPush, resyncExistingSubscription } from "@/li
 
 /**
  * مركز إشعارات القارئ التفاعلي — فوق الجدول المركزي الموحد (Notification):
- * - جرس تفاعلي بالهيدر بعداد رقمي حي (SSE لحظيًا + تحديث دوري احتياطي).
- * - نافذة منسدلة بتبويبين: «الكل» و«غير المقروءة» مع تعليم الكل كمقروء.
- * - مؤشرات أيقونية ملونة بحسب طبيعة الحدث (نجمة الأثر، فقاعة النقاش،
- *   درع الأمان، ماسة التوثيق، بوق النشر).
- * - توست لحظي (NotificationToasts) للحدث الحي الواقع أثناء التصفح فقط —
- *   لا إعادة إطلاق للإشعارات القديمة عند أي ريفريش (خط أساس صامت + حارس
- *   last_seen_notification_id في localStorage).
- * - زر إخفاء (X) على كل إشعار: حذف تفاؤلي فوري من الواجهة + dismissedAt
- *   في قاعدة البيانات (يخرج من القائمة والعداد نهائيًا مع بقاء التوثيق).
- * - نقر أي إشعار يفتح نافذة التفاصيل الكاملة: النص كاملًا دون اقتطاع +
- *   بادج النوع + التوقيت الدقيق + زر الانتقال للرابط + تعليم تلقائي كمقروء.
+ * - مخزن مشترك واحد (Singleton) بين الجرس بالهيدر ودرج الموبايل والتوست
+ *   لمنع تكرار الطلبات من عدة مكونات مركبة في نفس الصفحة.
+ * - استطلاع ذكي كل 60 ثانية للمسجلين فقط وحين يكون التبويب مرئيًا،
+ *   بلا اتصالات SSE متكررة على الخادم اللامركزي.
  */
 
 export type NotificationItem = {
@@ -35,6 +28,8 @@ export type NotificationItem = {
 type PushState = "unknown" | "unsupported" | "denied" | "off" | "on";
 
 const SEEN_KEY = "last_seen_notification_id";
+const POLL_INTERVAL_MS = 60_000;
+const VISIBILITY_STALE_MS = 45_000;
 
 const rtf = new Intl.RelativeTimeFormat("ar", { numeric: "auto" });
 
@@ -188,11 +183,6 @@ export function NotificationDetailModal({
   const title = item.title ?? "إشعار";
   const message = item.message ?? "";
 
-  /* ============ Portal إلى document.body — الإصلاح الجذري للتوسيط ============
-     كان المودال يُرندر داخل الهيدر (backdrop-blur) وداخل الدرج (transform) —
-     أي سلف بهذه الخصائص يجعل عنصر fixed يتموضع نسبةً إليه لا نسبةً للشاشة،
-     فيلتصق بأعلى الصفحة ويُقص على التابلت والكمبيوتر. النقل عبر Portal
-     يعتقه من كل سلاسل الأسلاف، والتوسيط مطلق مع تمرير داخلي آمن. */
   return createPortal(
     <div
       className="fixed inset-0 z-9999 flex items-center justify-center p-4 sm:p-6"
@@ -202,14 +192,11 @@ export function NotificationDetailModal({
       aria-modal="true"
       aria-label={title}
     >
-      {/* لوحة متمركزة حرفيًا (top/left 1/2 + translate) ببنية عمودية صارمة:
-          رأس وتذييل ثابتان (shrink-0) والمتن يتمرر وحده (flex-1) داخل سقف 80vh */}
       <div
         className="fixed top-1/2 left-1/2 flex max-h-[80dvh] w-[90vw] -translate-x-1/2 -translate-y-1/2 animate-fade-in flex-col overflow-hidden rounded-2xl border shadow-lift sm:max-w-md md:max-w-lg lg:max-w-xl"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* رأس ثابت — النوع والبادج وزر الإغلاق */}
         <div
           className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3"
           style={{ borderColor: "var(--border)" }}
@@ -241,7 +228,6 @@ export function NotificationDetailModal({
           </button>
         </div>
 
-        {/* المتن المتمرر — العنوان والنص الكامل والتوقيت والسياق (flex-1 داخل سقف 80vh) */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           <h3 className="text-base font-extrabold leading-8" style={{ color: "var(--ink)" }}>
             {title}
@@ -253,7 +239,6 @@ export function NotificationDetailModal({
             {message}
           </p>
 
-          {/* تفاصيل سياقية إضافية (أجهزة/مواقع لإشعارات الأمان) */}
           {meta && (meta.device || meta.location || meta.ip || meta.when) && (
             <div
               className="mt-4 space-y-1.5 rounded-xl p-3 text-[11px] leading-6"
@@ -287,7 +272,6 @@ export function NotificationDetailModal({
           </div>
         </div>
 
-        {/* تذييل ثابت — الانتقال للرابط والإخفاء */}
         <div
           className="flex shrink-0 items-center justify-between gap-2 border-t px-4 py-3"
           style={{ borderColor: "var(--border)" }}
@@ -323,156 +307,196 @@ export function NotificationDetailModal({
   );
 }
 
-/* ===================== طبقة البيانات — SSE لحظي + دوري احتياطي ===================== */
+/* ===================== المخزن المشترك (Singleton) — طلب واحد لكل التبويب ===================== */
 
-function useNotifications() {
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [unread, setUnread] = useState(0);
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  const [pushState, setPushState] = useState<PushState>("unknown");
-  const [enabling, setEnabling] = useState(false);
-  const [toast, setToast] = useState<NotificationItem | null>(null);
-  const [detail, setDetail] = useState<NotificationItem | null>(null);
+type StoreState = {
+  items: NotificationItem[];
+  unread: number;
+  authed: boolean | null;
+  pushState: PushState;
+  enabling: boolean;
+  toast: NotificationItem | null;
+  detail: NotificationItem | null;
+};
 
-  const load = useCallback(async (): Promise<void> => {
+let store: StoreState = {
+  items: [],
+  unread: 0,
+  authed: null,
+  pushState: "unknown",
+  enabling: false,
+  toast: null,
+  detail: null,
+};
+
+const listeners = new Set<() => void>();
+let activeMounts = 0;
+let lastFetchAt = 0;
+let inflightLoad: Promise<void> | null = null;
+let baselineReady = false;
+let prevUnread = 0;
+let resyncedSession = false;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+function setStore(patch: Partial<StoreState>): void {
+  store = { ...store, ...patch };
+  listeners.forEach((fn) => fn());
+}
+
+async function fetchNotifications(): Promise<void> {
+  if (inflightLoad) return inflightLoad;
+  inflightLoad = (async () => {
+    lastFetchAt = Date.now();
     try {
       const res = await fetch("/api/notifications", { cache: "no-store" });
       if (res.status === 401) {
-        setAuthed(false);
-        setItems([]);
-        setUnread(0);
+        setStore({ authed: false, items: [], unread: 0 });
+        baselineReady = false;
+        prevUnread = 0;
         return;
       }
       if (!res.ok) return;
-      const data = (await res.json()) as { items: NotificationItem[]; unread: number };
-      setAuthed(true);
-      setItems(data.items ?? []);
-      setUnread(data.unread ?? 0);
+      const data = (await res.json()) as { items?: NotificationItem[]; unread?: number };
+      const newItems = data.items ?? [];
+      const newUnread = data.unread ?? 0;
+
+      let nextToast = store.toast;
+      if (baselineReady && newUnread > prevUnread && newItems.length > 0) {
+        const latest = newItems[0];
+        let seenId: string | null = null;
+        try {
+          seenId = localStorage.getItem(SEEN_KEY);
+        } catch {
+          /* التخزين محجوب */
+        }
+        if (latest.id && seenId !== latest.id) {
+          try {
+            localStorage.setItem(SEEN_KEY, latest.id);
+          } catch {
+            /* صامت */
+          }
+          nextToast = {
+            ...latest,
+            type: latest.type ?? "system",
+            title: latest.title ?? "إشعار جديد",
+            message: latest.message ?? "",
+            link: latest.link ?? null,
+          };
+        }
+      }
+
+      baselineReady = true;
+      prevUnread = newUnread;
+      setStore({
+        authed: true,
+        items: newItems,
+        unread: newUnread,
+        toast: nextToast,
+      });
+
+      if (!resyncedSession) {
+        resyncedSession = true;
+        void resyncExistingSubscription();
+      }
     } catch {
       /* الشبكة متقطعة — يُعاد المحاولة في الدورة التالية */
+    } finally {
+      inflightLoad = null;
     }
-  }, []);
+  })();
+  return inflightLoad;
+}
 
-  const refreshPushState = useCallback(async (): Promise<void> => {
-    if (!pushSupported()) {
-      setPushState("unsupported");
+async function refreshPushStateShared(): Promise<void> {
+  if (!pushSupported()) {
+    setStore({ pushState: "unsupported" });
+    return;
+  }
+  try {
+    if (Notification.permission === "denied") {
+      setStore({ pushState: "denied" });
       return;
     }
-    try {
-      if (Notification.permission === "denied") {
-        setPushState("denied");
-        return;
-      }
-      if (Notification.permission !== "granted") {
-        setPushState("off");
-        return;
-      }
-      const reg = await navigator.serviceWorker.getRegistration();
-      const sub = reg ? await reg.pushManager.getSubscription() : null;
-      setPushState(sub ? "on" : "off");
-    } catch {
-      setPushState("off");
+    if (Notification.permission !== "granted") {
+      setStore({ pushState: "off" });
+      return;
     }
-  }, []);
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    setStore({ pushState: sub ? "on" : "off" });
+  } catch {
+    setStore({ pushState: "off" });
+  }
+}
+
+function onVisibilityChange(): void {
+  if (
+    document.visibilityState === "visible" &&
+    store.authed === true &&
+    Date.now() - lastFetchAt >= VISIBILITY_STALE_MS
+  ) {
+    void fetchNotifications();
+  }
+}
+
+function startPollingLoop(): void {
+  if (pollTimer) return;
+  void fetchNotifications();
+  void refreshPushStateShared();
+  pollTimer = setInterval(() => {
+    if (document.visibilityState === "visible" && store.authed === true) {
+      void fetchNotifications();
+    }
+  }, POLL_INTERVAL_MS);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+}
+
+function stopPollingLoop(): void {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+}
+
+function useNotifications() {
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    load();
-    refreshPushState();
-    resyncExistingSubscription();
-
-    /* التحديث الدوري الاحتياطي + عند العودة للتبويب */
-    const timer = setInterval(load, 60_000);
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
-
-    /* القناة اللحظية SSE — تحديث العداد والتوست بلا إعادة تحميل.
-       النبضة الأولى من الخادم تحمل isNewItem:false دائمًا (خط أساس صامت)،
-       وحارس localStorage يمنع أي إعادة إطلاق لإشعار شُوهد من قبل —
-       فلا توست عند الرفريش مهما تكرر، بل للحدث الحي الجديد حصرًا. */
-    let es: EventSource | null = null;
-    let reconnect: ReturnType<typeof setTimeout> | null = null;
-    let disposed = false;
-    const connect = (): void => {
-      if (disposed) return;
-      try {
-        es = new EventSource("/api/notifications/stream");
-        es.onmessage = (ev: MessageEvent<string>) => {
-          try {
-            const data = JSON.parse(ev.data) as {
-              unread?: number;
-              isNewItem?: boolean;
-              latest?: { id: string; title: string; message: string; link: string | null; type: string };
-              heartbeat?: boolean;
-            };
-            if (typeof data.unread === "number") setUnread(data.unread);
-            if (data.isNewItem && data.latest) {
-              load();
-              /* حارس التكرار النهائي: إشعار شُوهد سابقًا لا يُعرض توستًا مطلقًا */
-              let seenId: string | null = null;
-              try {
-                seenId = localStorage.getItem(SEEN_KEY);
-              } catch {
-                /* التخزين محجوب — نكمل بلا حارس */
-              }
-              const latestId = data.latest.id ?? "";
-              if (!latestId || seenId === latestId) return;
-              try {
-                localStorage.setItem(SEEN_KEY, latestId);
-              } catch {
-                /* صامت */
-              }
-              /* تحصين الشكل: أي حقل ناقص من قناة SSE لا يُسقط الواجهة أبدًا
-                 (درس انهيار e.message.length في الإنتاج) */
-              setToast({
-                id: latestId,
-                type: data.latest.type ?? "system",
-                title: data.latest.title ?? "إشعار جديد",
-                message: data.latest.message ?? "",
-                link: data.latest.link ?? null,
-                isRead: false,
-                readAt: null,
-                createdAt: new Date().toISOString(),
-              });
-            }
-          } catch {
-            /* نبض تالف — يتجاهل */
-          }
-        };
-        es.onerror = () => {
-          es?.close();
-          es = null;
-          if (!disposed) reconnect = setTimeout(connect, 5_000);
-        };
-      } catch {
-        /* SSE غير مدعوم — الدورة الاحتياطية تغطي */
+    const listener = () => setTick((t) => t + 1);
+    listeners.add(listener);
+    activeMounts += 1;
+    if (activeMounts === 1) {
+      startPollingLoop();
+    }
+    return () => {
+      listeners.delete(listener);
+      activeMounts = Math.max(0, activeMounts - 1);
+      if (activeMounts === 0) {
+        stopPollingLoop();
       }
     };
-    connect();
-
-    return () => {
-      disposed = true;
-      clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-      es?.close();
-      if (reconnect) clearTimeout(reconnect);
-    };
-  }, [load, refreshPushState]);
+  }, []);
 
   const enablePush = useCallback(async (): Promise<void> => {
-    setEnabling(true);
+    setStore({ enabling: true });
     try {
       const result = await subscribeToPush();
-      if (result.ok) setPushState("on");
-      else if (result.reason === "denied") setPushState("denied");
-      else if (result.reason === "unsupported") setPushState("unsupported");
+      if (result.ok) setStore({ pushState: "on" });
+      else if (result.reason === "denied") setStore({ pushState: "denied" });
+      else if (result.reason === "unsupported") setStore({ pushState: "unsupported" });
     } finally {
-      setEnabling(false);
+      setStore({ enabling: false });
     }
   }, []);
 
   const markAll = useCallback(async (): Promise<void> => {
-    setItems((prev) => prev.map((n) => ({ ...n, isRead: true, readAt: n.readAt ?? new Date().toISOString() })));
-    setUnread(0);
+    const now = new Date().toISOString();
+    prevUnread = 0;
+    setStore({
+      items: store.items.map((n) => ({ ...n, isRead: true, readAt: n.readAt ?? now })),
+      unread: 0,
+    });
     await fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -481,8 +505,13 @@ function useNotifications() {
   }, []);
 
   const markOne = useCallback(async (id: string): Promise<void> => {
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: n.readAt ?? new Date().toISOString() } : n)));
-    setUnread((u) => Math.max(0, u - 1));
+    const now = new Date().toISOString();
+    const nextUnread = Math.max(0, store.unread - 1);
+    prevUnread = nextUnread;
+    setStore({
+      items: store.items.map((n) => (n.id === id ? { ...n, isRead: true, readAt: n.readAt ?? now } : n)),
+      unread: nextUnread,
+    });
     await fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -490,12 +519,15 @@ function useNotifications() {
     }).catch(() => {});
   }, []);
 
-  /** الإخفاء النهائي — حذف تفاؤلي فوري من القائمة + dismissedAt في قاعدة البيانات */
   const dismiss = useCallback(async (item: NotificationItem): Promise<void> => {
-    if (!item.isRead) setUnread((u) => Math.max(0, u - 1));
-    setItems((prev) => prev.filter((n) => n.id !== item.id));
-    setDetail((d) => (d?.id === item.id ? null : d));
-    setToast((t) => (t?.id === item.id ? null : t));
+    const nextUnread = item.isRead ? store.unread : Math.max(0, store.unread - 1);
+    prevUnread = nextUnread;
+    setStore({
+      unread: nextUnread,
+      items: store.items.filter((n) => n.id !== item.id),
+      detail: store.detail?.id === item.id ? null : store.detail,
+      toast: store.toast?.id === item.id ? null : store.toast,
+    });
     try {
       localStorage.setItem(SEEN_KEY, item.id);
     } catch {
@@ -508,21 +540,33 @@ function useNotifications() {
     }).catch(() => {});
   }, []);
 
-  /** فتح التفاصيل — تعليم تلقائي كمقروء لحظة الفتح مع تحديث العداد */
   const openDetail = useCallback(
     (item: NotificationItem): void => {
-      setDetail(item);
+      setStore({ detail: item });
       if (!item.isRead) void markOne(item.id);
     },
     [markOne],
   );
 
-  const dismissToast = useCallback((): void => setToast(null), []);
+  const dismissToast = useCallback((): void => setStore({ toast: null }), []);
+  const closeDetail = useCallback((): void => setStore({ detail: null }), []);
 
   return {
-    items, unread, authed, pushState, enabling, toast, detail,
-    load, enablePush, markAll, markOne, dismiss, openDetail, dismissToast,
-    closeDetail: () => setDetail(null),
+    items: store.items,
+    unread: store.unread,
+    authed: store.authed,
+    pushState: store.pushState,
+    enabling: store.enabling,
+    toast: store.toast,
+    detail: store.detail,
+    load: fetchNotifications,
+    enablePush,
+    markAll,
+    markOne,
+    dismiss,
+    openDetail,
+    dismissToast,
+    closeDetail,
   };
 }
 
@@ -624,7 +668,6 @@ function NotificationList({
               </span>
             </span>
           </button>
-          {/* زر الإخفاء النهائي — لا يفتح التفاصيل أبدًا (إيقاف التتابع) */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -646,7 +689,7 @@ function NotificationList({
 /* ===================== التوست اللحظي — للحدث الحي الجديد حصرًا ===================== */
 
 export function NotificationToasts() {
-  const { toast, dismissToast, markOne, dismiss, openDetail, detail, closeDetail } = useNotifications();
+  const { toast, dismissToast, dismiss, openDetail, detail, closeDetail } = useNotifications();
   const [stack, setStack] = useState<NotificationItem[]>([]);
   const seen = useRef<Set<string>>(new Set());
 
@@ -666,7 +709,6 @@ export function NotificationToasts() {
       {stack.length > 0 && (
         <div className="pointer-events-none fixed bottom-4 left-4 z-90 flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
           {stack.map((t) => {
-            /* تحصين مزدوج: نص التوست صلب دائمًا — أي شكل ناقص لا يُسقط الصفحة */
             const rawMsg = t.message ?? "";
             const body = rawMsg.length > 90 ? `${rawMsg.slice(0, 90)}…` : rawMsg;
             const card = (
@@ -692,7 +734,6 @@ export function NotificationToasts() {
                 <button
                   className="block w-full text-right"
                   onClick={() => {
-                    /* النقر يفتح التفاصيل الكاملة — والرسالة تعلّم كمقروء تلقائيًا */
                     openDetail(t);
                     setStack((prev) => prev.filter((x) => x.id !== t.id));
                   }}
@@ -793,7 +834,6 @@ export function NotificationBell() {
             )}
           </div>
 
-          {/* التبويبان: الكل / غير المقروءة */}
           <div
             className="mx-1 mb-1 grid grid-cols-2 gap-1 rounded-xl p-1"
             style={{ background: "var(--bg-soft)" }}
