@@ -37,8 +37,8 @@ function isFixedElement(el: HTMLElement): boolean {
  * دليل التلميحات الذكية المزدوج:
  * 1. الوضع الثابت (`mode="inline"`): بطاقة إرشادية هادئة في موضعها للميزات البسيطة.
  * 2. الوضع التفاعلي الموجه (`mode="tour"`): جولة خطوة بخطوة تنتقل مع القارئ
- *    بين العناصر الفعلية الظاهرة (`selector`) مع تمرير سلس وإطار تسليط ضوء نحاسي،
- *    وعودة هادئة لأعلى الصفحة عند الانتهاء.
+ *    بين العناصر الفعلية الظاهرة (`selector`) مع تتبع تغير ارتفاع الصفحة (ResizeObserver)
+ *    حتى لا ينحرف الإطار عند تحميل عناصر غير متزامنة مثل الأجهزة المتصلة.
  */
 export function FirstVisitHint({
   id,
@@ -46,6 +46,7 @@ export function FirstVisitHint({
   text,
   mode = "inline",
   active = true,
+  scrollTopOnFinish = true,
   className = "",
 }: {
   id: string;
@@ -53,6 +54,7 @@ export function FirstVisitHint({
   text?: string;
   mode?: "inline" | "tour";
   active?: boolean;
+  scrollTopOnFinish?: boolean;
   className?: string;
 }) {
   const [visible, setVisible] = useState(false);
@@ -94,12 +96,17 @@ export function FirstVisitHint({
     try {
       window.localStorage.setItem(storageKey, "1");
     } catch {}
-    if (mode === "tour" && typeof window !== "undefined" && window.scrollY > 80) {
+    if (
+      mode === "tour" &&
+      scrollTopOnFinish &&
+      typeof window !== "undefined" &&
+      window.scrollY > 80
+    ) {
       try {
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch {}
     }
-  }, [storageKey, mode]);
+  }, [storageKey, mode, scrollTopOnFinish]);
 
   const measureTarget = useCallback(
     (shouldScroll: boolean) => {
@@ -121,8 +128,6 @@ export function FirstVisitHint({
       if (shouldScroll) {
         try {
           if (isFixedElement(el)) {
-            /* عناصر الهيدر العلوي فقط تعيد الصفحة للأعلى لتظهر؛
-               أما الشريط السفلي المثبت فيبقى في موضعه دون قفز للأعلى */
             const inTopHeader = Boolean(el.closest("header")) || el.getBoundingClientRect().top < 120;
             if (inTopHeader && window.scrollY > 80) {
               window.scrollTo({ top: 0, behavior: "smooth" });
@@ -130,7 +135,6 @@ export function FirstVisitHint({
           } else {
             const box = el.getBoundingClientRect();
             const vh = window.innerHeight || 800;
-            /* العناصر الطويلة جدًا (كجسم المقال) نمرر لبدايتها بدل منتصفها حتى لا نقفز لنصف المقال */
             if (box.height > vh * 0.65) {
               if (box.top < 60 || box.top > vh * 0.6) {
                 el.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
@@ -148,7 +152,6 @@ export function FirstVisitHint({
           return;
         }
         const vh = window.innerHeight || 800;
-        /* تقليم ارتفاع الإطار للعناصر الطويلة جدًا ليبقى أنيقًا داخل الشاشة */
         const clampedTop = Math.max(8, r.top);
         const clampedHeight = Math.min(r.height, vh - clampedTop - 88);
         setRect({
@@ -173,6 +176,11 @@ export function FirstVisitHint({
     const onUpdate = () => measureTarget(false);
     window.addEventListener("scroll", onUpdate, { passive: true, capture: true });
     window.addEventListener("resize", onUpdate, { passive: true });
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => measureTarget(false))
+        : null;
+    if (ro) ro.observe(document.body);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") dismiss();
     };
@@ -181,6 +189,7 @@ export function FirstVisitHint({
       if (typeof cleanup === "function") cleanup();
       window.removeEventListener("scroll", onUpdate, true);
       window.removeEventListener("resize", onUpdate);
+      ro?.disconnect();
       window.removeEventListener("keydown", onKey);
     };
   }, [visible, mode, active, measureTarget, dismiss]);

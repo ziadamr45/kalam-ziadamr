@@ -507,8 +507,6 @@ export function DiscussCompanion({
 
   const onInputKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
-    /* الإرسال بـ Enter فقط على الأجهزة ذات لوحة المفاتيح الفعلية والمؤشر الدقيق؛
-       على الهواتف والأجهزة اللوحية يضيف زر الإدخال سطرًا جديدًا بشكل طبيعي */
     const isDesktopKeyboard =
       typeof window !== "undefined" &&
       window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -645,7 +643,6 @@ export function DiscussCompanion({
                   </span>
                 )
               )}
-              {/* زر ملء الشاشة للتابلت والكمبيوتر (الهاتف يملأ الشاشة افتراضيًا) */}
               <button
                 type="button"
                 onClick={() => setFullscreen((f) => !f)}
@@ -690,6 +687,7 @@ export function DiscussCompanion({
                 id="ai-discuss"
                 mode="tour"
                 active={ready}
+                scrollTopOnFinish={false}
                 steps={[
                   {
                     selector: "[data-tour='discuss-input']",
