@@ -499,10 +499,15 @@ export function DiscussCompanion({
   };
 
   const onInputKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+    /* الإرسال بـ Enter فقط على الأجهزة ذات لوحة المفاتيح الفعلية والمؤشر الدقيق؛
+       على الهواتف والأجهزة اللوحية يضيف زر الإدخال سطرًا جديدًا بشكل طبيعي */
+    const isDesktopKeyboard =
+      typeof window !== "undefined" &&
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    if (!isDesktopKeyboard) return;
+    e.preventDefault();
+    send();
   };
 
   const arabicNum = (n: number) => new Intl.NumberFormat("ar-EG").format(n);
@@ -840,6 +845,7 @@ export function DiscussCompanion({
                     setError("");
                   }}
                   onKeyDown={onInputKey}
+                  enterKeyHint="enter"
                   rows={1}
                   disabled={exhausted || sending}
                   maxLength={1200}
