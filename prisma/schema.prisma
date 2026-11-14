@@ -472,7 +472,8 @@ model LegalPage {
 model ContactMessage {
   id        String   @id @default(cuid())
   name      String
-  email     String?\n  subject   String?
+  email     String?
+  subject   String?
   body      String   @db.Text
   ip        String?
   userAgent String?
