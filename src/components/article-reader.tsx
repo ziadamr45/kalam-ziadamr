@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { useSession } from "next-auth/react";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
+import { BrandMark } from "@/components/brand-mark";
 import { QuoteGenerator } from "@/components/quote-generator";
 import { ArticleBlocks } from "@/components/markdown-blocks";
 import { FirstVisitHint } from "@/components/first-visit-hint";
@@ -512,7 +513,7 @@ export function ArticleReader({
       />
 
       {article.coverImage && (
-        <div className="print-cover page-chrome mt-8 overflow-hidden rounded-2xl shadow-soft">
+        <div className="print-cover page-chrome relative mt-8 overflow-hidden rounded-2xl shadow-soft">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={article.coverImage}
@@ -520,6 +521,15 @@ export function ArticleReader({
             className="w-full object-cover"
             loading="eager"
           />
+          <div
+            className="no-print pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-2.5 py-1 backdrop-blur-xs"
+            aria-hidden
+          >
+            <BrandMark size={13} />
+            <span className="font-ui text-[11px] font-bold text-white/90">
+              كلام له لازمة
+            </span>
+          </div>
         </div>
       )}
 
