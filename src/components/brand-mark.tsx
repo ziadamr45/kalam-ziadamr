@@ -1,5 +1,5 @@
 /**
- * العلامة الميكروية الموحدة للمنصة — حرف الكاف والخط (شعار «كلام له لازمة»).
+ * العلامة الميكروية الموحدة للمنصة — حرف الكاف الهندسي والخط (شعار «كلام له لازمة» الأصلي).
  * SVG متزامن خفيف لا يضيف أي طلب شبكة، ويحافظ على نفس المقاسات في الهيدر والنوافذ.
  */
 export function BrandMark({
@@ -25,27 +25,19 @@ export function BrandMark({
       aria-hidden
       style={{ flexShrink: 0 }}
     >
-      {/* جسم حرف الكاف */}
+      {/* حرف الكاف الهندسي الأصلي */}
       <path
-        d="M92 22 L92 66 Q92 84 70 84 L40 84 Q25 84 24 70"
+        d="M95 30 L67 43 Q56 48.5 62 58 L75 76 Q82 88 68 88 L29 88"
         stroke={color}
         strokeWidth="10.5"
-        strokeLinecap="round"
+        strokeLinecap="butt"
         strokeLinejoin="round"
       />
-      {/* شارة الكاف الداخلية */}
+      {/* خط اللازمة السفلي */}
       <path
-        d="M63 36 C53 36 49 44 57 47 C64 50 58 59 47 59"
+        d="M81 116 L47 116"
         stroke={color}
-        strokeWidth="7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* خط اللازمة أسفل الكاف */}
-      <path
-        d="M94 103 L34 103"
-        stroke={color}
-        strokeWidth="9"
+        strokeWidth="4.4"
         strokeLinecap="round"
       />
     </svg>
