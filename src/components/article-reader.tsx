@@ -312,28 +312,31 @@ export function ArticleReader({
           borderColor: "var(--border)",
         }}
       >
-        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-0.5 sm:gap-3">
+        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1.5 sm:gap-3">
           {tashkeelAllowed && (
-            <button
-              onClick={toggleTashkeel}
-              role="switch"
-              aria-checked={tashkeel}
-              className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
-              title="تبديل النص المشكول بالحركات الكاملة"
-            >
-              <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
-                تشكيل
-              </span>
-              <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
-                <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
-              </span>
-            </button>
+            <>
+              <button
+                onClick={toggleTashkeel}
+                role="switch"
+                aria-checked={tashkeel}
+                className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
+                title="تبديل النص المشكول بالحركات الكاملة"
+              >
+                <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
+                  تشكيل
+                </span>
+                <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
+                  <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
+                </span>
+              </button>
+              <span className="h-4 w-px shrink-0 sm:hidden" style={{ background: "var(--border)" }} aria-hidden />
+            </>
           )}
 
-          <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
+          <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-start sm:gap-1">
             <button
               onClick={() => setShowSummary((v) => !v)}
-              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-1.5 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
             >
               <span className="sm:hidden">المختصر</span>
@@ -345,11 +348,11 @@ export function ArticleReader({
                 onClick={() => setSaveMenuOpen((v) => !v)}
                 aria-expanded={saveMenuOpen}
                 aria-haspopup="menu"
-                className={`min-h-11 whitespace-nowrap rounded-full px-1.5 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
+                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
                 style={{ color: anySaved ? "var(--accent-strong)" : "var(--ink-muted)" }}
                 title="خيارات الحفظ: في حسابك متزامنًا، أو على هذا الجهاز دون إنترنت"
               >
-                <span className="sm:hidden">{anySaved ? "محفوظ" : "حفظ"}</span>
+                <span className="sm:hidden">{anySaved ? "محفوظ ✓" : "حفظ"}</span>
                 <span className="hidden sm:inline">{anySaved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
               </button>
 
@@ -428,7 +431,7 @@ export function ArticleReader({
             <button
               type="button"
               onClick={() => window.print()}
-              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-1.5 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}
               title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
             >
@@ -465,14 +468,25 @@ export function ArticleReader({
               المختصر المفيد
             </p>
             <ul className="space-y-2.5">
-              {summaryPoints.map((point, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
-                  <span className="font-body leading-9" style={{ color: "var(--ink)" }}>
-                    {point}
-                  </span>
-                </li>
-              ))}
+              {summaryPoints.map((point, i) => {
+                const colonIdx = point.indexOf(":");
+                const hasLabel = colonIdx > 0 && colonIdx <= 28;
+                const label = hasLabel ? point.slice(0, colonIdx) : null;
+                const body = hasLabel ? point.slice(colonIdx + 1).trim() : point;
+                return (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <span className="font-body leading-9" style={{ color: "var(--ink)" }}>
+                      {label && (
+                        <strong className="font-ui ml-1.5 text-sm font-bold" style={{ color: "var(--accent-strong)" }}>
+                          {label}:
+                        </strong>
+                      )}
+                      {body}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
