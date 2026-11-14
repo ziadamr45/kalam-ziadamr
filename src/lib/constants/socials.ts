@@ -64,12 +64,12 @@ export const SOCIAL_LABELS: Record<SocialKey, string> = {
   linkedin: "لينكد إن",
 };
 
-/** الحزمة الرسمية المعتمدة — كل منصات صاحب المنصة في مكان واحد */
+/** الحزمة الرسمية المعتمدة — البريد الرسمي للمنصة kalamlaholazma@gmail.com */
 export const SOCIAL_LINKS: Record<SocialKey, string> = {
   facebook: "https://www.facebook.com/ziadamr.me",
   whatsapp: "https://wa.me/+201152978155",
   telegram: "https://t.me/ziadamr",
-  email: "mailto:ziad90216@gmail.com",
+  email: "mailto:kalamlaholazma@gmail.com",
   youtube: "https://youtube.com/@alhayat_ala_eltarek?si=pcsc_31Kcv3Jym14",
   instagram: "https://www.instagram.com/ziadamr.me/",
   threads: "https://www.threads.com/@ziadamr.me",
