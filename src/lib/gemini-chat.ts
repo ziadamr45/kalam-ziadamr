@@ -1,8 +1,8 @@
 /**
  * عميل Gemini النصي — المنصة العامة (يعمل حصريًا على السيرفر).
  *
- * - النموذج المعتمد رسميًا: gemini-3.5-flash-lite (فائق السرعة، خفيف التكلفة).
- * - بدائل احتياطية إن تقاعد الاسم أو لم يتوفر للمفتاح + تراجع أُسّي على 429/5xx.
+ * - النموذج الأساسي: gemini-3.5-flash-lite (سريع جدًا وبحدود استخدام واسعة تتحمل الضغط).
+ * - بدائل احتياطية حديثة إن لم يتوفر الاسم أو عند التراجع الأُسّي.
  * - لا يغادر المفتاح بيئة الخادم أبدًا.
  */
 
@@ -13,8 +13,8 @@ const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 const CHAT_CANDIDATES = [
   process.env.GEMINI_CHAT_MODEL,
   "gemini-3.5-flash-lite",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3.8-flash",
 ].filter(Boolean) as string[];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -118,7 +118,6 @@ export async function geminiChat(opts: {
           .trim();
 
         if (!text) {
-          /* SAFETY: النموذج حجب الطلب — نعامله كرفض مهذب لا كعطل */
           if (json.promptFeedback?.blockReason) {
             return "";
           }
@@ -128,7 +127,7 @@ export async function geminiChat(opts: {
       } catch (err) {
         lastErr = err;
         const status = err instanceof GeminiError ? err.status : 0;
-        if (status === 404) break; // الموديل التالي فورًا
+        if (status === 404) break;
         if (status === 401 || status === 403) throw err;
         if (attempt < 3) await sleep(800 * Math.pow(2, attempt - 1) + Math.random() * 300);
       } finally {
@@ -141,7 +140,7 @@ export async function geminiChat(opts: {
   throw new GeminiError("تعذر الاتصال بخدمة الذكاء الاصطناعي", 502);
 }
 
-/** استخراج JSON من رد النموذج (مع تحمّل أسوار الماركداون الاحتياطية) */
+/** استخراج JSON من رد النموذج */
 export function extractJson<T>(raw: string): T | null {
   const cleaned = raw
     .replace(/^```(?:json)?\s*/i, "")
