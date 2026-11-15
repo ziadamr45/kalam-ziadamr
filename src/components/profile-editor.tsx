@@ -229,6 +229,30 @@ export function ProfileEditor({
             {imageUrl ? "صورة مخصصة" : googleImage ? "صورة Google الحالية" : "لا صورة بعد"}
           </p>
 
+          {/* تنبيه فوري أسفل الصورة على الهاتف حتى يراه المستخدم دون الحاجة للنزول لأسفل */}
+          {message && (
+            <div
+              className="mt-1 flex w-full flex-col items-center gap-2 rounded-2xl px-3.5 py-2.5 text-center text-xs font-bold leading-6 sm:hidden"
+              style={{
+                background: message.ok ? "var(--accent-soft)" : "rgba(220,38,38,0.08)",
+                color: message.ok ? "var(--accent-strong)" : "#DC2626",
+              }}
+            >
+              <span>{message.text}</span>
+              {dirty && (
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={busy || uploading}
+                  className="rounded-full px-5 py-1.5 text-xs font-bold shadow-soft transition-all active:scale-95 disabled:opacity-50"
+                  style={{ background: "var(--accent)", color: "#fff" }}
+                >
+                  {busy ? "جارٍ الحفظ.." : "حفظ التغييرات"}
+                </button>
+              )}
+            </div>
+          )}
+
           <input
             ref={inputRef}
             type="file"
