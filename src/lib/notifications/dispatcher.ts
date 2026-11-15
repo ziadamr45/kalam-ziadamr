@@ -546,6 +546,7 @@ export async function dispatchAdminEvent(input: {
   metadata?: Record<string, unknown> | null;
   pushTag?: string;
   emergencyEmail?: boolean;
+  skipDevicePush?: boolean;
 }): Promise<void> {
   const ownerId = await getOwnerUserId();
   if (ownerId) {
@@ -562,6 +563,7 @@ export async function dispatchAdminEvent(input: {
       forceEmail: input.emergencyEmail,
     }).catch(() => {});
   }
+  if (input.skipDevicePush) return;
   try {
     await pushAdmins({
       title: input.title.slice(0, 120),

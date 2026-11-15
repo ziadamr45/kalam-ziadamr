@@ -170,10 +170,7 @@ export async function POST(request: Request) {
 
     const trimmed = content.trim();
 
-    /* ============ «اعتماد التعليقات تلقائيًا» — المفتاح الحي من لوحة الأدمن ============
-       الاعتماد الآمن فقط: تعليق نظيف من الفلترة الأخلاقية والرقابة AI وخطورة منخفضة.
-       المُعلَّم بالفلترة أو ذو الخطورة المرتفعة يبقى PENDING للمراجعة البشرية مهما
-       كان المفتاح — فالأتمتة لا تتجاوز الحارس أبدًا. */
+    /* ============ «اعتماد التعليقات تلقائيًا» — المفتاح الحي من لوحة الأدمن ============\n       الاعتماد الآمن فقط: تعليق نظيف من الفلترة الأخلاقية والرقابة AI وخطورة منخفضة.\n       المُعلَّم بالفلترة أو ذو الخطورة المرتفعة يبقى PENDING للمراجعة البشرية مهما\n       كان المفتاح — فالأتمتة لا تتجاوز الحارس أبدًا. */
     const autoApprove = await readAutoApprove();
     const autoApproved = autoApprove && !verdict.flagged && verdict.riskScore < 0.4;
 
@@ -198,10 +195,7 @@ export async function POST(request: Request) {
       } catch {}
     }
 
-    /* ============ «التعليق الهادف المعتمد» +2 نقطة أثر ============
-       تُمنح للتعليق الذي اجتاز الفلترة الأخلاقية متعددة المستويات أعلاه
-       واستوفى شروط الطول والمضمون (40 حرفًا فأكثر، بخطورة منخفضة)،
-       بسقف يومي 3 تعليقات محتسبة حمايةً من تربية النقاط. */
+    /* ============ «التعليق الهادف المعتمد» +2 نقطة أثر ============\n       تُمنح للتعليق الذي اجتاز الفلترة الأخلاقية متعددة المستويات أعلاه\n       واستوفى شروط الطول والمضمون (40 حرفًا فأكثر، بخطورة منخفضة)،\n       بسقف يومي 3 تعليقات محتسبة حمايةً من تربية النقاط. */
     let impact: Awaited<ReturnType<typeof awardImpact>> | null = null;
     if (trimmed.length >= 40 && verdict.riskScore < 0.4) {
       try {
@@ -218,16 +212,21 @@ export async function POST(request: Request) {
       }
     }
 
-    /* حدث سيادة: تعليق جديد وارد — سجل موحد لحساب المالك (جرس اللوحة) + رنين هواتف الإدارة */
+    /* حدث سيادة: تعليق جديد وارد — إن اعتُمد آليًا بدون اشتباه يُرصد في الجرس داخل
+       المنصة فقط دون رنين لهاتف الأدمن، أما التعليق المشتبه به أو المعلق للمراجعة
+       فيُبث فورًا لهاتف الإدارة. */
     void dispatchAdminEvent({
       type: "ADMIN_NEW_COMMENT",
-      title: `تعليق جديد وارد على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
+      title: autoApproved
+        ? `تعليق منشور آليًا على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`
+        : `تعليق بانتظار المراجعة على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
       message: `${session.user.name ?? "قارئ"}: ${trimmed.slice(0, 110)}${
         trimmed.length > 110 ? "…" : ""
       }`,
       link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments`,
       pushTag: "new-comment",
-      metadata: { articleId, authorEmail: session.user.email ?? null },
+      skipDevicePush: autoApproved,
+      metadata: { articleId, authorEmail: session.user.email ?? null, autoApproved },
     });
 
     return NextResponse.json({

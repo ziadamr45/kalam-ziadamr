@@ -16,20 +16,17 @@ import { publicIdFromCloudinaryUrl, destroyCloudinaryImage } from "@/lib/cloudin
  * - سجلات تفاعله بالمقالات (Reaction/Interaction)
  * - رصيده وسجل أثره كاملًا (ImpactLedger/ImpactLog)
  * - محفوظاته السحابية (SavedArticle) ومواضع استئناف قراءته
- * - حصص نقاشه مع الذكاء الاصطناعي (AiDiscussionUsage)
+ * - حصص ورسائل نقاشه مع الذكاء الاصطناعي (AiDiscussionUsage)
+ * - سجل بحثه (SearchHistory)
  * - مقترحاته في قناة أهل الكلمة (UserProposal)
  * - إشعاراته وتفضيلاتها (Notification) واشتراكاته بالبث الفوري
- * - جلساته وأجهزته المسجلة وروابط Google (Session, Account)
+ * - جلساته وأجهزته المسجلة وروابط Google (Session, Account, UserDevice)
+ * - إزالة البريد والـ IP من سجلات الدخول (LoginLog)
  * - وأخيرًا سجله الأساسي (User) — ويليه كل المتبقي بالتتالي
  *
  * ويُكتب قيد التدقيق في AuditTrail داخل المعاملة نفسها: لا يُمحى
  * الحساب إلا أن يُوثق محوه (بلا أي معرِّف شخصي بعد الحذف — سياسة
  * الاحتفاظ القانوني بسجل الامتثال غير المعرّف).
- *
- * بعدها: حذف صوره الشخصية من مزود التخزين السحابي فورًا، وإعادة
- * صياغة صفحات المقالات التي ظهرت فيها تعليقاته حتى يختفي أثرها لحظةً.
- * ملاحظة سياسة: سجل الدخول LoginLog يبقى منقّى من هوية المستخدم
- * (SetNull) كدليل امتثال غير معرّف وفق نص سياسة الخصوصية.
  */
 
 export async function DELETE(request: Request) {
@@ -115,6 +112,10 @@ export async function DELETE(request: Request) {
       await tx.userProposal.deleteMany({ where: { userId: uid } });
       await tx.userNotification.deleteMany({ where: { userId: uid } });
       await tx.userPushSubscription.deleteMany({ where: { userId: uid } });
+      await tx.loginLog.updateMany({
+        where: { OR: [{ userId: uid }, ...(user.email ? [{ email: user.email }] : [])] },
+        data: { userId: null, email: null, ip: null },
+      });
       await tx.session.deleteMany({ where: { userId: uid } });
       await tx.account.deleteMany({ where: { userId: uid } });
       await tx.user.delete({ where: { id: uid } });
