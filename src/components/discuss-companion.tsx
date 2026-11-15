@@ -322,7 +322,7 @@ export function DiscussCompanion({
         setLimit(data.limit);
         setExhausted(!data.unlimited && data.remaining <= 0);
         setUnlimited(data.unlimited === true || data.remaining > 1_000_000);
-        if (Array.isArray(data.messages)) {
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
           const synced = data.messages.slice(-40);
           setMessages(synced);
           persistSession(synced, data.remaining);
