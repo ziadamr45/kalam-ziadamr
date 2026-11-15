@@ -163,19 +163,19 @@ export function Footer({
 
   return (
     <footer className="site-footer mt-auto border-t" style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}>
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-3">
+      <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-9">
+        <div className="grid gap-6 sm:grid-cols-2 sm:gap-8 md:grid-cols-3">
           <div>
             <p className="font-ui text-xl font-bold" style={{ color: "var(--ink)" }}>
               كلام له لازمة
             </p>
-            <p className="mt-2 max-w-sm text-sm leading-7" style={{ color: "var(--ink-muted)" }}>
+            <p className="mt-1.5 max-w-sm text-sm leading-7" style={{ color: "var(--ink-muted)" }}>
               مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.
               <br />
               منصة فكرية نقية: بلا ضجيج، بلا إعلانات، بلا حشو.
             </p>
             {/* منصات صاحب المنصة — مجمّعة ومتوازنة */}
-            <div className="mt-5">
+            <div className="mt-4">
               <div className="grid max-w-[236px] grid-cols-5 gap-2">
                 {platformGroup.map((s) => (
                   <SocialChip key={s.key} s={s} />
@@ -183,7 +183,7 @@ export function Footer({
               </div>
               {devGroup.length > 0 && (
                 <>
-                  <div className="mt-4 mb-2.5 flex items-center gap-2">
+                  <div className="mt-3 mb-2 flex items-center gap-2">
                     <span className="h-px w-8" style={{ background: "var(--border)" }} />
                     <span className="text-[11px] font-medium" style={{ color: "var(--ink-muted)" }}>
                       روابط المطوّر
@@ -200,10 +200,10 @@ export function Footer({
           </div>
 
           <div>
-            <p className="mb-3 text-sm font-semibold" style={{ color: "var(--ink)" }}>
+            <p className="mb-2.5 text-sm font-semibold" style={{ color: "var(--ink)" }}>
               الأقسام
             </p>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-2 text-sm">
               {sections.map((s) => (
                 <li key={s.slug}>
                   <Link
@@ -219,10 +219,10 @@ export function Footer({
           </div>
 
           <div>
-            <p className="mb-3 text-sm font-semibold" style={{ color: "var(--ink)" }}>
+            <p className="mb-2.5 text-sm font-semibold" style={{ color: "var(--ink)" }}>
               المنصة والسياسات
             </p>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/about" className="transition-colors hover:text-(--accent)" style={{ color: "var(--ink-muted)" }}>
                   فلسفتنا ومعايير النشر
@@ -258,7 +258,7 @@ export function Footer({
         </div>
 
         <div
-          className="mt-10 border-t pt-6 text-center text-xs leading-6"
+          className="mt-7 border-t pt-5 text-center text-xs leading-6"
           style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
         >
           {footerText}

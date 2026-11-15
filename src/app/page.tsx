@@ -83,7 +83,7 @@ export default async function HomePage() {
         />
 
         {/* البطل — الهوية والشعار المندمج */}
-        <section className="relative overflow-hidden pt-22 pb-14 text-center sm:pt-28 sm:pb-20">
+        <section className="relative overflow-hidden pt-22 pb-10 text-center sm:pt-28 sm:pb-14">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 top-0 h-72 opacity-60"
@@ -96,7 +96,7 @@ export default async function HomePage() {
             <h1 className="font-body text-4xl font-bold leading-[1.6] sm:text-5xl sm:leading-[1.6]" style={{ color: "var(--ink)" }}>
               {cfg?.SITE_NAME ?? "كلام له لازمة"}
             </h1>
-            <div className="mx-auto my-6 h-[3px] w-24 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
+            <div className="mx-auto my-5 h-[3px] w-24 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
             <p className="font-body text-xl leading-9 sm:text-2xl sm:leading-10" style={{ color: "var(--ink-muted)" }}>
               {(cfg?.WELCOME_MESSAGE ?? "مش كل كلام لازم يتقال.. بس فيه كلام له لازمة.").split("\n").map((line, i) => (
                 <span key={i}>
@@ -104,9 +104,6 @@ export default async function HomePage() {
                   {line}
                 </span>
               ))}
-            </p>
-            <p className="font-ui mt-8 text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
-              منصة فكرية ومعرفية عربية.. نقية من الضجيج، غنية بالعمق.
             </p>
           </div>
         </section>

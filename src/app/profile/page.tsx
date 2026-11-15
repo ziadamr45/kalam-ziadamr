@@ -249,45 +249,49 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                   </svg>
                 </Link>
-                {user.isVerified && (() => {
-                  const sealColor = verificationSealColor(user.verificationType);
-                  const sealLabel = verificationSealLabel(user.verificationType, user.verificationLabel);
-                  return (
+              </div>
+              {(user.isVerified || (user.isVip && user.vipBadgeTitle)) && (
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  {user.isVerified && (() => {
+                    const sealColor = verificationSealColor(user.verificationType);
+                    const sealLabel = verificationSealLabel(user.verificationType, user.verificationLabel);
+                    return (
+                      <span
+                        className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                        style={{
+                          background: `${sealColor}1f`,
+                          color: sealColor,
+                          border: `1px solid ${sealColor}55`,
+                        }}
+                        title={`حساب موثّق رسميًا — ${sealLabel}${user.verifiedAt ? ` منذ ${formatArabicDate(user.verifiedAt)}` : ""}`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                          <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+                          <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                        </svg>
+                        {sealLabel}
+                      </span>
+                    );
+                  })()}
+                  {user.isVip && user.vipBadgeTitle && (
                     <span
                       className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
                       style={{
-                        background: `${sealColor}1f`,
-                        color: sealColor,
-                        border: `1px solid ${sealColor}55`,
+                        background: `${user.vipBadgeColor || "#7C3AED"}1f`,
+                        color: user.vipBadgeColor || "#7C3AED",
+                        border: `1px solid ${user.vipBadgeColor || "#7C3AED"}55`,
                       }}
-                      title={`حساب موثّق رسميًا — ${sealLabel}${user.verifiedAt ? ` منذ ${formatArabicDate(user.verifiedAt)}` : ""}`}
+                      title={user.vipReason ? `عضوية مميزة: ${user.vipReason}` : "عضوية مميزة"}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                        <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
-                        <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <path d="M12 2l2.6 6.2L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.4-.8L12 2z" />
                       </svg>
-                      {sealLabel}
+                      {user.vipBadgeTitle}
                     </span>
-                  );
-                })()}
-                {user.isVip && user.vipBadgeTitle && (
-                  <span
-                    className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
-                    style={{
-                      background: `${user.vipBadgeColor || "#7C3AED"}1f`,
-                      color: user.vipBadgeColor || "#7C3AED",
-                      border: `1px solid ${user.vipBadgeColor || "#7C3AED"}55`,
-                    }}
-                    title={user.vipReason ? `عضوية مميزة: ${user.vipReason}` : "عضوية مميزة"}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <path d="M12 2l2.6 6.2L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.4-.8L12 2z" />
-                    </svg>
-                    {user.vipBadgeTitle}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 truncate text-sm" dir="ltr" style={{ color: "var(--ink-muted)" }}>
+                  )}
+                </div>
+              )}
+              <p className="mt-1.5 truncate text-sm" dir="ltr" style={{ color: "var(--ink-muted)" }}>
                 {user.email}
               </p>
               <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs sm:justify-start" style={{ color: "var(--ink-muted)" }}>
