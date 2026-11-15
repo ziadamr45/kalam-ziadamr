@@ -32,7 +32,7 @@ export default async function ContactPage() {
     <>
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-4 pb-24 pt-28 sm:px-6">
+        <section className="mx-auto max-w-3xl px-4 pb-20 pt-20 sm:px-6 sm:pb-24 sm:pt-24">
           <header className="page-chrome text-center">
             <h1 className="font-body text-3xl font-bold leading-[1.8] sm:text-4xl" style={{ color: "var(--ink)" }}>
               اتصل بنا

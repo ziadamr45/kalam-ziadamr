@@ -83,7 +83,7 @@ export default async function HomePage() {
         />
 
         {/* البطل — الهوية والشعار المندمج */}
-        <section className="relative overflow-hidden pt-32 pb-20 text-center">
+        <section className="relative overflow-hidden pt-22 pb-14 text-center sm:pt-28 sm:pb-20">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 top-0 h-72 opacity-60"

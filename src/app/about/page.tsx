@@ -23,7 +23,7 @@ export default function AboutPage() {
     <>
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-4 pt-32 pb-8 text-center sm:px-6">
+        <section className="mx-auto max-w-3xl px-4 pt-20 pb-6 text-center sm:px-6 sm:pt-24 sm:pb-8">
           <h1 className="font-body text-4xl font-bold leading-[1.6]" style={{ color: "var(--ink)" }}>
             عن المنصة
           </h1>

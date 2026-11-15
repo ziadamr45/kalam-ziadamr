@@ -143,7 +143,7 @@ export default async function ArticlePage({
       <ContinueReadingBadge slug={article.slug} articleId={article.id} />
 
       <main className="flex-1">
-        <article id="printable-article" className="mx-auto max-w-3xl px-4 pt-28 pb-28 sm:px-6">
+        <article id="printable-article" className="mx-auto max-w-3xl px-4 pt-22 pb-24 sm:px-6 sm:pt-28 sm:pb-28">
           <PrintMasthead url={articleFullUrl} />
 
           <div className="print-only print-cover-page" aria-hidden>

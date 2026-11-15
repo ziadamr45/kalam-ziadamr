@@ -61,7 +61,7 @@ export default async function SectionPage({
     <>
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-5xl px-4 pt-32 pb-10 text-center sm:px-6">
+        <section className="mx-auto max-w-5xl px-4 pt-22 pb-8 text-center sm:px-6 sm:pt-28 sm:pb-10">
           <h1 className="font-body text-4xl font-bold leading-[1.6]" style={{ color: "var(--ink)" }}>
             {name}
           </h1>
