@@ -86,7 +86,7 @@ export async function PUT(request: Request) {
         const allowedHosts = ["res.cloudinary.com", "lh3.googleusercontent.com"];
         if (!allowedHosts.includes(imgHost)) {
           return NextResponse.json(
-            { error: "صورة الملف الشخصي تُقبل من رفع المنصة (Cloudinary) أو صورة Google فقط" },
+            { error: "صورة الملف الشخصي تُقبل من رفع المنصة أو صورة Google فقط" },
             { status: 400 },
           );
         }

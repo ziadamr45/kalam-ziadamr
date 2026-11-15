@@ -215,7 +215,7 @@ export function ProfileEditor({
             </button>
           )}
           <p className="text-center text-[10px] leading-5" style={{ color: "var(--ink-muted)" }}>
-            {imageUrl ? "صورة مخصصة (Cloudinary)" : googleImage ? "صورة Google الحالية" : "لا صورة بعد"}
+            {imageUrl ? "صورة مخصصة" : googleImage ? "صورة Google الحالية" : "لا صورة بعد"}
           </p>
 
           <input
