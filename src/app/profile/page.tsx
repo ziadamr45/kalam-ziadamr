@@ -290,12 +290,18 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               <p className="mt-1 truncate text-sm" dir="ltr" style={{ color: "var(--ink-muted)" }}>
                 {user.email}
               </p>
-              <p className="mt-2 text-xs" style={{ color: "var(--ink-muted)" }}>
-                {roleLabelAr(user.role)} · قارئ معنا منذ {formatArabicDate(user.createdAt)} · رصيد أثرك{" "}
-                <strong style={{ color: "var(--accent-strong)" }}>
-                  {new Intl.NumberFormat("ar-EG").format(user.impactScore)}
-                </strong>
-              </p>
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs sm:justify-start" style={{ color: "var(--ink-muted)" }}>
+                <span>{roleLabelAr(user.role)}</span>
+                <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
+                <span>قارئ معنا منذ {formatArabicDate(user.createdAt)}</span>
+                <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
+                <span>
+                  رصيد أثرك{" "}
+                  <strong style={{ color: "var(--accent-strong)" }}>
+                    {new Intl.NumberFormat("ar-EG").format(user.impactScore)}
+                  </strong>
+                </span>
+              </div>
               {user.bio && (
                 <p className="font-body mt-3 text-sm leading-7" style={{ color: "var(--ink)" }}>
                   {user.bio}
@@ -540,7 +546,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                       ) : (
                         formatArabicDate(l.createdAt)
                       )}
-                      {l.article?.slug ? ` · ${formatArabicDate(l.createdAt)}` : ""}
+                      {l.article?.slug ? ` — ${formatArabicDate(l.createdAt)}` : ""}
                     </p>
                   </div>
                   <span
@@ -680,7 +686,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               <ul className="mt-4 space-y-2.5">
                 {loginLogs.map((l) => {
                   const dev = DEVICE_TYPE_LABEL[l.deviceType ?? ""] ?? "جهاز";
-                  const agent = [l.browser, l.os].filter(Boolean).join(" · ");
+                  const agent = [l.browser, l.os].filter(Boolean).join(" على ");
                   const loc = [l.city, l.country].filter(Boolean).join("، ");
                   return (
                     <li
@@ -693,7 +699,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                           {dev}{agent ? ` — ${agent}` : ""}
                         </p>
                         <p className="mt-0.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                          {formatArabicDate(l.createdAt)}{loc ? ` · ${loc}` : ""}
+                          {formatArabicDate(l.createdAt)}{loc ? ` — ${loc}` : ""}
                         </p>
                       </div>
                       {l.isNewDevice && (

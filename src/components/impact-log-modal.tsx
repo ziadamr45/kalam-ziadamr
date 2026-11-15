@@ -111,7 +111,7 @@ export function ImpactLogModal({ open, onClose }: { open: boolean; onClose: () =
             </h2>
             <p className="mt-0.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
               كل نقطة في رصيدك موثقة هنا — {total > 0 ? `${total} عملية` : "لا عمليات بعد"}
-              {typeof score === "number" ? ` · رصيدك الحالي ${new Intl.NumberFormat("ar-EG").format(score)} نقطة` : ""}
+              {typeof score === "number" ? ` — رصيدك الحالي ${new Intl.NumberFormat("ar-EG").format(score)} نقطة` : ""}
             </p>
           </div>
           <button

@@ -52,7 +52,7 @@ export function ArticleCard({ article, index = 0 }: { article: ArticleCardData; 
         style={{ color: "var(--ink-muted)" }}
       >
         {article.publishedAt && <span>{formatArabicDate(article.publishedAt)}</span>}
-        <span aria-hidden>·</span>
+        {article.publishedAt && <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />}
         <span>{formatReadingTime(article.readingTimeSec)}</span>
       </div>
     </Link>

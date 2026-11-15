@@ -309,7 +309,7 @@ export default function SavedClient() {
                           key={s.id}
                           title={s.title}
                           summary={s.summary}
-                          meta={`حُفظ في ${formatArabicDate(new Date(s.savedAt))}${s.sectionName ? ` · ${s.sectionName}` : ""} · ${formatReadingTime(s.readingTimeSec)}`}
+                          meta={`حُفظ في ${formatArabicDate(new Date(s.savedAt))}${s.sectionName ? ` — ${s.sectionName}` : ""} — ${formatReadingTime(s.readingTimeSec)}`}
                           href={`/article/${s.slug}`}
                           onRemove={() => void removeAccount(s.id)}
                           removeLabel="إزالة من الحساب"
@@ -364,7 +364,7 @@ export default function SavedClient() {
                           key={a.id}
                           title={a.title}
                           summary={a.summary}
-                          meta={`متاح دون إنترنت · ${formatReadingTime(a.readingTimeSec)}`}
+                          meta={`متاح دون إنترنت — ${formatReadingTime(a.readingTimeSec)}`}
                           href={`/article/${a.slug}`}
                           onRemove={() => void removeDevice(a.id)}
                           removeLabel="إزالة من الجهاز"

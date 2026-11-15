@@ -388,7 +388,7 @@ export default function SearchPalette({ hostDialog = false }: { hostDialog?: boo
 
               {/* تلميحات التنقل + الجسر إلى صفحة البحث الكاملة */}
               <div className="flex items-center justify-between border-t px-4 py-2 text-[11px]" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
-                <span>↑↓ للتنقل · Enter للفتح</span>
+                <span>↑↓ للتنقل — Enter للفتح</span>
                 <Link
                   href={searchHref}
                   onClick={() => setPaletteOpen(false)}

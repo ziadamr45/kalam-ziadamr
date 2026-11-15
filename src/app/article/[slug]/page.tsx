@@ -152,7 +152,7 @@ export default async function ArticlePage({
             )}
             <div className="print-cover-title">{article.title}</div>
             <div className="print-cover-meta">
-              فريق كلام له لازمة · {formatArabicDate(article.publishedAt)} · مدة القراءة المتوقعة:{" "}
+              فريق كلام له لازمة — {formatArabicDate(article.publishedAt)} — مدة القراءة المتوقعة:{" "}
               {formatReadingTime(article.readingTimeSec)}
             </div>
             <div className="print-cover-rule" aria-hidden />
@@ -196,11 +196,11 @@ export default async function ArticlePage({
             >
               {article.title}
             </h1>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:mt-5" style={{ color: "var(--ink-muted)" }}>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs sm:mt-5" style={{ color: "var(--ink-muted)" }}>
               <span>فريق كلام له لازمة</span>
-              <span aria-hidden>·</span>
+              <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
               <span>{formatArabicDate(article.publishedAt)}</span>
-              <span aria-hidden>·</span>
+              <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
               <span>مدة القراءة المتوقعة: {formatReadingTime(article.readingTimeSec)}</span>
             </div>
             <div className="mx-auto mt-5 h-[3px] w-16 rounded-full sm:mt-6" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
@@ -298,7 +298,7 @@ export default async function ArticlePage({
           <div className="print-only print-colophon" aria-hidden>
             <div className="print-colophon-ornament">✦</div>
             <p className="print-colophon-line">انتهت هذه النسخة — قراءة هادئة تكون لها لازمة</p>
-            <p className="print-colophon-brand">منصة كلام له لازمة · {article.title}</p>
+            <p className="print-colophon-brand">منصة كلام له لازمة — {article.title}</p>
             <p className="print-colophon-url">{`${siteUrl.replace(/^https?:\/\//, "")}/article/${article.slug}`}</p>
           </div>
         </article>

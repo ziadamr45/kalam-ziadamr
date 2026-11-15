@@ -196,7 +196,7 @@ export function DevicesPanel() {
                           style={{ background: "rgba(60,122,78,0.16)", color: "#3c7a4e" }}
                         >
                           <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "#3c7a4e" }} />
-                          هذا الجهاز (الجلسة الحالية) · نشط الآن
+                          هذا الجهاز (الجلسة الحالية) — نشط الآن
                         </span>
                       )}
                     </span>
