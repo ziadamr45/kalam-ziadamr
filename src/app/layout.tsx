@@ -7,6 +7,7 @@ import {
   Noto_Naskh_Arabic,
 } from "next/font/google";
 import "./globals.css";
+import "./print.css";
 import { Providers } from "@/components/providers";
 
 const amiri = Amiri({
