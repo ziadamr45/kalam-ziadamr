@@ -709,7 +709,10 @@ export async function POST(request: Request) {
     }
 
     const updatedMessages: StoredTurn[] = [
-      ...history,
+      ...history.map((m): StoredTurn => ({
+        role: m.role === "model" ? "model" : "user",
+        text: m.text,
+      })),
       { role: "user", text: message.trim() },
       { role: "model", text: reply },
     ].slice(-40);
