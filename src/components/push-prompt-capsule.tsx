@@ -10,15 +10,18 @@ import { pushSupported, subscribeToPush } from "@/lib/push-client";
  * شروط الظهور الصارمة:
  *  1) ممنوعة كليًا داخل صفحات قراءة المقالات الفردية (/article/*)
  *     — وتظهر فقط في الرئيسية وصفحة الحساب (مواضع تحميلها المدروسة).
- *  2) لا تظهر إن سبق تفعيل الإشعارات في هذا المتصفح أبدًا.
- *  3) لا تظهر إن رفض الزائر الإذن سابقًا (حالة denied من المتصفح نفسه).
- *  4) [لاحقًا] تهدئة 4 أيام كاملة قبل التذكير مجددًا.
- *  5) حد أقصى 3 مرات طوال عمر المتصفح — بعدها صمت أبدِ.
+ *  2) في الرئيسية: تنتظر انتهاء الجولة التفاعلية الأولى (kalam_tour_home-tour_v4)
+ *     حتى لا تتزاحم البطاقات أمام القارئ الجديد في أول زيارة.
+ *  3) لا تظهر إن سبق تفعيل الإشعارات في هذا المتصفح أبدًا.
+ *  4) لا تظهر إن رفض الزائر الإذن سابقًا (حالة denied من المتصفح نفسه).
+ *  5) [لاحقًا] تهدئة 4 أيام كاملة قبل التذكير مجددًا.
+ *  6) حد أقصى 3 مرات طوال عمر المتصفح — بعدها صمت أبدِ.
  */
 
 const LATER_TS_KEY = "kalam_push_later_ts";
 const PROMPT_COUNT_KEY = "kalam_push_prompt_count";
 const DONE_KEY = "kalam_push_done";
+const HOME_TOUR_KEY = "kalam_tour_home-tour_v4";
 const COOLDOWN_MS = 4 * 24 * 60 * 60 * 1000; // 4 أيام
 const MAX_PROMPTS = 3; // حد أقصى ثلاث مرات
 
@@ -33,7 +36,10 @@ export default function PushPromptCapsule() {
     if (pathname.startsWith("/article")) return;
 
     let alive = true;
-    (async () => {
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+    let cleanupTourListener: (() => void) | null = null;
+
+    const tryReveal = async () => {
       try {
         if (typeof window === "undefined") return;
         if (window.localStorage.getItem(DONE_KEY)) return;
@@ -64,10 +70,34 @@ export default function PushPromptCapsule() {
       } catch {
         /* كبسولة تزيين — أي عطل يصمت */
       }
-    })();
+    };
+
+    try {
+      const needsHomeTourFirst =
+        pathname === "/" && !window.localStorage.getItem(HOME_TOUR_KEY);
+      if (needsHomeTourFirst) {
+        const onTourFinished = (e: Event) => {
+          const detail = (e as CustomEvent<{ id?: string }>).detail;
+          if (detail?.id && detail.id !== "home-tour") return;
+          window.removeEventListener("kalam:tour-finished", onTourFinished);
+          delayTimer = setTimeout(() => {
+            if (alive) void tryReveal();
+          }, 450);
+        };
+        window.addEventListener("kalam:tour-finished", onTourFinished);
+        cleanupTourListener = () =>
+          window.removeEventListener("kalam:tour-finished", onTourFinished);
+      } else {
+        void tryReveal();
+      }
+    } catch {
+      void tryReveal();
+    }
 
     return () => {
       alive = false;
+      if (delayTimer) clearTimeout(delayTimer);
+      cleanupTourListener?.();
     };
   }, [pathname]);
 

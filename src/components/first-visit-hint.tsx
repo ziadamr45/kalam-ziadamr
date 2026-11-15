@@ -96,6 +96,11 @@ export function FirstVisitHint({
     try {
       window.localStorage.setItem(storageKey, "1");
     } catch {}
+    if (mode === "tour" && typeof window !== "undefined") {
+      try {
+        window.dispatchEvent(new CustomEvent("kalam:tour-finished", { detail: { id } }));
+      } catch {}
+    }
     if (
       mode === "tour" &&
       scrollTopOnFinish &&
@@ -106,7 +111,7 @@ export function FirstVisitHint({
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch {}
     }
-  }, [storageKey, mode, scrollTopOnFinish]);
+  }, [id, storageKey, mode, scrollTopOnFinish]);
 
   const measureTarget = useCallback(
     (shouldScroll: boolean) => {

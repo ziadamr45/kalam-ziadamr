@@ -104,6 +104,27 @@ export function ArticleReader({
   }, [tashkeelAllowed, tashkeel]);
 
   const [showSummary, setShowSummary] = useState(false);
+  const summaryBtnRef = useRef<HTMLButtonElement | null>(null);
+  const summaryPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showSummary) return;
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (summaryPanelRef.current?.contains(target)) return;
+      if (summaryBtnRef.current?.contains(target)) return;
+      setShowSummary(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSummary(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [showSummary]);
 
   const source = tashkeel ? article.contentWithTashkeel || article.content : article.content;
   const blocks = useMemo(() => parseBlocks(source), [source]);
@@ -348,7 +369,9 @@ export function ArticleReader({
 
           <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-center sm:gap-1">
             <button
+              ref={summaryBtnRef}
               onClick={() => setShowSummary((v) => !v)}
+              aria-expanded={showSummary}
               data-tour="summary-btn"
               className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
@@ -475,6 +498,7 @@ export function ArticleReader({
         aria-hidden={!showSummary}
       >
         <div
+          ref={summaryPanelRef}
           className="mx-auto max-w-3xl rounded-2xl border shadow-lift"
           style={showSummary ? { background: "var(--surface)", borderColor: "var(--border)" } : { borderColor: "transparent" }}
         >
