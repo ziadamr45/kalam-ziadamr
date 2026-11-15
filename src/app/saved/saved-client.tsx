@@ -25,7 +25,7 @@ type AccountSave = {
 
 type LibraryTab = "cloud" | "device";
 
-/* شارة الحالة البصرية — سحابة للحفظ السحابي، هاتف للقطة الجهاز */
+/* شارة الحالة البصرية — سحابة للحفظ السحابي، هاتف لنسخة الجهاز */
 function StateBadge({ kind }: { kind: "cloud" | "device" }) {
   const isCloud = kind === "cloud";
   return (
@@ -76,7 +76,7 @@ function SaveCard({
     <li className="rounded-2xl border p-5 shadow-soft sm:p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          {/* شارات الحالة الفورية: سحابة = الحساب المتزامن، هاتف = لقطة هذا الجهاز */}
+          {/* شارات الحالة الفورية: سحابة = الحساب المتزامن، هاتف = نسخة هذا الجهاز */}
           {badges && <div className="mb-2.5 flex flex-wrap items-center gap-1.5">{badges}</div>}
           <Link href={href} className="font-body text-lg font-bold leading-8 hover:underline" style={{ color: "var(--ink)" }}>
             {title}
@@ -136,7 +136,7 @@ export default function SavedClient() {
       .catch(() => setSaves([]));
   }, [status]);
 
-  /* محفوظات الجهاز (لقطة دون اتصال) */
+  /* محفوظات الجهاز (نسخ للقراءة دون اتصال) */
   const refreshDevice = useCallback(() => {
     getOfflineArticles()
       .then(setDevice)
@@ -149,7 +149,7 @@ export default function SavedClient() {
   const cloudIds = new Set((saves ?? []).map((s) => s.id));
   const deviceIds = new Set((device ?? []).map((a) => a.id));
 
-  /* إزالة من الحساب فقط — لا تمس لقطة الجهاز (فصل القناتين) */
+  /* إزالة من الحساب فقط — لا تمس نسخة الجهاز (فصل القناتين) */
   const removeAccount = async (id: string) => {
     setSaves((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
     await fetch("/api/saves", {
@@ -159,7 +159,7 @@ export default function SavedClient() {
     }).catch(() => {});
   };
 
-  /* إزالة لقطة الجهاز فقط — لا تمس مكتبة الحساب (فصل القناتين) */
+  /* إزالة نسخة الجهاز فقط — لا تمس مكتبة الحساب (فصل القناتين) */
   const removeDevice = async (id: string) => {
     await removeOfflineArticle(id);
     setDevice((prev) => (prev ? prev.filter((a) => a.id !== id) : prev));
@@ -173,19 +173,19 @@ export default function SavedClient() {
       const res = await fetch(`/api/offline-snapshot?id=${encodeURIComponent(id)}`);
       const data = (await res.json().catch(() => null)) as { snapshot?: OfflineArticle } | null;
       if (!res.ok || !data?.snapshot) {
-        setNote("تعذر تنزيل اللقطة الآن — أعد المحاولة");
+        setNote("تعذر تنزيل المقال الآن — أعد المحاولة");
       } else {
         await saveOfflineArticle(data.snapshot);
         refreshDevice();
-        setNote("نُزّلت اللقطة إلى هذا الجهاز — متاحة دون إنترنت");
+        setNote("نُزّل المقال إلى هذا الجهاز — متاح دون إنترنت");
       }
     } catch {
-      setNote("تعذر تنزيل اللقطة الآن — أعد المحاولة");
+      setNote("تعذر تنزيل المقال الآن — أعد المحاولة");
     }
     setBusyId(null);
   };
 
-  /* مزامنة لقطة جهاز مع مكتبة الحساب */
+  /* مزامنة مقال الجهاز مع مكتبة الحساب */
   const syncToAccount = async (id: string) => {
     setBusyId(id);
     setNote("");
@@ -224,7 +224,7 @@ export default function SavedClient() {
             {authPending
               ? "جارٍ التحميل.."
               : loggedIn
-                ? "قناتا حفظ مستقلتان: مكتبة حسابك المتزامنة عبر الأجهزة، ولقطات هذا الجهاز للقراءة دون إنترنت"
+                ? "قناتا حفظ مستقلتان: مكتبة حسابك المتزامنة عبر الأجهزة، ومقالات هذا الجهاز للقراءة دون إنترنت"
                 : "محفوظة داخل جهازك — سجّل الدخول لتتزامن عبر كل أجهزتك"}
           </p>
         </section>
@@ -346,9 +346,9 @@ export default function SavedClient() {
                 ) : device.length === 0 ? (
                   <div className="rounded-2xl border border-dashed p-8 text-center" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
                     <p className="font-body text-base leading-8">
-                      لم تُحفظ لقطات على هذا الجهاز بعد..
+                      لم تُحفظ مقالات على هذا الجهاز بعد..
                       <br />
-                      اضغط «حفظ» في أي مقال يلهث قلبك واختر «حفظ على هذا الجهاز».
+                      اضغط «حفظ» في أي مقال يعجبك واختر «حفظ على هذا الجهاز».
                     </p>
                   </div>
                 ) : (
@@ -360,7 +360,7 @@ export default function SavedClient() {
                           key={a.id}
                           title={a.title}
                           summary={a.summary}
-                          meta={`متاحة دون إنترنت · ${formatReadingTime(a.readingTimeSec)}`}
+                          meta={`متاح دون إنترنت · ${formatReadingTime(a.readingTimeSec)}`}
                           href={`/article/${a.slug}`}
                           onRemove={() => void removeDevice(a.id)}
                           removeLabel="إزالة من الجهاز"
@@ -387,7 +387,7 @@ export default function SavedClient() {
                                 <Link href="/auth/login?callback=/saved" className="underline" style={{ color: "var(--accent-strong)" }}>
                                   سجّل الدخول
                                 </Link>{" "}
-                                لمزامنتها مع حسابك
+                                لمزامنته مع حسابك
                               </p>
                             )
                           }
@@ -404,7 +404,7 @@ export default function SavedClient() {
                 <Link href="/auth/login?callback=/saved" className="underline" style={{ color: "var(--accent-strong)" }}>
                   سجّل الدخول بحساب Google
                 </Link>{" "}
-                لتحصل على مكتبة متزامنة تلاحظك أينما قرأت.
+                لتحصل على مكتبة متزامنة ترافقك أينما قرأت.
               </p>
             )}
           </section>

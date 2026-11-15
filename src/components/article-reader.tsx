@@ -11,6 +11,7 @@ import SearchJump from "@/components/search-jump";
 import { trackView, trackComplete, trackDwell } from "@/lib/analytics";
 import {
   saveOfflineArticle,
+  removeOfflineArticle,
   isArticleSaved,
 } from "@/lib/indexeddb";
 import { parseBlocks, blockWordCount, blockPlainWords } from "@/lib/content-blocks";
@@ -226,24 +227,40 @@ export function ArticleReader({
     const onDoc = (e: MouseEvent) => {
       if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) setSaveMenuOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSaveMenuOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [saveMenuOpen]);
 
   const handleSaveCloud = useCallback(async () => {
-    if (saveBusy || cloudSaved) return;
+    if (saveBusy) return;
     if (!loggedIn) {
       requestAuth({ kind: "save" });
       return;
     }
     setSaveBusy("cloud");
     try {
-      await fetch("/api/saves", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ articleId: article.id }),
-      });
-      setCloudSaved(true);
+      if (cloudSaved) {
+        const res = await fetch("/api/saves", {
+          method: "DELETE",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ articleId: article.id }),
+        });
+        if (res.ok) setCloudSaved(false);
+      } else {
+        const res = await fetch("/api/saves", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ articleId: article.id }),
+        });
+        if (res.ok) setCloudSaved(true);
+      }
     } catch {}
     setSaveBusy(null);
   }, [article.id, cloudSaved, saveBusy, loggedIn]);
@@ -261,23 +278,28 @@ export function ArticleReader({
   );
 
   const handleSaveLocal = useCallback(async () => {
-    if (saveBusy || localSaved) return;
+    if (saveBusy) return;
     setSaveBusy("local");
-    const snapshot: OfflineArticle = {
-      id: article.id,
-      slug: article.slug,
-      title: article.title,
-      summary: article.summary,
-      content: article.content,
-      contentWithTashkeel: article.contentWithTashkeel,
-      readingTimeSec: article.readingTimeSec,
-      audioUrl: article.audioUrl,
-      sectionName: null,
-      sectionSlug: null,
-    };
     try {
-      await saveOfflineArticle(snapshot);
-      setLocalSaved(true);
+      if (localSaved) {
+        await removeOfflineArticle(article.id);
+        setLocalSaved(false);
+      } else {
+        const snapshot: OfflineArticle = {
+          id: article.id,
+          slug: article.slug,
+          title: article.title,
+          summary: article.summary,
+          content: article.content,
+          contentWithTashkeel: article.contentWithTashkeel,
+          readingTimeSec: article.readingTimeSec,
+          audioUrl: article.audioUrl,
+          sectionName: null,
+          sectionSlug: null,
+        };
+        await saveOfflineArticle(snapshot);
+        setLocalSaved(true);
+      }
     } catch {}
     setSaveBusy(null);
   }, [article, localSaved, saveBusy]);
@@ -396,16 +418,16 @@ export function ArticleReader({
               {saveMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full left-3 right-3 mb-2 w-auto max-w-none rounded-2xl border p-2 shadow-lift animate-fade-in sm:left-auto sm:right-0 sm:w-76 sm:max-w-[calc(100vw-2rem)]"
+                  className="absolute bottom-full left-3 right-3 mb-2 max-h-[calc(100dvh-5.5rem)] w-auto max-w-none overflow-y-auto overscroll-contain rounded-2xl border p-2 shadow-lift animate-fade-in sm:left-auto sm:right-0 sm:w-80 sm:max-w-[calc(100vw-2rem)]"
                   style={{ background: "var(--surface)", borderColor: "var(--border)" }}
                 >
                   <button
                     role="menuitem"
                     onClick={() => void handleSaveCloud()}
-                    disabled={cloudSaved || saveBusy !== null}
-                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:opacity-65"
+                    disabled={saveBusy !== null}
+                    className="w-full cursor-pointer rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:cursor-wait disabled:opacity-65"
                   >
-                    <span className="flex items-center justify-between gap-2">
+                    <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                       <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: "var(--accent-strong)" }}>
                           <path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6.5 6.5 0 0 0-12.7 1.74A4 4 0 0 0 6 19.5h11.5z" />
@@ -417,16 +439,18 @@ export function ArticleReader({
                           <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
                             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                           </svg>
-                          جارٍ الحفظ…
+                          {cloudSaved ? "جارٍ الإلغاء…" : "جارٍ الحفظ…"}
                         </span>
                       ) : cloudSaved ? (
                         <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
                       ) : null}
                     </span>
                     <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                      {loggedIn
-                        ? "للوصول إليه من أي جهاز عند تسجيل الدخول"
-                        : "يتطلب تسجيل الدخول — سيُفتح باب الدخول"}
+                      {cloudSaved
+                        ? "محفوظ حاليًا في حسابك — اضغط لإلغاء الحفظ"
+                        : loggedIn
+                          ? "للوصول إليه من أي جهاز عند تسجيل الدخول"
+                          : "يتطلب تسجيل الدخول — سيُفتح باب الدخول"}
                     </span>
                   </button>
 
@@ -435,10 +459,10 @@ export function ArticleReader({
                   <button
                     role="menuitem"
                     onClick={() => void handleSaveLocal()}
-                    disabled={localSaved || saveBusy !== null}
-                    className="w-full rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:opacity-65"
+                    disabled={saveBusy !== null}
+                    className="w-full cursor-pointer rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:cursor-wait disabled:opacity-65"
                   >
-                    <span className="flex items-center justify-between gap-2">
+                    <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                       <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: "var(--accent-strong)" }}>
                           <rect x="7" y="2" width="10" height="20" rx="2" />
@@ -451,14 +475,16 @@ export function ArticleReader({
                           <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
                             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                           </svg>
-                          جارٍ الحفظ…
+                          {localSaved ? "جارٍ الإلغاء…" : "جارٍ الحفظ…"}
                         </span>
                       ) : localSaved ? (
                         <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
                       ) : null}
                     </span>
                     <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                      للقراءة في أي وقت بدون اتصال على هذا المتصفح
+                      {localSaved
+                        ? "محفوظ حاليًا على هذا الجهاز — اضغط لإلغاء الحفظ"
+                        : "للقراءة في أي وقت بدون اتصال على هذا المتصفح"}
                     </span>
                   </button>
                 </div>
