@@ -30,6 +30,16 @@ import { getSiteConfig } from "@/lib/site-config";
 import { formatArabicDate } from "@/lib/utils";
 import { formatReadingTime } from "@/lib/readingTime";
 
+const CLOUDINARY_UPLOAD_PREFIX = "https://res.cloudinary.com/e2umhdt0/image/upload/";
+const WATERMARK_TRANSFORM = "l_kalam:brand:watermark-pill,fl_relative,w_0.17,g_south_west,x_16,y_16/";
+
+function withCoverWatermark(url: string | null): string | null {
+  if (!url) return null;
+  if (!url.startsWith(CLOUDINARY_UPLOAD_PREFIX)) return url;
+  if (url.includes("l_kalam:brand:watermark-pill")) return url;
+  return `${CLOUDINARY_UPLOAD_PREFIX}${WATERMARK_TRANSFORM}${url.slice(CLOUDINARY_UPLOAD_PREFIX.length)}`;
+}
+
 export const revalidate = 3600;
 
 export async function generateStaticParams() {
@@ -104,6 +114,7 @@ export default async function ArticlePage({
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://kalam-ziadamr.vercel.app").replace(/\/$/, "");
   const articleFullUrl = `${siteUrl}/article/${encodeURIComponent(article.slug)}`;
+  const watermarkedPrintCover = withCoverWatermark(article.coverImage);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -145,10 +156,10 @@ export default async function ArticlePage({
               {formatReadingTime(article.readingTimeSec)}
             </div>
             <div className="print-cover-rule" aria-hidden />
-            {article.coverImage && (
+            {watermarkedPrintCover && (
               <div className="print-cover-figure">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={article.coverImage} alt="" />
+                <img src={watermarkedPrintCover} alt="" />
               </div>
             )}
             {article.summary.trim() && (
