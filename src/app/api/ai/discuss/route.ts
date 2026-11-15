@@ -713,8 +713,8 @@ export async function POST(request: Request) {
         role: m.role === "model" ? "model" : "user",
         text: m.text,
       })),
-      { role: "user", text: message.trim() },
-      { role: "model", text: reply },
+      { role: "user" as const, text: message.trim() },
+      { role: "model" as const, text: reply },
     ].slice(-40);
 
     let usedAfter = used + 1;
