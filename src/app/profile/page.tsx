@@ -575,9 +575,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             </ul>
           )}
 
-          <p className="mt-6 text-center text-[11px]" style={{ color: "var(--ink-muted)" }}>
-            كل تعليق يمرّ بفلترة أخلاقية من ثلاث مستويات — {approvedCount > 0 ? `و${approvedCount} من تعليقاتك هنا منشورة` : "المراجعة تحمي مساحة الحوار للجميع"}.
-          </p>
+          {approvedCount > 0 && (
+            <p className="mt-6 text-center text-[11px]" style={{ color: "var(--ink-muted)" }}>
+              نُشر {new Intl.NumberFormat("ar-EG").format(approvedCount)} من تعليقاتك هنا.
+            </p>
+          )}
         </section>
           </>
         )}
