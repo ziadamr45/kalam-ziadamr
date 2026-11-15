@@ -110,19 +110,11 @@ export function ArticleReader({
 
   useEffect(() => {
     if (!showSummary) return;
-    const onDoc = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (summaryPanelRef.current?.contains(target)) return;
-      if (summaryBtnRef.current?.contains(target)) return;
-      setShowSummary(false);
-    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setShowSummary(false);
     };
-    document.addEventListener("mousedown", onDoc);
     window.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
       window.removeEventListener("keydown", onKey);
     };
   }, [showSummary]);
@@ -224,16 +216,11 @@ export function ArticleReader({
 
   useEffect(() => {
     if (!saveMenuOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) setSaveMenuOpen(false);
-    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSaveMenuOpen(false);
     };
-    document.addEventListener("mousedown", onDoc);
     window.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
       window.removeEventListener("keydown", onKey);
     };
   }, [saveMenuOpen]);
@@ -360,6 +347,19 @@ export function ArticleReader({
 
   return (
     <div className={`relative ${tashkeelAllowed ? "tashkeel-ok" : ""}`}>
+      {(showSummary || saveMenuOpen) && (
+        <div
+          aria-hidden
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowSummary(false);
+            setSaveMenuOpen(false);
+          }}
+          className="page-chrome no-print fixed inset-0 z-35"
+        />
+      )}
+
       <div
         className="page-chrome no-print fixed bottom-0 left-0 right-0 z-40 border-t px-2 py-2 backdrop-blur-md sm:px-3"
         style={{
@@ -392,7 +392,10 @@ export function ArticleReader({
           <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-center sm:gap-1">
             <button
               ref={summaryBtnRef}
-              onClick={() => setShowSummary((v) => !v)}
+              onClick={() => {
+                setSaveMenuOpen(false);
+                setShowSummary((v) => !v);
+              }}
               aria-expanded={showSummary}
               data-tour="summary-btn"
               className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
@@ -404,7 +407,10 @@ export function ArticleReader({
 
             <div ref={saveMenuRef} className="shrink-0 sm:relative" data-tour="save-btn">
               <button
-                onClick={() => setSaveMenuOpen((v) => !v)}
+                onClick={() => {
+                  setShowSummary(false);
+                  setSaveMenuOpen((v) => !v);
+                }}
                 aria-expanded={saveMenuOpen}
                 aria-haspopup="menu"
                 className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
@@ -440,7 +446,7 @@ export function ArticleReader({
                         {cloudSaved
                           ? "متزامن عبر كل أجهزتك"
                           : loggedIn
-                            ? "مزامنة سحابية عبر كل أجهزتك"
+                            ? "مزامنة عبر كل أجهزتك"
                             : "يتطلب تسجيل الدخول — سيُفتح باب الدخول"}
                       </span>
                     </span>
