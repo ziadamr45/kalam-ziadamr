@@ -211,23 +211,24 @@ export function ProfileEditor({
             </span>
           </button>
 
-          {/* استرجاع صورة Google الأصلية بنقرة واحدة */}
-          {imageUrl && (
-            <button
-              type="button"
-              onClick={() => {
-                setImageUrl(null);
-                setMessage({ ok: true, text: "ستعود صورة Google الأصلية بعد الحفظ" });
-              }}
-              className="text-[11px] font-bold underline-offset-2 hover:underline"
-              style={{ color: "var(--accent-strong)" }}
-            >
-              استرجاع صورة Google الأصلية
-            </button>
-          )}
-          <p className="text-center text-[10px] leading-5" style={{ color: "var(--ink-muted)" }}>
-            {imageUrl ? "صورة مخصصة" : googleImage ? "صورة Google الحالية" : "لا صورة بعد"}
-          </p>
+          <div className="flex flex-col items-center gap-0.5 text-center">
+            <p className="text-[11px] leading-4" style={{ color: "var(--ink-muted)" }}>
+              {imageUrl ? "صورة مخصصة" : googleImage ? "صورة Google الحالية" : "لا صورة بعد"}
+            </p>
+            {imageUrl && (
+              <button
+                type="button"
+                onClick={() => {
+                  setImageUrl(null);
+                  setMessage({ ok: true, text: "ستعود صورة Google الأصلية بعد الحفظ" });
+                }}
+                className="text-[11px] font-bold leading-5 underline-offset-2 hover:underline"
+                style={{ color: "var(--accent-strong)" }}
+              >
+                استرجاع صورة Google الأصلية
+              </button>
+            )}
+          </div>
 
           {/* تنبيه فوري أسفل الصورة على الهاتف حتى يراه المستخدم دون الحاجة للنزول لأسفل */}
           {message && (
