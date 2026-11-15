@@ -431,13 +431,13 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                       : { background: "var(--bg-soft)", color: "var(--ink-muted)" }
                   }
                 >
-                  {r.key} · {new Intl.NumberFormat("ar-EG").format(r.min)}+
+                  {r.key} ({new Intl.NumberFormat("ar-EG").format(r.min)}+)
                 </span>
               ))}
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] leading-6" style={{ color: "var(--ink-muted)" }}>
-                {meta.hint}.
+                {meta.hint}
               </p>
               <ImpactGuideButton />
             </div>

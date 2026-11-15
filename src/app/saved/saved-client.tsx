@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
-import { Footer } from "@/components/footer";
 import { getOfflineArticles, removeOfflineArticle, saveOfflineArticle } from "@/lib/indexeddb";
 import type { OfflineArticle } from "@/types/offline";
 import { formatArabicDate } from "@/lib/utils";
@@ -231,40 +230,45 @@ export default function SavedClient() {
 
         {!authPending && (
           <section className="mx-auto max-w-3xl px-4 pb-24 sm:px-6">
-            {/* ============ تبويبا القناتين ============ */}
-            <div className="no-scrollbar mb-6 flex items-center gap-2 overflow-x-auto pb-1" role="tablist" aria-label="قنوات الحفظ">
+            {/* ============ تبويبا القناتين — مقسم بالتساوي بدون تمرير أفقي على الهاتف ============ */}
+            <div
+              className="mb-6 grid grid-cols-2 gap-1.5 rounded-2xl border p-1.5 shadow-soft"
+              style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+              role="tablist"
+              aria-label="قنوات الحفظ"
+            >
               <button
                 role="tab"
                 aria-selected={tab === "cloud"}
                 onClick={() => setTab("cloud")}
-                className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-xs font-bold transition-colors`}
+                className="flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-xs font-bold transition-all"
                 style={
                   tab === "cloud"
-                    ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
-                    : { background: "var(--surface)", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                    ? { background: "var(--accent)", color: "#fff" }
+                    : { background: "transparent", color: "var(--ink-muted)" }
                 }
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
                   <path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6.5 6.5 0 0 0-12.7 1.74A4 4 0 0 0 6 19.5h11.5z" />
                 </svg>
-                الحفظ المتزامن (في الحساب)
+                <span>في حسابي{saves ? ` (${new Intl.NumberFormat("ar-EG").format(saves.length)})` : ""}</span>
               </button>
               <button
                 role="tab"
                 aria-selected={tab === "device"}
                 onClick={() => setTab("device")}
-                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-xs font-bold transition-colors"
+                className="flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-xs font-bold transition-all"
                 style={
                   tab === "device"
-                    ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
-                    : { background: "var(--surface)", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                    ? { background: "var(--accent)", color: "#fff" }
+                    : { background: "transparent", color: "var(--ink-muted)" }
                 }
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
                   <rect x="7" y="2" width="10" height="20" rx="2" />
                   <path d="M11 18.5h2" />
                 </svg>
-                الحفظ على هذا الجهاز
+                <span>على الجهاز{device ? ` (${new Intl.NumberFormat("ar-EG").format(device.length)})` : ""}</span>
               </button>
             </div>
 
@@ -410,7 +414,6 @@ export default function SavedClient() {
           </section>
         )}
       </main>
-      <Footer />
     </>
   );
 }

@@ -134,13 +134,13 @@ export function ImpactGuideButton({ className = "" }: { className?: string }) {
                           {r.key}
                         </span>
                         <span className="text-[11px] font-bold" style={{ color: "var(--ink-muted)" }}>
-                          {new Intl.NumberFormat("ar-EG").format(r.min)}+ نقطة ·{" "}
+                          {new Intl.NumberFormat("ar-EG").format(r.min)}+ نقطة —{" "}
                           {new Intl.NumberFormat("ar-EG").format(AI_QUOTA_BY_RANK[r.key] ?? 6)} رسائل/مقال
                         </span>
                       </div>
                       <p className="mt-1.5 text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
                         {r.hint}
-                        {r.key === "أهل الكلمة" ? " + فتح قناة المقترحات الخاصة." : "."}
+                        {r.key === "أهل الكلمة" ? " + فتح قناة المقترحات الخاصة" : ""}
                       </p>
                     </div>
                   ))}
