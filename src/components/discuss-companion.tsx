@@ -239,7 +239,8 @@ function MiniMarkdown({ text }: { text: string }) {
   return <div className="space-y-2.5 overflow-hidden">{nodes}</div>;
 }
 
-const HISTORY_KEY = (articleId: string) => `kalam_discuss_${articleId}`;
+const HISTORY_KEY = (articleId: string, userId?: string) =>
+  userId ? `kalam_discuss_${userId}_${articleId}` : `kalam_discuss_${articleId}`;
 
 export function DiscussCompanion({
   articleId,
@@ -279,25 +280,29 @@ export function DiscussCompanion({
 
   const restoreSession = useCallback(() => {
     try {
-      const raw = localStorage.getItem(HISTORY_KEY(articleId));
+      const raw = localStorage.getItem(HISTORY_KEY(articleId, session?.user?.id));
       if (raw) {
         const saved = JSON.parse(raw) as { messages: ChatMessage[]; remaining: number };
-        if (Array.isArray(saved.messages)) setMessages(saved.messages.slice(-40));
+        setMessages(Array.isArray(saved.messages) ? saved.messages.slice(-40) : []);
         if (typeof saved.remaining === "number") setRemaining(saved.remaining);
+      } else {
+        setMessages([]);
       }
-    } catch {}
-  }, [articleId]);
+    } catch {
+      setMessages([]);
+    }
+  }, [articleId, session?.user?.id]);
 
   const persistSession = useCallback(
     (msgs: ChatMessage[], rem: number | null) => {
       try {
         localStorage.setItem(
-          HISTORY_KEY(articleId),
+          HISTORY_KEY(articleId, session?.user?.id),
           JSON.stringify({ messages: msgs.slice(-40), remaining: rem }),
         );
       } catch {}
     },
-    [articleId],
+    [articleId, session?.user?.id],
   );
 
   const fetchQuota = useCallback(async () => {
