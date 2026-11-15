@@ -17,6 +17,7 @@ const UNTRACKED = ["/api/internal", "/_next/static", "/_next/image", "/sw.js", "
  * سياسة أمان المحتوى الصارمة:
  * - default-src 'self' — كل ما لم يُصرَّح به محصور بالأصل
  * - script-src بلا أي مصدر خارجي — منع حقن السكربتات (XSS)
+ * - script-src-attr 'none' — حظر سمات الأحداث المضمنة (onclick/onerror)
  * - object-src 'none' + base-uri 'self' + form-action 'self'
  * - frame-ancestors 'none' — لا تضمين داخل أي iframe خارجي (Anti-Clickjacking)
  * (الصور والوسائط https: لأن المنصة تعرض محتوى من مصادر خارجية اختيارها التحرير)
@@ -24,6 +25,7 @@ const UNTRACKED = ["/api/internal", "/_next/static", "/_next/image", "/sw.js", "
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
+  "script-src-attr 'none'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "media-src 'self' https: blob:",

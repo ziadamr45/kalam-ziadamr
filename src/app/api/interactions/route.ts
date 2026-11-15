@@ -99,24 +99,21 @@ export async function POST(request: Request) {
       /* نقرة ثانية على نفس التصويت = إلغاء (idempotent ضد النقرات المتسابقة) */
       await prisma.interaction.deleteMany({ where: { id: existing.id } });
       myVote = null;
-    } else if (existing) {
-      await prisma.interaction.upsert({
-        where,
-        create: { articleId, value, userId, visitorFp: null },
-        update: { value },
-      });
-      myVote = value;
     } else {
-      await prisma.interaction.upsert({
-        where,
-        create: {
-          articleId,
-          value,
-          userId,
-          visitorFp: null,
-        },
-        update: { value },
-      });
+      try {
+        await prisma.interaction.upsert({
+          where,
+          create: { articleId, value, userId, visitorFp: null },
+          update: { value },
+        });
+      } catch (e: unknown) {
+        /* سباق تزامن P2002 عند نقرتين متطابقتين في اللحظة نفسها → تحديث آمن */
+        if ((e as { code?: string })?.code === "P2002") {
+          await prisma.interaction.update({ where, data: { value } });
+        } else {
+          throw e;
+        }
+      }
       myVote = value;
     }
 
