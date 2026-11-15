@@ -139,7 +139,7 @@ export function ProfileEditor({
       className="rounded-3xl border p-6 shadow-soft sm:p-8"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      <h2 className="font-ui mb-1 text-lg font-bold" style={{ color: "var(--ink)" }}>
+      <h2 className="font-ui mb-1 text-lg font-bold\" style={{ color: "var(--ink)" }}>
         هويتي المعروضة
       </h2>
       <p className="mb-6 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
@@ -164,30 +164,50 @@ export function ProfileEditor({
               if (file) uploadAvatar(file);
             }}
             disabled={uploading}
-            className={`group relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 transition-all ${
+            aria-label="تغيير الصورة الشخصية"
+            className={`group relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-4 transition-all hover:brightness-95 ${
               dragging ? "scale-105 border-dashed" : ""
             } disabled:opacity-70`}
             style={{ borderColor: "var(--accent-soft)" }}
             title="انقر أو أفلِت صورتك هنا — تُحسَّن تلقائيًا وتُرفع بجودة مناسبة"
           >
-            {currentAvatar ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={currentAvatar}
-                alt="صورتي الشخصية"
-                className="h-full w-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span
-                className="flex h-full w-full items-center justify-center text-3xl font-bold"
-                style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-              >
-                {displayName({ customName: name, name: googleName }).charAt(0)}
-              </span>
-            )}
-            <span className="absolute inset-0 flex items-end justify-center bg-black/45 pb-2 text-[10px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
-              {uploading ? "جارٍ الرفع.." : "تغيير الصورة"}
+            <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
+              {currentAvatar ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={currentAvatar}
+                  alt="صورتي الشخصية"
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span
+                  className="flex h-full w-full items-center justify-center text-3xl font-bold"
+                  style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                >
+                  {displayName({ customName: name, name: googleName }).charAt(0)}
+                </span>
+              )}
+            </span>
+            <span
+              aria-hidden
+              className="absolute -bottom-0.5 -left-0.5 flex h-8 w-8 items-center justify-center rounded-full border-2 shadow-soft transition-transform group-hover:scale-110"
+              style={{
+                background: "var(--accent)",
+                color: "#fff",
+                borderColor: "var(--surface)",
+              }}
+            >
+              {uploading ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="animate-spin">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                  <circle cx="12" cy="13" r="3" />
+                </svg>
+              )}
             </span>
           </button>
 
