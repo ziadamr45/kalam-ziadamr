@@ -139,7 +139,7 @@ export function ProfileEditor({
       className="rounded-3xl border p-6 shadow-soft sm:p-8"
       style={{ background: "var(--surface)", borderColor: "var(--border)" }}
     >
-      <h2 className="font-ui mb-1 text-lg font-bold\" style={{ color: "var(--ink)" }}>
+      <h2 className="font-ui mb-1 text-lg font-bold" style={{ color: "var(--ink)" }}>
         هويتي المعروضة
       </h2>
       <p className="mb-6 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
