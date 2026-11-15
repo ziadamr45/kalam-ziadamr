@@ -393,7 +393,7 @@ export function CommentsSection({
         الحوار ({comments.length > 0 ? new Intl.NumberFormat("ar-EG").format(comments.length) : "لا تعليقات بعد"})
       </h2>
 
-      {/* التنبيه الهادئ للزائر عند محاولة التفاعل */}
+      {/* التنبيه الهادئ — زر الدخول يظهر فقط للزائر غير المسجل */}
       {voteNotice && (
         <div
           className="mb-5 flex flex-col items-start justify-between gap-3 rounded-2xl border p-4 text-sm sm:flex-row sm:items-center"
@@ -401,13 +401,15 @@ export function CommentsSection({
           role="status"
         >
           <span className="leading-7">{voteNotice}</span>
-          <Link
-            href={`/auth/login?callback=${encodeURIComponent(`/article/${articleSlug ?? ""}#comments`)}`}
-            className="shrink-0 rounded-full px-4 py-2 text-xs font-bold shadow-soft transition-all hover:scale-105"
-            style={{ background: "var(--accent)", color: "#fff" }}
-          >
-            تسجيل الدخول باستخدام Google
-          </Link>
+          {!loggedIn && (
+            <Link
+              href={`/auth/login?callback=${encodeURIComponent(`/article/${articleSlug ?? ""}#comments`)}`}
+              className="shrink-0 rounded-full px-4 py-2 text-xs font-bold shadow-soft transition-all hover:scale-105"
+              style={{ background: "var(--accent)", color: "#fff" }}
+            >
+              تسجيل الدخول باستخدام Google
+            </Link>
+          )}
         </div>
       )}
 

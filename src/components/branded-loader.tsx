@@ -6,25 +6,33 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
       aria-label={label}
     >
       <style>{`
+        .kalam-loader-aura {
+          animation: kalam-aura-pulse 1.15s ease-in-out infinite;
+        }
         .kalam-loader-kaf {
-          animation: kalam-kaf-glow 2.2s ease-in-out infinite;
+          animation: kalam-kaf-glow 1.15s ease-in-out infinite;
         }
         .kalam-loader-line {
           stroke-dasharray: 100;
-          stroke-dashoffset: 100;
-          animation: kalam-line-write 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+          stroke-dashoffset: 60;
+          animation: kalam-line-write 0.95s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
+        @keyframes kalam-aura-pulse {
+          0%, 100% { transform: scale(0.96); opacity: 0.45; }
+          50% { transform: scale(1.06); opacity: 0.95; }
         }
         @keyframes kalam-kaf-glow {
-          0%, 100% { opacity: 0.72; }
+          0%, 100% { opacity: 0.65; }
           50% { opacity: 1; }
         }
         @keyframes kalam-line-write {
-          0% { stroke-dashoffset: 100; opacity: 0.35; }
+          0% { stroke-dashoffset: 60; opacity: 0.65; }
           55% { stroke-dashoffset: 0; opacity: 1; }
-          82% { stroke-dashoffset: 0; opacity: 1; }
-          100% { stroke-dashoffset: -100; opacity: 0.25; }
+          85% { stroke-dashoffset: 0; opacity: 1; }
+          100% { stroke-dashoffset: -100; opacity: 0.35; }
         }
         @media (prefers-reduced-motion: reduce) {
+          .kalam-loader-aura { animation: none !important; opacity: 0.7 !important; }
           .kalam-loader-kaf { animation: none !important; opacity: 1 !important; }
           .kalam-loader-line { animation: none !important; stroke-dashoffset: 0 !important; opacity: 1 !important; }
         }
@@ -32,14 +40,14 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
       <div className="flex flex-col items-center gap-6 text-center animate-fade-in [@media(max-height:500px)]:gap-3">
         <div className="relative flex items-center justify-center">
           <span
-            className="absolute inset-0 -m-3 rounded-[30%] animate-pulse"
+            className="kalam-loader-aura absolute inset-0 -m-3 rounded-[34%]"
             style={{
               background: "color-mix(in srgb, var(--accent) 18%, transparent)",
             }}
             aria-hidden
           />
           <div
-            className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-[26%] border shadow-lift sm:h-28 sm:w-28 md:h-32 md:w-32 [@media(max-height:500px)]:h-16 [@media(max-height:500px)]:w-16"
+            className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-[32%] border shadow-lift sm:h-28 sm:w-28 md:h-32 md:w-32 [@media(max-height:500px)]:h-16 [@media(max-height:500px)]:w-16"
             style={{
               background: "var(--surface)",
               borderColor: "var(--border)",
