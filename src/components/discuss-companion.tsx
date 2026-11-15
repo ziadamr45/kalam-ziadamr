@@ -289,6 +289,14 @@ function mergeChatLists(serverMsgs: ChatMessage[], localMsgs: ChatMessage[]): Ch
   return combined.slice(-40);
 }
 
+function sameChatLists(a: ChatMessage[], b: ChatMessage[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].role !== b[i].role || a[i].text !== b[i].text) return false;
+  }
+  return true;
+}
+
 export function DiscussCompanion({
   articleId,
   articleTitle,
@@ -326,6 +334,7 @@ export function DiscussCompanion({
   const openRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
   const syncSeqRef = useRef(0);
+  const shouldScrollRef = useRef(false);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -360,8 +369,10 @@ export function DiscussCompanion({
   const restoreSession = useCallback((): ChatMessage[] => {
     const local = readLocalMessages();
     const combined = mergeChatLists(messagesRef.current, local.messages);
-    setMessages(combined);
-    messagesRef.current = combined;
+    if (!sameChatLists(messagesRef.current, combined)) {
+      setMessages(combined);
+      messagesRef.current = combined;
+    }
     if (local.remaining !== null && remaining === null) {
       setRemaining(local.remaining);
       if (local.remaining <= 0 && !unlimited) {
@@ -415,8 +426,10 @@ export function DiscussCompanion({
         if (data.unlimited === true) setUnlimited(true);
         if (Array.isArray(data.messages) && data.messages.length > 0) {
           const merged = mergeChatLists(data.messages, messagesRef.current);
-          setMessages(merged);
-          messagesRef.current = merged;
+          if (!sameChatLists(messagesRef.current, merged)) {
+            setMessages(merged);
+            messagesRef.current = merged;
+          }
           persistSession(merged, typeof data.remaining === "number" ? data.remaining : remaining);
         }
       } catch {}
@@ -450,8 +463,10 @@ export function DiscussCompanion({
         const merged = mergeChatLists(serverMsgs, mergeChatLists(messagesRef.current, localMsgs));
 
         if (merged.length > 0) {
-          setMessages(merged);
-          messagesRef.current = merged;
+          if (!sameChatLists(messagesRef.current, merged)) {
+            setMessages(merged);
+            messagesRef.current = merged;
+          }
           persistSession(merged, data.remaining);
         }
 
@@ -463,12 +478,19 @@ export function DiscussCompanion({
     [articleId, persistSession, pushLocalToServer, readLocalMessages, status],
   );
 
-  /* الجلب المسبق في الخلفية فور جاهزية جلسة القارئ:
-     حتى يظهر الرصيد المتبقي أو حالة نفاد الحصة وسجل الرسائل لحظيًا (0ms) عند فتح النافذة */
+  /* الجلب المسبق في الخلفية فور جاهزية جلسة القارئ، وعند عودة المستخدم للتبويب:
+     حتى يظهر الرصيد المتبقي أو حالة نفاد الحصة وسجل الرسائل لحظيًا (0ms) بدون تأخير */
   useEffect(() => {
     if (status !== "authenticated") return;
     const local = restoreSession();
     void fetchQuota(local);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void fetchQuota();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [status, session?.user?.id, articleId, restoreSession, fetchQuota]);
 
   const openDrawer = useCallback(() => {
@@ -477,6 +499,7 @@ export function DiscussCompanion({
       return;
     }
     const local = restoreSession();
+    shouldScrollRef.current = true;
     setOpen(true);
     openRef.current = true;
     void fetchQuota(local);
@@ -512,8 +535,11 @@ export function DiscussCompanion({
       .catch(() => {});
   }, []);
 
+  /* التمرير التلقائي لأسفل يحدث فقط عند فتح النافذة أو عند إرسال رسالة/وصول رد جديد،
+     وليس عند تحديث المزامنة في الخلفية حتى لا يسحب القارئ للأسفل أثناء صعوده للأعلى */
   useEffect(() => {
-    if (!open || !listRef.current) return;
+    if (!open || !listRef.current || !shouldScrollRef.current) return;
+    shouldScrollRef.current = false;
     const last = messages[messages.length - 1];
     if (!sending && last?.role === "model") {
       const el = listRef.current.querySelector(`[data-msg-idx="${messages.length - 1}"]`);
@@ -589,6 +615,7 @@ export function DiscussCompanion({
     setActiveIdx(null);
     const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
     const nextMessages: ChatMessage[] = [...baseMessages, { role: "user", text }];
+    shouldScrollRef.current = true;
     setMessages(nextMessages);
     messagesRef.current = nextMessages;
     setSending(true);
@@ -637,6 +664,7 @@ export function DiscussCompanion({
           ? data.messages.slice(-40)
           : [...nextMessages, { role: "model", text: data.reply }];
       const rem = typeof data.remaining === "number" ? data.remaining : null;
+      shouldScrollRef.current = true;
       setMessages(finalMessages);
       messagesRef.current = finalMessages;
       if (data.unlimited === true || (rem !== null && rem > 1_000_000)) setUnlimited(true);
