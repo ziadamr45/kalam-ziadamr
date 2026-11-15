@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useDialogs } from "@/components/ui/dialogs";
 
 /**
- * أدوات الخصوصية والتجربة — تبويب «الإعدادات والتفضيلات»:\n * - مسح سجل البحث الخاص بالحساب (وعد الخصوصية: سجلك بيدك وحدك).\n * - إعادة عرض بطاقة الترحيب فورًا دون إعادة تحميل الصفحة.\n */
+ * أدوات الخصوصية والتجربة — تبويب «الإعدادات والتفضيلات»:
+ * - مسح سجل البحث الخاص بالحساب (وعد الخصوصية: سجلك بيدك وحدك).
+ * - إعادة عرض بطاقة الترحيب فورًا دون إعادة تحميل الصفحة.
+ */
 
 export function PrivacyToolsCard() {
   const router = useRouter();
@@ -27,7 +30,7 @@ export function PrivacyToolsCard() {
       toast("مُسح سجل البحث الخاص بحسابك بالكامل");
       router.refresh();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "تعذر الاتصال بالخادم", "error");
+      toast(err instanceof Error ? err.message : "انقطع الاتصال — أعد المحاولة", "error");
     } finally {
       setBusy(null);
     }
@@ -46,7 +49,7 @@ export function PrivacyToolsCard() {
       if (!res.ok) throw new Error("تعذر تجهيز الترحيب — جرّب مرة أخرى");
       window.dispatchEvent(new Event("kalam:replay-onboarding"));
     } catch (err) {
-      toast(err instanceof Error ? err.message : "تعذر الاتصال بالخادم", "error");
+      toast(err instanceof Error ? err.message : "انقطع الاتصال — أعد المحاولة", "error");
     } finally {
       setBusy(null);
     }

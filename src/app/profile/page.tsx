@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
+import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { DevicesPanel } from "@/components/devices-panel";
 import { ReadingPreferencesCard } from "@/components/reading-preferences-card";
 import { PrivacyToolsCard } from "@/components/privacy-tools-card";
@@ -378,17 +379,22 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           steps={[
             {
               selector: "[data-tour='settings-editor']",
-              title: "تخصيص هويتك وإشعاراتك",
-              text: "من هنا تعدّل اسمك وصورتك ونبذتك الفكرية وتتحكم في الإشعارات التي تصلك.",
+              title: "تخصيص هويتك المعروضة",
+              text: "من هنا تعدّل اسمك وصورتك ونبذتك الفكرية كما تظهر أمام القرّاء.",
+            },
+            {
+              selector: "[data-tour='settings-notifications']",
+              title: "تفضيلات الإشعارات",
+              text: "من هنا تتحكم في الإشعارات التي تصلك من المنصة.",
             },
             {
               selector: "[data-tour='settings-reading']",
               title: "تفضيلات القراءة",
-              text: "من هنا تختار ما إذا كان التشكيل يظهر افتراضيًا في المقالات أم لا.",
+              text: "من هنا تختار وضع القراءة وما إذا كان التشكيل يظهر افتراضيًا في المقالات أم لا.",
             },
             {
               selector: "[data-tour='settings-privacy']",
-              title: "الخصوصية وإعادة الجولة",
+              title: "الخصوصية وإعادة الترحيب",
               text: "ومن هنا تمسح سجل بحثك أو تعيد عرض بطاقة الترحيب متى شئت.",
             },
           ]}
@@ -403,14 +409,19 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               bio: user.bio,
               extendedBio: user.extendedBio,
               verifiedSocialLinks: parseSocialLinks(user.verifiedSocialLinks),
-              notificationPrefs: (() => {
-                const p = user.notificationPrefs as { pushNewArticles?: boolean; impactAndReplies?: boolean } | null;
-                return p
-                  ? { pushNewArticles: p.pushNewArticles !== false, impactAndReplies: p.impactAndReplies !== false }
-                  : null;
-              })(),
             }}
             isVerified={user.isVerified}
+          />
+        </section>
+
+        <section data-tour="settings-notifications" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <NotificationPreferencesCard
+            initial={(() => {
+              const p = user.notificationPrefs as { pushNewArticles?: boolean; impactAndReplies?: boolean } | null;
+              return p
+                ? { pushNewArticles: p.pushNewArticles !== false, impactAndReplies: p.impactAndReplies !== false }
+                : null;
+            })()}
           />
         </section>
 

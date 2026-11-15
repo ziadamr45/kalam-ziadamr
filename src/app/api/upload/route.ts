@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
   if (!cloudinaryConfigured) {
     return NextResponse.json(
-      { error: "خدمة رفع الصور غير مهيأة — تُضاف مفاتيح Cloudinary إلى متغيرات البيئة" },
+      { error: "خدمة رفع الصور غير متاحة حاليًا — حاول لاحقًا" },
       { status: 503 },
     );
   }
@@ -144,6 +144,6 @@ export async function POST(request: Request) {
       requestId: request.headers.get("x-kalam-rid"),
       url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors`,
     });
-    return NextResponse.json({ error: "فشل الرفع السحابي — أعد المحاولة" }, { status: 500 });
+    return NextResponse.json({ error: "تعذر رفع الصورة — أعد المحاولة" }, { status: 500 });
   }
 }

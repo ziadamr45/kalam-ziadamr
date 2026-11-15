@@ -27,7 +27,7 @@ export default async function AuthLoginPage({
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
           >
             <p className="font-ui text-sm font-bold" style={{ color: "var(--ink)", textAlign: "right" }}>
-              تم إنهاء جلستك على هذا الجهاز من لوحة التحكم
+              تم إنهاء جلستك على هذا الجهاز من إدارة المنصة
             </p>
             <p className="font-body mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)", textAlign: "right" }}>
               يمكنك تسجيل الدخول مرة أخرى في أي وقت — قراءاتك محفوظة بأمان.

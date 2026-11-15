@@ -14,7 +14,7 @@ import {
  * محرّر الهوية المعروضة — استقلالية القارئ عن بيانات Google
  * ============================================================
  * - تعديل الاسم المعروض مع فحص فوري لمنع الأسماء المسيئة أو الفارغة.
- * - رفع صورة شخصية مباشر ومتكامل مع Cloudinary (من الهاتف أو الكمبيوتر).
+ * - رفع صورة شخصية مباشر (من الهاتف أو الكمبيوتر).
  * - استرجاع صورة Google الأصلية بنقرة زر واحدة.
  * - البطاقة الفكرية الموسعة (نبذة + روابط شخصية) — لحاملي التوثيق الرسمي.
  * - زر حفظ موحّد بتنبيه فوري بالنجاح أو الخطأ.
@@ -27,7 +27,6 @@ type Initial = {
   bio: string | null;
   extendedBio?: string | null;
   verifiedSocialLinks?: VerifiedSocialLinks;
-  notificationPrefs?: { pushNewArticles: boolean; impactAndReplies: boolean } | null;
 };
 
 export function ProfileEditor({
@@ -54,11 +53,6 @@ export function ProfileEditor({
   /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
   const [extendedBio, setExtendedBio] = useState(initial.extendedBio ?? "");
   const [links, setLinks] = useState<VerifiedSocialLinks>(initial.verifiedSocialLinks ?? {});
-  /* مركز تفضيلات الإشعارات — بريد الأمان إلزامي دائمًا ولا يُعرض كخيار */
-  const [prefs, setPrefs] = useState({
-    pushNewArticles: initial.notificationPrefs?.pushNewArticles !== false,
-    impactAndReplies: initial.notificationPrefs?.impactAndReplies !== false,
-  });
 
   const currentAvatar = imageUrl || googleImage;
   const nameError = name.trim() ? validateCustomName(name) : null;
@@ -69,9 +63,7 @@ export function ProfileEditor({
     (imageUrl ?? "") !== (initial.customImage ?? "") ||
     (isVerified && extendedBio.trim() !== (initial.extendedBio ?? "")) ||
     (isVerified &&
-      SOCIAL_LINK_KEYS.some((k) => (links[k] ?? "") !== (initial.verifiedSocialLinks?.[k] ?? ""))) ||
-    prefs.pushNewArticles !== (initial.notificationPrefs?.pushNewArticles !== false) ||
-    prefs.impactAndReplies !== (initial.notificationPrefs?.impactAndReplies !== false);
+      SOCIAL_LINK_KEYS.some((k) => (links[k] ?? "") !== (initial.verifiedSocialLinks?.[k] ?? "")));
 
   const uploadAvatar = async (file: File) => {
     setMessage(null);
@@ -91,7 +83,7 @@ export function ProfileEditor({
       form.append("folder", "account");
       const res = await fetch("/api/upload", { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.url) throw new Error(data?.error || "فشل الرفع السحابي");
+      if (!res.ok || !data.url) throw new Error(data?.error || "تعذر رفع الصورة");
       setImageUrl(data.url as string);
       setMessage({ ok: true, text: "رُفعت الصورة — اضغط «حفظ التغييرات» لتثبيتها" });
     } catch (err) {
@@ -116,7 +108,6 @@ export function ProfileEditor({
           customName: name.trim() || null,
           customImage: imageUrl,
           bio: bio.trim() || null,
-          notificationPrefs: prefs,
           ...(isVerified
             ? {
                 extendedBio: extendedBio.trim() || null,
@@ -177,7 +168,7 @@ export function ProfileEditor({
               dragging ? "scale-105 border-dashed" : ""
             } disabled:opacity-70`}
             style={{ borderColor: "var(--accent-soft)" }}
-            title="انقر أو أفلِت صورتك هنا — تُحسَّن تلقائيًا وتُرفع بأحدث صيغ الويب"
+            title="انقر أو أفلِت صورتك هنا — تُحسَّن تلقائيًا وتُرفع بجودة مناسبة"
           >
             {currentAvatar ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -352,57 +343,6 @@ export function ProfileEditor({
               </p>
             </div>
           )}
-
-          {/* ==================== مركز تفضيلات الإشعارات — لكل القراء ==================== */}
-          <div
-            className="rounded-2xl border p-4"
-            style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
-          >
-            <p className="mb-1 text-xs font-bold" style={{ color: "var(--ink)" }}>
-              مركز تفضيلات الإشعارات
-            </p>
-            <p className="mb-3 text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-              اختر ما يصلك ومن أين. بريد التنبيهات الأمنية إلزامي لحماية حسابك ولا يمكن إلغاؤه.
-            </p>
-            <ul className="space-y-2.5">
-              <li>
-                <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
-                  <input
-                    type="checkbox"
-                    className="mt-1.5 accent-(--accent)"
-                    checked={prefs.pushNewArticles}
-                    onChange={(e) => {
-                      setPrefs((p) => ({ ...p, pushNewArticles: e.target.checked }));
-                      setMessage(null);
-                    }}
-                  />
-                  <span>إشعارات المتصفح للمقالات الجديدة.</span>
-                </label>
-              </li>
-              <li>
-                <label className="flex items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
-                  <input type="checkbox" className="mt-1.5" checked disabled aria-label="بريد التنبيهات الأمنية إلزامي" />
-                  <span style={{ color: "var(--ink-muted)" }}>
-                    إشعارات البريد الإلكتروني للتنبيهات الأمنية (إلزامية مسبقًا ولا يمكن إلغاؤها).
-                  </span>
-                </label>
-              </li>
-              <li>
-                <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-6" style={{ color: "var(--ink)" }}>
-                  <input
-                    type="checkbox"
-                    className="mt-1.5 accent-(--accent)"
-                    checked={prefs.impactAndReplies}
-                    onChange={(e) => {
-                      setPrefs((p) => ({ ...p, impactAndReplies: e.target.checked }));
-                      setMessage(null);
-                    }}
-                  />
-                  <span>إشعارات الأثر والردود على التعليقات.</span>
-                </label>
-              </li>
-            </ul>
-          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
