@@ -53,6 +53,54 @@ function sanitizeStoredMessages(raw: unknown): StoredTurn[] {
     .slice(-40);
 }
 
+/**
+ * دمج رسائل المتصفح المحلية مع رسائل قاعدة البيانات دون تكرار أو فقدان:
+ * - إذا كان أحدهما فارغًا يُعتمد الآخر.
+ * - إذا كان أحدهما امتدادًا مباشرًا للآخر (نفس البداية) يُعتمد الأطول.
+ * - عند اختلاف الرسائل بين جهازين، تُدمج مع إزالة التطابق المتتالي وتُحفظ آخر 40 رسالة.
+ */
+function mergeStoredMessages(serverMsgs: StoredTurn[], clientMsgs: StoredTurn[]): StoredTurn[] {
+  if (serverMsgs.length === 0) return clientMsgs.slice(-40);
+  if (clientMsgs.length === 0) return serverMsgs.slice(-40);
+
+  const isPrefix = (shorter: StoredTurn[], longer: StoredTurn[]) =>
+    shorter.every((m, idx) => longer[idx]?.role === m.role && longer[idx]?.text === m.text);
+
+  if (serverMsgs.length <= clientMsgs.length && isPrefix(serverMsgs, clientMsgs)) {
+    return clientMsgs.slice(-40);
+  }
+  if (clientMsgs.length <= serverMsgs.length && isPrefix(clientMsgs, serverMsgs)) {
+    return serverMsgs.slice(-40);
+  }
+
+  const combined: StoredTurn[] = [...serverMsgs];
+  for (const m of clientMsgs) {
+    const exists = combined.some((x) => x.role === m.role && x.text === m.text);
+    if (!exists) combined.push(m);
+  }
+  return combined.slice(-40);
+}
+
+async function resolveAuthenticatedUserId(session: {
+  user?: { id?: string; email?: string | null };
+  deviceRevoked?: boolean;
+} | null): Promise<string | null> {
+  if (!session || session.deviceRevoked) return null;
+  if (session.user?.id && session.user.id.trim().length > 0) {
+    return session.user.id.trim();
+  }
+  const email = session.user?.email?.toLowerCase().trim();
+  if (!email) return null;
+  try {
+    const u = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, banned: true },
+    });
+    if (u && !u.banned) return u.id;
+  } catch {}
+  return null;
+}
+
 async function limitFor(readerKey: string): Promise<number> {
   if (readerKey.startsWith("u:")) {
     try {
@@ -106,6 +154,46 @@ async function dbConsume(
       select: { messageCount: true },
     });
     return row.messageCount;
+  } catch {
+    return null;
+  }
+}
+
+async function dbSyncMessagesOnly(
+  userId: string,
+  articleId: string,
+  clientMessages: StoredTurn[],
+): Promise<{ count: number; messages: StoredTurn[] } | null> {
+  try {
+    const existing = await prisma.aiDiscussionUsage.findUnique({
+      where: { userId_articleId: { userId, articleId } },
+      select: { messageCount: true, messages: true },
+    });
+    const serverMsgs = sanitizeStoredMessages(existing?.messages);
+    const merged = mergeStoredMessages(serverMsgs, clientMessages);
+    if (merged.length === 0) {
+      return { count: existing?.messageCount ?? 0, messages: [] };
+    }
+    const inferredUserTurns = merged.filter((m) => m.role === "user").length;
+    const nextCount = Math.max(existing?.messageCount ?? 0, inferredUserTurns);
+    const saved = await prisma.aiDiscussionUsage.upsert({
+      where: { userId_articleId: { userId, articleId } },
+      create: {
+        userId,
+        articleId,
+        messageCount: Math.max(1, nextCount),
+        messages: merged,
+      },
+      update: {
+        messages: merged,
+        ...(nextCount > (existing?.messageCount ?? 0) ? { messageCount: nextCount } : {}),
+      },
+      select: { messageCount: true, messages: true },
+    });
+    return {
+      count: saved.messageCount,
+      messages: sanitizeStoredMessages(saved.messages),
+    };
   } catch {
     return null;
   }
@@ -444,8 +532,8 @@ ${opts.articleContext}
 - لا تخترع آراء أو اقتباسات أو أقسامًا أو روابط غير موجودة في البيانات الرسمية أعلاه.`;
 }
 
-function getReaderKey(session: { user?: { id?: string } } | null, fp: string | null): string {
-  return session?.user?.id ? `u:${session.user.id}` : `f:${fp ?? "anon"}`;
+function getReaderKey(userId: string | null, fp: string | null): string {
+  return userId ? `u:${userId}` : `f:${fp ?? "anon"}`;
 }
 
 function cleanText(raw: string): string {
@@ -479,26 +567,70 @@ export async function GET(request: Request) {
   }
 
   const session = await auth().catch(() => null);
+  const userId = await resolveAuthenticatedUserId(session);
   const fp = url.searchParams.get("fp");
-  const readerKey = getReaderKey(session, fp);
+  const readerKey = getReaderKey(userId, fp);
 
   const limit = await limitFor(readerKey);
-  const db = readerKey.startsWith("u:") ? await dbUsage(readerKey.slice(2), articleId) : null;
+  const db = userId ? await dbUsage(userId, articleId) : null;
   const used = db !== null ? db.count : await usedFor(request, articleId, readerKey);
 
-  return NextResponse.json({
-    limit,
-    used,
-    remaining: Math.max(0, limit - used),
-    unlimited: limit >= UNLIMITED_QUOTA,
-    messages: db?.messages ?? [],
-  });
+  return NextResponse.json(
+    {
+      limit,
+      used,
+      remaining: Math.max(0, limit - used),
+      unlimited: limit >= UNLIMITED_QUOTA,
+      messages: db?.messages ?? [],
+    },
+    {
+      headers: {
+        "Cache-Control": "private, no-store, no-cache, must-revalidate",
+      },
+    },
+  );
+}
+
+export async function PUT(request: Request) {
+  try {
+    const session = await auth().catch(() => null);
+    const userId = await resolveAuthenticatedUserId(session);
+    if (!userId) {
+      return NextResponse.json({ error: "غير مصرّح" }, { status: 401 });
+    }
+
+    const body = (await request.json().catch(() => ({}))) as {
+      articleId?: string;
+      messages?: unknown;
+    };
+    const articleId = body.articleId?.trim() ?? "";
+    if (!articleId) {
+      return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
+    }
+
+    const clientMessages = sanitizeStoredMessages(body.messages);
+    const limit = await limitFor(`u:${userId}`);
+    const synced = await dbSyncMessagesOnly(userId, articleId, clientMessages);
+    const used = synced?.count ?? 0;
+
+    return NextResponse.json({
+      synced: true,
+      limit,
+      used,
+      remaining: Math.max(0, limit - used),
+      unlimited: limit >= UNLIMITED_QUOTA,
+      messages: synced?.messages ?? clientMessages,
+    });
+  } catch {
+    return NextResponse.json({ error: "تعذر مزامنة المحادثة" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
   try {
     const gateSession = await auth();
-    if (!gateSession?.user?.id) {
+    const userId = await resolveAuthenticatedUserId(gateSession);
+    if (!userId) {
       return NextResponse.json(
         {
           error: "محاورة الذكاء الاصطناعي متاحة للأعضاء المسجلين — سجّل دخولك لفتح النقاش.",
@@ -545,8 +677,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "رسالتك أطول من اللازم — اخصرها" }, { status: 400 });
     }
 
-    const userId = gateSession.user.id;
-    const readerKey = getReaderKey(gateSession, fp ?? null);
+    const readerKey = getReaderKey(userId, fp ?? null);
 
     const unlimitedAi = await userHasPrivilege(userId, "unlimitedAiChat").catch(() => false);
     if (!unlimitedAi && !allowBurst(readerKey)) {
@@ -557,7 +688,8 @@ export async function POST(request: Request) {
     }
 
     const limit = await limitFor(readerKey);
-    const used = await usedFor(request, articleId, readerKey);
+    const existingDb = await dbUsage(userId, articleId);
+    const used = existingDb !== null ? existingDb.count : await usedFor(request, articleId, readerKey);
     if (used >= limit) {
       return NextResponse.json(
         {
@@ -628,20 +760,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "المقال غير متاح للنقاش" }, { status: 404 });
     }
 
-    const history: ChatTurn[] = (Array.isArray(body.history) ? body.history : [])
-      .filter(
-        (h): h is { role: string; text: string } =>
-          typeof h?.role === "string" && typeof h?.text === "string" && h.text.trim().length > 0,
-      )
-      .slice(-40)
-      .map((h) => ({
-        role: h.role === "model" ? ("model" as const) : ("user" as const),
-        text: h.text.slice(0, 2000),
-      }))
-      .filter(
-        (h, idx, arr) =>
-          !(idx === arr.length - 1 && h.role === "user" && h.text === message.trim()),
-      );
+    const clientHistory: StoredTurn[] = sanitizeStoredMessages(body.history).filter(
+      (h, idx, arr) =>
+        !(idx === arr.length - 1 && h.role === "user" && h.text === message.trim()),
+    );
+    const mergedHistory: StoredTurn[] =
+      clientHistory.length > 0
+        ? clientHistory
+        : (existingDb?.messages ?? []);
+
+    const history: ChatTurn[] = mergedHistory.map((h) => ({
+      role: h.role,
+      text: h.text.slice(0, 2000),
+    }));
 
     const { recentTurns, olderSummary } = compactHistory(history);
 
@@ -709,10 +840,7 @@ export async function POST(request: Request) {
     }
 
     const updatedMessages: StoredTurn[] = [
-      ...history.map((m): StoredTurn => ({
-        role: m.role === "model" ? "model" : "user",
-        text: m.text,
-      })),
+      ...mergedHistory,
       { role: "user" as const, text: message.trim() },
       { role: "model" as const, text: reply },
     ].slice(-40);

@@ -242,6 +242,53 @@ function MiniMarkdown({ text }: { text: string }) {
 const HISTORY_KEY = (articleId: string, userId?: string) =>
   userId ? `kalam_discuss_${userId}_${articleId}` : `kalam_discuss_${articleId}`;
 
+const LEGACY_KEY = (articleId: string) => `kalam_discuss_${articleId}`;
+
+function parseStoredTurns(raw: string | null): { messages: ChatMessage[]; remaining: number | null } {
+  if (!raw) return { messages: [], remaining: null };
+  try {
+    const parsed = JSON.parse(raw) as { messages?: unknown; remaining?: unknown };
+    const msgs = Array.isArray(parsed?.messages)
+      ? parsed.messages
+          .filter(
+            (m): m is { role: "user" | "model"; text: string } =>
+              Boolean(m) &&
+              typeof m === "object" &&
+              ((m as { role?: string }).role === "user" || (m as { role?: string }).role === "model") &&
+              typeof (m as { text?: string }).text === "string" &&
+              (m as { text: string }).text.trim().length > 0,
+          )
+          .slice(-40)
+      : [];
+    const rem = typeof parsed?.remaining === "number" ? parsed.remaining : null;
+    return { messages: msgs, remaining: rem };
+  } catch {
+    return { messages: [], remaining: null };
+  }
+}
+
+function mergeChatLists(serverMsgs: ChatMessage[], localMsgs: ChatMessage[]): ChatMessage[] {
+  if (serverMsgs.length === 0) return localMsgs.slice(-40);
+  if (localMsgs.length === 0) return serverMsgs.slice(-40);
+
+  const isPrefix = (shorter: ChatMessage[], longer: ChatMessage[]) =>
+    shorter.every((m, idx) => longer[idx]?.role === m.role && longer[idx]?.text === m.text);
+
+  if (serverMsgs.length <= localMsgs.length && isPrefix(serverMsgs, localMsgs)) {
+    return localMsgs.slice(-40);
+  }
+  if (localMsgs.length <= serverMsgs.length && isPrefix(localMsgs, serverMsgs)) {
+    return serverMsgs.slice(-40);
+  }
+
+  const combined: ChatMessage[] = [...serverMsgs];
+  for (const m of localMsgs) {
+    const exists = combined.some((x) => x.role === m.role && x.text === m.text);
+    if (!exists) combined.push(m);
+  }
+  return combined.slice(-40);
+}
+
 export function DiscussCompanion({
   articleId,
   articleTitle,
@@ -277,69 +324,158 @@ export function DiscussCompanion({
   const listRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const openRef = useRef(false);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const syncSeqRef = useRef(0);
 
-  const restoreSession = useCallback(() => {
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const readLocalMessages = useCallback((): { messages: ChatMessage[]; remaining: number | null } => {
     try {
-      const raw = localStorage.getItem(HISTORY_KEY(articleId, session?.user?.id));
-      if (raw) {
-        const saved = JSON.parse(raw) as { messages: ChatMessage[]; remaining: number };
-        setMessages(Array.isArray(saved.messages) ? saved.messages.slice(-40) : []);
-        if (typeof saved.remaining === "number") setRemaining(saved.remaining);
-      } else {
-        setMessages([]);
+      const uid = session?.user?.id;
+      const scoped = parseStoredTurns(localStorage.getItem(HISTORY_KEY(articleId, uid)));
+      const legacy = uid ? parseStoredTurns(localStorage.getItem(LEGACY_KEY(articleId))) : { messages: [], remaining: null };
+      if (scoped.messages.length >= legacy.messages.length && scoped.messages.length > 0) {
+        return scoped;
       }
+      if (legacy.messages.length > 0) {
+        if (uid) {
+          try {
+            localStorage.setItem(
+              HISTORY_KEY(articleId, uid),
+              JSON.stringify({ messages: legacy.messages, remaining: legacy.remaining }),
+            );
+            localStorage.removeItem(LEGACY_KEY(articleId));
+          } catch {}
+        }
+        return legacy;
+      }
+      return scoped;
     } catch {
-      setMessages([]);
+      return { messages: [], remaining: null };
     }
   }, [articleId, session?.user?.id]);
+
+  const restoreSession = useCallback((): ChatMessage[] => {
+    const local = readLocalMessages();
+    const combined = mergeChatLists(messagesRef.current, local.messages);
+    setMessages(combined);
+    messagesRef.current = combined;
+    if (local.remaining !== null && remaining === null) {
+      setRemaining(local.remaining);
+    }
+    return combined;
+  }, [readLocalMessages, remaining]);
 
   const persistSession = useCallback(
     (msgs: ChatMessage[], rem: number | null) => {
       try {
+        const clean = msgs.slice(-40);
+        const uid = session?.user?.id;
         localStorage.setItem(
-          HISTORY_KEY(articleId, session?.user?.id),
-          JSON.stringify({ messages: msgs.slice(-40), remaining: rem }),
+          HISTORY_KEY(articleId, uid),
+          JSON.stringify({ messages: clean, remaining: rem }),
         );
+        if (uid) {
+          localStorage.removeItem(LEGACY_KEY(articleId));
+        }
       } catch {}
     },
     [articleId, session?.user?.id],
   );
 
-  const fetchQuota = useCallback(async () => {
-    try {
-      const res = await fetch(
-        `/api/ai/discuss?articleId=${encodeURIComponent(articleId)}&fp=${encodeURIComponent(getVisitorFingerprint())}`,
-        { cache: "no-store" },
-      );
-      if (res.ok) {
+  const pushLocalToServer = useCallback(
+    async (localMsgs: ChatMessage[]) => {
+      if (localMsgs.length === 0 || status !== "authenticated") return;
+      try {
+        const res = await fetch("/api/ai/discuss", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            articleId,
+            messages: localMsgs.slice(-40),
+          }),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          remaining?: number;
+          limit?: number;
+          unlimited?: boolean;
+          messages?: ChatMessage[];
+        };
+        if (typeof data.limit === "number") setLimit(data.limit);
+        if (typeof data.remaining === "number") {
+          setRemaining(data.remaining);
+          setExhausted(!data.unlimited && data.remaining <= 0);
+        }
+        if (data.unlimited === true) setUnlimited(true);
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          const merged = mergeChatLists(data.messages, messagesRef.current);
+          setMessages(merged);
+          messagesRef.current = merged;
+          persistSession(merged, typeof data.remaining === "number" ? data.remaining : remaining);
+        }
+      } catch {}
+    },
+    [articleId, persistSession, remaining, status],
+  );
+
+  const fetchQuota = useCallback(
+    async (localSnapshot?: ChatMessage[]) => {
+      const seq = ++syncSeqRef.current;
+      try {
+        const res = await fetch(
+          `/api/ai/discuss?articleId=${encodeURIComponent(articleId)}&fp=${encodeURIComponent(getVisitorFingerprint())}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok || seq !== syncSeqRef.current) return;
         const data = (await res.json()) as {
           remaining: number;
           limit: number;
           unlimited?: boolean;
           messages?: ChatMessage[];
         };
+        if (seq !== syncSeqRef.current) return;
         setRemaining(data.remaining);
         setLimit(data.limit);
         setExhausted(!data.unlimited && data.remaining <= 0);
         setUnlimited(data.unlimited === true || data.remaining > 1_000_000);
-        if (Array.isArray(data.messages) && data.messages.length > 0) {
-          const synced = data.messages.slice(-40);
-          setMessages(synced);
-          persistSession(synced, data.remaining);
+
+        const serverMsgs = Array.isArray(data.messages) ? data.messages.slice(-40) : [];
+        const localMsgs = localSnapshot ?? readLocalMessages().messages;
+        const merged = mergeChatLists(serverMsgs, mergeChatLists(messagesRef.current, localMsgs));
+
+        if (merged.length > 0) {
+          setMessages(merged);
+          messagesRef.current = merged;
+          persistSession(merged, data.remaining);
         }
-      }
-    } catch {}
-  }, [articleId, persistSession]);
+
+        if (merged.length > serverMsgs.length && status === "authenticated") {
+          void pushLocalToServer(merged);
+        }
+      } catch {}
+    },
+    [articleId, persistSession, pushLocalToServer, readLocalMessages, status],
+  );
+
+  /* عند اكتمال جلسة المستخدم والنافذة مفتوحة، نعيد استرجاع ومزامنة السجل تحت معرفه الصحيح */
+  useEffect(() => {
+    if (!open || status !== "authenticated") return;
+    const local = restoreSession();
+    void fetchQuota(local);
+  }, [open, status, session?.user?.id, restoreSession, fetchQuota]);
 
   const openDrawer = useCallback(() => {
     if (status === "unauthenticated") {
       requestAuth({ kind: "ai-chat" });
       return;
     }
-    restoreSession();
+    const local = restoreSession();
     setOpen(true);
     openRef.current = true;
-    fetchQuota();
+    void fetchQuota(local);
   }, [restoreSession, fetchQuota, status]);
 
   const openDrawerRef = useRef(openDrawer);
@@ -439,6 +575,9 @@ export function DiscussCompanion({
     const text = input.trim();
     if (!text || sending || exhausted) return;
 
+    /* إلغاء أي استجابة fetchQuota معلقة حتى لا تكتب فوق الرسالة الجديدة */
+    syncSeqRef.current += 1;
+
     setError("");
     setInput("");
     const editIndex = editing;
@@ -447,6 +586,7 @@ export function DiscussCompanion({
     const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
     const nextMessages: ChatMessage[] = [...baseMessages, { role: "user", text }];
     setMessages(nextMessages);
+    messagesRef.current = nextMessages;
     setSending(true);
 
     try {
@@ -469,6 +609,7 @@ export function DiscussCompanion({
         unlimited?: boolean;
         error?: string;
         exhausted?: boolean;
+        messages?: ChatMessage[];
       };
 
       if (!res.ok || !data.reply) {
@@ -481,17 +622,19 @@ export function DiscussCompanion({
           setError(data.error || "تعذر إرسال الرسالة — أعد المحاولة");
         }
         setMessages(baseMessages);
+        messagesRef.current = baseMessages;
         setInput(text);
         if (editIndex !== null) setEditing(editIndex);
         return;
       }
 
-      const finalMessages: ChatMessage[] = [
-        ...nextMessages,
-        { role: "model", text: data.reply },
-      ];
+      const finalMessages: ChatMessage[] =
+        Array.isArray(data.messages) && data.messages.length > 0
+          ? data.messages.slice(-40)
+          : [...nextMessages, { role: "model", text: data.reply }];
       const rem = typeof data.remaining === "number" ? data.remaining : null;
       setMessages(finalMessages);
+      messagesRef.current = finalMessages;
       if (data.unlimited === true || (rem !== null && rem > 1_000_000)) setUnlimited(true);
       if (rem !== null) {
         setRemaining(rem);
@@ -514,6 +657,7 @@ export function DiscussCompanion({
     } catch {
       setError("انقطع الاتصال — أعد المحاولة");
       setMessages(baseMessages);
+      messagesRef.current = baseMessages;
       setInput(text);
       if (editIndex !== null) setEditing(editIndex);
     } finally {
