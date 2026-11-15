@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
@@ -720,7 +719,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         )}
       </main>
       <PushPromptCapsule />
-      <SiteFooter />
     </>
   );
 }
