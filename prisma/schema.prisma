@@ -254,7 +254,8 @@ model CommentReport {
   commentId      String
   comment        Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
   reason         String
-  details        String?\n  reporterFp     String?
+  details        String?
+  reporterFp     String?
   reporterUserId String?
   reporterEmail  String?
   createdAt      DateTime @default(now())
@@ -292,7 +293,8 @@ model Interaction {
   @@unique([articleId, userId])
 }
 
-model SocialShare {\n  id        String   @id @default(cuid())
+model SocialShare {
+  id        String   @id @default(cuid())
   articleId String
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   platform  String
@@ -623,7 +625,8 @@ model LoginLog {
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   email       String?
-  ip          String?\n  userAgent   String?  @db.Text
+  ip          String?
+  userAgent   String?  @db.Text
   deviceType  String? // mobile | desktop | tablet
   browser     String?
   os          String?

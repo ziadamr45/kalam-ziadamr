@@ -592,7 +592,7 @@ export function DiscussCompanion({
             className="border-b p-4"
             style={{ borderColor: "var(--border)" }}
           >
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <p className="font-ui text-sm font-bold" style={{ color: "var(--ink)" }}>
                   محاورة المقال فكريًا
@@ -660,7 +660,7 @@ export function DiscussCompanion({
                   onClick={() => setFullscreen((f) => !f)}
                   aria-label={fullscreen ? "تصغير نافذة النقاش" : "توسيع نافذة النقاش لملء الشاشة"}
                   title={fullscreen ? "الوضع الجانبي" : "ملء الشاشة"}
-                  className="hidden rounded-full p-2 transition-colors hover:bg-(--accent-soft) sm:inline-flex"
+                  className="hidden h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft) sm:inline-flex"
                   style={{ color: fullscreen ? "var(--accent-strong)" : "var(--ink-muted)" }}
                 >
                   {fullscreen ? (
@@ -683,7 +683,7 @@ export function DiscussCompanion({
                   type="button"
                   onClick={closeDrawer}
                   aria-label="إغلاق النقاش"
-                  className="rounded-full p-2 transition-colors hover:bg-(--accent-soft)"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft)"
                   style={{ color: "var(--ink-muted)" }}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
