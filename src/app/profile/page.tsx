@@ -151,10 +151,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     <>
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-4 pt-28 sm:px-6">
+        <section className="mx-auto max-w-3xl px-4 pt-20 sm:px-6 sm:pt-24">
           <nav
             data-tour="profile-tabs"
-            className="flex gap-1.5 rounded-2xl border p-1.5 shadow-soft"
+            className="grid grid-cols-3 gap-1.5 rounded-2xl border p-1.5 shadow-soft"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
             aria-label="أقسام الملف الشخصي"
           >
@@ -165,7 +165,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                   key={t.key}
                   href={t.href}
                   prefetch={true}
-                  className="flex-1 rounded-xl px-2 py-2.5 text-center text-xs font-bold transition-all"
+                  className="flex items-center justify-center rounded-xl px-2 py-2.5 text-center text-xs font-bold leading-snug transition-all"
                   style={{
                     background: active ? "var(--accent)" : "transparent",
                     color: active ? "#fff" : "var(--ink-muted)",
@@ -203,10 +203,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           ]}
         />
 
-        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
           <div
             data-tour="profile-identity"
-            className="flex flex-col items-center gap-6 rounded-3xl border p-8 shadow-lift sm:flex-row sm:text-right"
+            className="flex flex-col items-center gap-5 rounded-3xl border p-6 shadow-lift sm:flex-row sm:gap-6 sm:p-8 sm:text-right"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
           >
             <div className="flex flex-col items-center gap-2">
@@ -232,8 +232,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               <RankBadge rank={user.intellectualRank} size="md" />
             </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-0 flex-1 text-center sm:text-right">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 <h1 className="font-body text-2xl font-bold" style={{ color: "var(--ink)" }}>
                   {displayName(user)}
                 </h1>
@@ -307,7 +307,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </div>
         </section>
 
-        <section className="mx-auto mt-6 grid max-w-3xl grid-cols-3 gap-3 px-4 sm:px-6">
+        <section className="mx-auto mt-5 grid max-w-3xl grid-cols-3 gap-3 px-4 sm:px-6">
           <div
             className="rounded-2xl border p-4 text-center shadow-soft"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
@@ -350,7 +350,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           const granted = (Object.keys(PRIVILEGE_LABELS) as (keyof typeof PRIVILEGE_LABELS)[]).filter((k) => privs[k]);
           if (!granted.length && !user.vipReason) return null;
           return (
-            <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+            <section className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
               <div
                 className="rounded-2xl border p-5 shadow-soft"
                 style={{
@@ -398,7 +398,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           );
         })()}
 
-        <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
           <div
             data-tour="profile-rank"
             className="rounded-2xl border p-5 shadow-soft"
@@ -474,7 +474,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             },
           ]}
         />
-        <section data-tour="settings-editor" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section data-tour="settings-editor" className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
           <ProfileEditor
             googleName={user.name}
             googleImage={user.image}
@@ -489,7 +489,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           />
         </section>
 
-        <section data-tour="settings-notifications" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section data-tour="settings-notifications" className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
           <NotificationPreferencesCard
             initial={(() => {
               const p = user.notificationPrefs as { pushNewArticles?: boolean; impactAndReplies?: boolean } | null;
@@ -500,11 +500,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           />
         </section>
 
-        <section data-tour="settings-reading" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section data-tour="settings-reading" className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
           <ReadingPreferencesCard />
         </section>
 
-        <section data-tour="settings-privacy" className="mx-auto mt-6 max-w-3xl px-4 pb-24 sm:px-6">
+        <section data-tour="settings-privacy" className="mx-auto mt-5 max-w-3xl px-4 pb-16 sm:px-6">
           <PrivacyToolsCard />
         </section>
           </>
@@ -513,7 +513,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         {tab === "profile" && (
           <>
         {logs.length > 0 && (
-          <section className="mx-auto mt-10 max-w-3xl px-4 sm:px-6">
+          <section className="mx-auto mt-8 max-w-3xl px-4 sm:px-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
                 سجل أثرك الأخير
@@ -560,12 +560,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         )}
 
         {canSendProposals(user.intellectualRank) && (
-          <section className="mx-auto mt-10 max-w-3xl px-4 sm:px-6">
+          <section className="mx-auto mt-8 max-w-3xl px-4 sm:px-6">
             <ProposalForm />
           </section>
         )}
 
-        <section className="mx-auto mt-10 max-w-3xl px-4 pb-24 sm:px-6">
+        <section className="mx-auto mt-8 max-w-3xl px-4 pb-16 sm:px-6">
           <h2 className="mb-4 font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
             تعليقاتي
           </h2>
@@ -656,7 +656,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             },
           ]}
         />
-        <section data-tour="security-devices" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+        <section data-tour="security-devices" className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
           <div
             className="rounded-2xl border p-5 shadow-soft sm:p-6"
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
@@ -666,7 +666,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         </section>
 
         {loginLogs.length > 0 && (
-          <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <section className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
             <div
               className="rounded-2xl border p-5 shadow-soft sm:p-6"
               style={{ background: "var(--surface)", borderColor: "var(--border)" }}
@@ -712,7 +712,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </section>
         )}
 
-        <section data-tour="security-danger" className="mx-auto mt-6 max-w-3xl px-4 pb-24 sm:px-6">
+        <section data-tour="security-danger" className="mx-auto mt-5 max-w-3xl px-4 pb-16 sm:px-6">
           <AccountDangerZone />
         </section>
           </>

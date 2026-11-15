@@ -215,11 +215,11 @@ export default function SavedClient() {
   return (
     <>
       <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-4 pt-32 pb-8 text-center sm:px-6">
-          <h1 className="font-body text-3xl font-bold leading-[1.6]" style={{ color: "var(--ink)" }}>
+        <section className="mx-auto max-w-3xl px-4 pt-20 pb-6 text-center sm:px-6 sm:pt-24">
+          <h1 className="font-body text-2xl font-bold leading-[1.6] sm:text-3xl" style={{ color: "var(--ink)" }}>
             قراءاتي المحفوظة
           </h1>
-          <p className="mt-3 text-sm" style={{ color: "var(--ink-muted)" }}>
+          <p className="mt-2 text-sm" style={{ color: "var(--ink-muted)" }}>
             {authPending
               ? "جارٍ التحميل.."
               : loggedIn
@@ -229,7 +229,7 @@ export default function SavedClient() {
         </section>
 
         {!authPending && (
-          <section className="mx-auto max-w-3xl px-4 pb-24 sm:px-6">
+          <section className="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
             {/* ============ تبويبا القناتين — مقسم بالتساوي بدون تمرير أفقي على الهاتف ============ */}
             <div
               className="mb-6 grid grid-cols-2 gap-1.5 rounded-2xl border p-1.5 shadow-soft"
@@ -241,7 +241,7 @@ export default function SavedClient() {
                 role="tab"
                 aria-selected={tab === "cloud"}
                 onClick={() => setTab("cloud")}
-                className="flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-xs font-bold transition-all"
+                className="flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-xs font-bold leading-snug transition-all"
                 style={
                   tab === "cloud"
                     ? { background: "var(--accent)", color: "#fff" }
@@ -257,7 +257,7 @@ export default function SavedClient() {
                 role="tab"
                 aria-selected={tab === "device"}
                 onClick={() => setTab("device")}
-                className="flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-xs font-bold transition-all"
+                className="flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-xs font-bold leading-snug transition-all"
                 style={
                   tab === "device"
                     ? { background: "var(--accent)", color: "#fff" }
