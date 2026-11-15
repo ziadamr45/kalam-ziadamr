@@ -307,7 +307,7 @@ export function ProfileEditor({
               }}
               rows={3}
               maxLength={200}
-              placeholder="عبارة مقتضبة تعبّر عنك — «أقرأ ل أفهم» مثلًا"
+              placeholder="عبارة مقتضبة تعبّر عنك — «أقرأ لأفهم» مثلًا"
               className="w-full resize-none rounded-xl border bg-transparent px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent)"
               style={{
                 borderColor: bioError ? "#DC2626" : "var(--border)",

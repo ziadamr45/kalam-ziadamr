@@ -11,7 +11,7 @@ const QUICK_TOPICS = [
   "اقتراح تطوير",
   "ملاحظة على مقال",
   "طلب محو حسابي وبياناتي نهائيًا",
-  "كلمة طيبة للإدارة",
+  "كلمة طيبة لإدارة المنصة",
 ];
 
 export function ContactForm() {
@@ -76,11 +76,11 @@ export function ContactForm() {
           ✓
         </div>
         <h2 className="font-ui mt-5 text-lg font-bold" style={{ color: "var(--ink)" }}>
-          وصلت رسالتك إلى الإدارة مباشرة
+          وصلت رسالتك إلى إدارة المنصة مباشرة
         </h2>
         <p className="mt-3 text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
-          شكرًا لوقتك.. سيطّلع صاحب المنصة على رسالتك قريبًا
-          ويرد عليك إن تركت بريدًا للتواصل.
+          شكرًا لوقتك.. ستطّلع إدارة المنصة على رسالتك قريبًا
+          وترد عليك إن تركت بريدًا للتواصل.
         </p>
         <button
           onClick={() => setState("idle")}
@@ -176,7 +176,7 @@ export function ContactForm() {
         />
         {subject === "طلب محو حسابي وبياناتي نهائيًا" && (
           <p className="mt-2 rounded-xl px-3.5 py-2.5 text-[11px] leading-6" style={{ background: "var(--accent-soft)", color: "var(--ink)" }}>
-            لتقديم طلب المحو: اكتب في الرسالة بريد حسابك المسجّل وعبارة تأكيد واضحة، وسينفّذ صاحب المنصة
+            لتقديم طلب المحو: اكتب في الرسالة بريد حسابك المسجّل وعبارة تأكيد واضحة، وستنفّذ إدارة المنصة
             المحو الشامل لحسابك وبياناتك خلال مدة لا تتجاوز ١٤ يومًا من الطلب. ولمحو أسرع فوري،
             يمكنك حذف حسابك بنفسك من صفحة «ملفي» — الحذف هناك فوري بلا انتظار.
           </p>
@@ -195,7 +195,7 @@ export function ContactForm() {
           maxLength={3000}
           className={`${inputCls} resize-none`}
           style={{ borderColor: "var(--border)", color: "var(--ink)" }}
-          placeholder="اكتب رسالتك بهدوء.. ستصل مباشرة إلى صاحب المنصة."
+          placeholder="اكتب رسالتك بهدوء.. ستصل مباشرة إلى إدارة المنصة."
         />
         <p className="mt-1 text-[11px]" style={{ color: "var(--ink-muted)" }}>
           {body.length} / 3000 حرف — اكتب سطرين على الأقل أو 50 حرفًا ليثمر حوارك نفعًا
@@ -214,7 +214,7 @@ export function ContactForm() {
         className="mt-6 w-full rounded-2xl px-6 py-3.5 text-sm font-bold transition-all hover:shadow-lift disabled:opacity-60"
         style={{ background: "var(--accent)", color: "#fff" }}
       >
-        {state === "sending" ? "جارٍ الإرسال.." : "إرسال الرسالة إلى الإدارة"}
+        {state === "sending" ? "جارٍ الإرسال.." : "إرسال الرسالة إلى إدارة المنصة"}
       </button>
     </form>
   );

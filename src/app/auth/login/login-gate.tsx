@@ -111,7 +111,7 @@ function LoginGateInner() {
 
   return (
     <main className="flex-1">
-      <section className="mx-auto flex max-w-lg flex-col items-center px-4 pb-24 pt-24 text-center sm:px-6">
+      <section className="mx-auto flex max-w-lg flex-col items-center px-4 pb-20 pt-20 text-center sm:px-6 sm:pb-24 sm:pt-24">
         {/* بوابة الوصول */}
         <div
           className="flex h-16 w-16 items-center justify-center rounded-3xl shadow-lift"
@@ -174,7 +174,7 @@ function LoginGateInner() {
                 href="/contact"
                 className="rounded-lg border border-[#FECACA] px-3 py-1.5 text-[11px] font-bold"
               >
-                إبلاغ الإدارة
+                إبلاغ إدارة المنصة
               </Link>
             </div>
           </div>
@@ -290,7 +290,7 @@ function LoginGateInner() {
                 بوابة الدخول بجوجل جاهزة.. بانتظار المفاتيح
               </p>
               <p className="mt-3 text-xs leading-7" style={{ color: "var(--ink-muted)" }}>
-                البنية التقنية اكتملت 100٪. لمّا يضيف مالك المنصة مفاتيح Google OAuth ستشتغل
+                البنية التقنية اكتملت 100٪. لمّا تضيف إدارة المنصة مفاتيح Google OAuth ستشتغل
                 هذه البوابة تلقائيًا دون أي تحديث إضافي.
               </p>
             </div>
@@ -311,7 +311,7 @@ export default function LoginGate() {
       {/* حدود Suspense إلزامية — useSearchParams في بوابة الوصول */}
       <Suspense
         fallback={
-          <p className="pt-32 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
+          <p className="pt-24 text-center text-sm" style={{ color: "var(--ink-muted)" }}>
             جارٍ التحميل..
           </p>
         }

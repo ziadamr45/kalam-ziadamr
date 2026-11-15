@@ -46,7 +46,7 @@ export const RANKS: RankMeta[] = [
     min: 350,
     color: "#8A5A14",
     soft: "rgba(138,90,20,0.16)",
-    hint: "أعلى رتبة فكرية — كلمتك لها وزن خاص عند صاحب المنصة",
+    hint: "أعلى رتبة فكرية — كلمتك لها وزن خاص عند إدارة المنصة",
   },
 ];
 
@@ -79,7 +79,7 @@ export function aiQuotaForScore(score: number): number {
   return AI_QUOTA_BY_RANK[rankForScore(score)] ?? AI_QUOTA_BASE;
 }
 
-/** هل الرتبة تتيح إرسال مقترحات خاصة للأدمن؟ (ميزة «أهل الكلمة» حصريًا) */
+/** هل الرتبة تتيح إرسال مقترحات خاصة لإدارة المنصة؟ (ميزة «أهل الكلمة» حصريًا) */
 export function canSendProposals(rank: string | null | undefined): boolean {
   return rank === "أهل الكلمة";
 }

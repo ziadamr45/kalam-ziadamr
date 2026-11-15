@@ -15,7 +15,7 @@ export const IMPACT_ACTION_LABEL: Record<string, string> = {
   QUOTE_SHARE: "حفظ ومشاركة اقتباس",
   CHANNEL_UNLOCKED: "افتتاح قناة «أهل الكلمة»",
   CALIBRATION: "معايرة اقتصاد النقاط",
-  ADMIN_ADJUST: "تعديل إداري من صاحب المنصة",
+  ADMIN_ADJUST: "تعديل من إدارة المنصة",
 };
 
 type LogRow = {

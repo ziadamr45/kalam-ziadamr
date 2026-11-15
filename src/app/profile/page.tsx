@@ -400,7 +400,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                 )}
                 {user.vipReason && (
                   <p className="mt-3 border-t pt-3 text-xs leading-6" style={{ borderColor: `${user.vipBadgeColor || "#D97706"}22`, color: "var(--ink-muted)" }}>
-                    سبب التمييز من الإدارة: {user.vipReason}
+                    سبب التمييز من إدارة المنصة: {user.vipReason}
                   </p>
                 )}
               </div>

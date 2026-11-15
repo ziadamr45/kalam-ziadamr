@@ -8,7 +8,7 @@ import type { SocialLinkEntry } from "@/lib/site-config";
 export const metadata: Metadata = {
   title: "اتصل بنا",
   description:
-    "راسل إدارة منصة كلام له لازمة مباشرة — اقتراحات، ملاحظات، أو كلمة طيبة. رسالتك تصل للإدارة مباشرة.",
+    "راسل إدارة منصة كلام له لازمة مباشرة — اقتراحات، ملاحظات، أو كلمة طيبة. رسالتك تصل لإدارة المنصة مباشرة.",
 };
 
 /* قنوات المراسلة السريعة المعتمدة — واتساب وتليجرام والبريد أزرار مباشرة */
@@ -40,7 +40,7 @@ export default async function ContactPage() {
             <div className="mx-auto mt-6 h-[3px] w-16 rounded-full" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
             <p className="mx-auto mt-5 max-w-xl text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
               اقتراح.. ملاحظة.. طلب حذف بيانات.. أو كلمة طيبة — كل الرسائل تصل
-              مباشرة إلى لوحة تحكم صاحب المنصة ويُطّلع عليها شخصيًا.
+              مباشرة إلى لوحة تحكم إدارة المنصة ويُطّلع عليها بعناية.
             </p>
           </header>
 

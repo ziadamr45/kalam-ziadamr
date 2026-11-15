@@ -4,7 +4,7 @@ import { useState } from "react";
 
 /**
  * قناة «أهل الكلمة» — نموذج إرسال المقترحات والموضوعات الفكرية الخاصة
- * مباشرة إلى الأدمن، حصريًا لأصحاب أعلى رتبة فكرية (350 نقطة أثر فأكثر).
+ * مباشرة إلى إدارة المنصة، حصريًا لأصحاب أعلى رتبة فكرية (350 نقطة أثر فأكثر).
  */
 export function ProposalForm() {
   const [open, setOpen] = useState(false);
@@ -32,7 +32,7 @@ export function ProposalForm() {
       setTitle("");
       setContent("");
       setOpen(false);
-      setMessage({ ok: true, text: "وصل مقترحك مباشرة إلى مكتب صاحب المنصة — شكرًا لثقتك" });
+      setMessage({ ok: true, text: "وصل مقترحك مباشرة إلى إدارة المنصة — شكرًا لثقتك" });
     } catch {
       setMessage({ ok: false, text: "انقطع الاتصال — أعد المحاولة" });
     } finally {
@@ -54,7 +54,7 @@ export function ProposalForm() {
             قناة «أهل الكلمة»
           </h2>
           <p className="mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
-            رتبتك تمنحك صوتًا خاصًا: أرسل موضوعاتك ومقترحاتك الفكرية مباشرة إلى صاحب المنصة.
+            رتبتك تمنحك صوتًا خاصًا: أرسل موضوعاتك ومقترحاتك الفكرية مباشرة إلى إدارة المنصة.
           </p>
         </div>
         <button
@@ -95,10 +95,10 @@ export function ProposalForm() {
               className="rounded-full px-6 py-2.5 text-sm font-bold shadow-soft transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
               style={{ background: "var(--accent)", color: "#fff" }}
             >
-              {busy ? "جارٍ الإرسال.." : "إرسال مباشر للأدمن"}
+              {busy ? "جارٍ الإرسال.." : "إرسال مباشر لإدارة المنصة"}
             </button>
             <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
-              خاص تمامًا — لا يراه سوى صاحب المنصة
+              خاص تمامًا — لا يراه سوى إدارة المنصة
             </span>
           </div>
         </div>
