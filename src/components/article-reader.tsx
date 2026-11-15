@@ -425,33 +425,40 @@ export function ArticleReader({
                     role="menuitem"
                     onClick={() => void handleSaveCloud()}
                     disabled={saveBusy !== null}
-                    className="w-full cursor-pointer rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:cursor-wait disabled:opacity-65"
+                    className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:cursor-wait disabled:opacity-65"
                   >
-                    <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                    <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: "var(--accent-strong)" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0" style={{ color: "var(--accent-strong)" }}>
                           <path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6.5 6.5 0 0 0-12.7 1.74A4 4 0 0 0 6 19.5h11.5z" />
                         </svg>
-                        حفظ في حسابي (مزامنة سحابية)
-                      </span>
-                      {saveBusy === "cloud" ? (
-                        <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
-                          <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                          </svg>
-                          {cloudSaved ? "جارٍ الإلغاء…" : "جارٍ الحفظ…"}
+                        <span className="truncate">
+                          {cloudSaved ? "محفوظ في حسابي ✓" : "حفظ في حسابي"}
                         </span>
-                      ) : cloudSaved ? (
-                        <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
-                      ) : null}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                        {cloudSaved
+                          ? "متزامن عبر كل أجهزتك"
+                          : loggedIn
+                            ? "مزامنة سحابية عبر كل أجهزتك"
+                            : "يتطلب تسجيل الدخول — سيُفتح باب الدخول"}
+                      </span>
                     </span>
-                    <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                      {cloudSaved
-                        ? "محفوظ حاليًا في حسابك — اضغط لإلغاء الحفظ"
-                        : loggedIn
-                          ? "للوصول إليه من أي جهاز عند تسجيل الدخول"
-                          : "يتطلب تسجيل الدخول — سيُفتح باب الدخول"}
-                    </span>
+                    {saveBusy === "cloud" ? (
+                      <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
+                        <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        {cloudSaved ? "جارٍ الإلغاء…" : "جارٍ الحفظ…"}
+                      </span>
+                    ) : cloudSaved ? (
+                      <span
+                        className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={{ background: "rgba(180, 68, 60, 0.1)", color: "#b4443c" }}
+                      >
+                        إلغاء الحفظ
+                      </span>
+                    ) : null}
                   </button>
 
                   <div className="mx-2 my-1 h-px" style={{ background: "var(--border)" }} aria-hidden />
@@ -460,32 +467,39 @@ export function ArticleReader({
                     role="menuitem"
                     onClick={() => void handleSaveLocal()}
                     disabled={saveBusy !== null}
-                    className="w-full cursor-pointer rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:cursor-wait disabled:opacity-65"
+                    className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl p-3 text-right transition-colors hover:bg-(--accent-soft) disabled:cursor-wait disabled:opacity-65"
                   >
-                    <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                    <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: "var(--accent-strong)" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0" style={{ color: "var(--accent-strong)" }}>
                           <rect x="7" y="2" width="10" height="20" rx="2" />
                           <path d="M11 18.5h2" />
                         </svg>
-                        حفظ على هذا الجهاز (قراءة بدون إنترنت)
-                      </span>
-                      {saveBusy === "local" ? (
-                        <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
-                          <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                          </svg>
-                          {localSaved ? "جارٍ الإلغاء…" : "جارٍ الحفظ…"}
+                        <span className="truncate">
+                          {localSaved ? "محفوظ على هذا الجهاز ✓" : "حفظ على هذا الجهاز"}
                         </span>
-                      ) : localSaved ? (
-                        <span className="shrink-0 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>✓ محفوظ</span>
-                      ) : null}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                        {localSaved
+                          ? "متاح بدون إنترنت"
+                          : "قراءة بدون إنترنت على هذا المتصفح"}
+                      </span>
                     </span>
-                    <span className="mt-1 block text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
-                      {localSaved
-                        ? "محفوظ حاليًا على هذا الجهاز — اضغط لإلغاء الحفظ"
-                        : "للقراءة في أي وقت بدون اتصال على هذا المتصفح"}
-                    </span>
+                    {saveBusy === "local" ? (
+                      <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
+                        <svg className="animate-spin motion-reduce:animate-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        {localSaved ? "جارٍ الإلغاء…" : "جارٍ الحفظ…"}
+                      </span>
+                    ) : localSaved ? (
+                      <span
+                        className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={{ background: "rgba(180, 68, 60, 0.1)", color: "#b4443c" }}
+                      >
+                        إلغاء الحفظ
+                      </span>
+                    ) : null}
                   </button>
                 </div>
               )}
