@@ -309,16 +309,27 @@ export function DiscussCompanion({
     try {
       const res = await fetch(
         `/api/ai/discuss?articleId=${encodeURIComponent(articleId)}&fp=${encodeURIComponent(getVisitorFingerprint())}`,
+        { cache: "no-store" },
       );
       if (res.ok) {
-        const data = (await res.json()) as { remaining: number; limit: number; unlimited?: boolean };
+        const data = (await res.json()) as {
+          remaining: number;
+          limit: number;
+          unlimited?: boolean;
+          messages?: ChatMessage[];
+        };
         setRemaining(data.remaining);
         setLimit(data.limit);
         setExhausted(!data.unlimited && data.remaining <= 0);
         setUnlimited(data.unlimited === true || data.remaining > 1_000_000);
+        if (Array.isArray(data.messages)) {
+          const synced = data.messages.slice(-40);
+          setMessages(synced);
+          persistSession(synced, data.remaining);
+        }
       }
     } catch {}
-  }, [articleId]);
+  }, [articleId, persistSession]);
 
   const openDrawer = useCallback(() => {
     if (status === "unauthenticated") {

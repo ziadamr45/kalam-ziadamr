@@ -187,12 +187,14 @@ model SearchHistory {
 }
 
 /* حصة نقاش الذكاء الاصطناعي الدائمة — سجل استهلاك صارم لكل قارئ مسجل
-   في كل مقال: يتحقق منه الخادم قبل أي نداء لـ Gemini ولا يُصفَّر بالتحديث */
+   في كل مقال: يتحقق منه الخادم قبل أي نداء لـ Gemini ولا يُصفَّر بالتحديث،
+   ويحفظ آخر 40 رسالة لمزامنة الحوار عبر كل أجهزة القارئ */
 model AiDiscussionUsage {
   id            String   @id @default(cuid())
   userId        String
   articleId     String
   messageCount  Int      @default(0)
+  messages      Json?    // آخر رسائل الحوار [{ role: "user" | "model", text: string }] للمزامنة عبر الأجهزة
   lastMessageAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -252,8 +254,7 @@ model CommentReport {
   commentId      String
   comment        Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
   reason         String
-  details        String?
-  reporterFp     String?
+  details        String?\n  reporterFp     String?
   reporterUserId String?
   reporterEmail  String?
   createdAt      DateTime @default(now())
@@ -291,8 +292,7 @@ model Interaction {
   @@unique([articleId, userId])
 }
 
-model SocialShare {
-  id        String   @id @default(cuid())
+model SocialShare {\n  id        String   @id @default(cuid())
   articleId String
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   platform  String
@@ -623,8 +623,7 @@ model LoginLog {
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   email       String?
-  ip          String?
-  userAgent   String?  @db.Text
+  ip          String?\n  userAgent   String?  @db.Text
   deviceType  String? // mobile | desktop | tablet
   browser     String?
   os          String?

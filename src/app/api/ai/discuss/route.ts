@@ -34,6 +34,25 @@ function quotaKey(articleId: string, readerKey: string): string {
 
 const UNLIMITED_QUOTA = Number.MAX_SAFE_INTEGER;
 
+type StoredTurn = { role: "user" | "model"; text: string };
+
+function sanitizeStoredMessages(raw: unknown): StoredTurn[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (item): item is { role: unknown; text: unknown } =>
+        Boolean(item) && typeof item === "object",
+    )
+    .filter(
+      (item): item is { role: "user" | "model"; text: string } =>
+        (item.role === "user" || item.role === "model") &&
+        typeof item.text === "string" &&
+        item.text.trim().length > 0,
+    )
+    .map((item) => ({ role: item.role, text: item.text.slice(0, 4000) }))
+    .slice(-40);
+}
+
 async function limitFor(readerKey: string): Promise<number> {
   if (readerKey.startsWith("u:")) {
     try {
@@ -50,26 +69,39 @@ async function limitFor(readerKey: string): Promise<number> {
   return BASE_PER_READER_PER_ARTICLE;
 }
 
-async function dbUsage(userId: string, articleId: string): Promise<number | null> {
+async function dbUsage(
+  userId: string,
+  articleId: string,
+): Promise<{ count: number; messages: StoredTurn[] } | null> {
   try {
     const row = await prisma.aiDiscussionUsage.findUnique({
       where: { userId_articleId: { userId, articleId } },
-      select: { messageCount: true },
+      select: { messageCount: true, messages: true },
     });
-    return row?.messageCount ?? 0;
+    if (!row) return { count: 0, messages: [] };
+    return {
+      count: row.messageCount,
+      messages: sanitizeStoredMessages(row.messages),
+    };
   } catch {
     return null;
   }
 }
 
-async function dbConsume(userId: string, articleId: string): Promise<number | null> {
+async function dbConsume(
+  userId: string,
+  articleId: string,
+  messages: StoredTurn[],
+): Promise<number | null> {
   try {
+    const clean = messages.slice(-40);
     const row = await prisma.aiDiscussionUsage.upsert({
       where: { userId_articleId: { userId, articleId } },
-      create: { userId, articleId, messageCount: 1 },
+      create: { userId, articleId, messageCount: 1, messages: clean },
       update: {
         messageCount: { increment: 1 },
         lastMessageAt: new Date(),
+        messages: clean,
       },
       select: { messageCount: true },
     });
@@ -433,7 +465,7 @@ async function usedFor(
 ): Promise<number> {
   if (readerKey.startsWith("u:")) {
     const db = await dbUsage(readerKey.slice(2), articleId);
-    if (db !== null) return db;
+    if (db !== null) return db.count;
     return memUsage(articleId, readerKey);
   }
   return guestUsage(request, articleId);
@@ -451,13 +483,15 @@ export async function GET(request: Request) {
   const readerKey = getReaderKey(session, fp);
 
   const limit = await limitFor(readerKey);
-  const used = await usedFor(request, articleId, readerKey);
+  const db = readerKey.startsWith("u:") ? await dbUsage(readerKey.slice(2), articleId) : null;
+  const used = db !== null ? db.count : await usedFor(request, articleId, readerKey);
 
   return NextResponse.json({
     limit,
     used,
     remaining: Math.max(0, limit - used),
     unlimited: limit >= UNLIMITED_QUOTA,
+    messages: db?.messages ?? [],
   });
 }
 
@@ -674,9 +708,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const updatedMessages: StoredTurn[] = [
+      ...history,
+      { role: "user", text: message.trim() },
+      { role: "model", text: reply },
+    ].slice(-40);
+
     let usedAfter = used + 1;
     if (readerKey.startsWith("u:")) {
-      const dbCount = await dbConsume(readerKey.slice(2), articleId);
+      const dbCount = await dbConsume(readerKey.slice(2), articleId, updatedMessages);
       if (dbCount !== null) {
         usedAfter = dbCount;
       } else {
@@ -692,6 +732,7 @@ export async function POST(request: Request) {
       limit,
       used: usedAfter,
       unlimited: isUnlimited,
+      messages: updatedMessages,
     });
 
     if (!readerKey.startsWith("u:")) {
