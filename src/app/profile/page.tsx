@@ -20,6 +20,7 @@ import { verificationSealColor, verificationSealLabel, parseSocialLinks } from "
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 import { displayName } from "@/lib/identity";
 import { IMPACT_ACTION_LABEL, ImpactLogButton } from "@/components/impact-log-modal";
+import { ImpactGuideButton } from "@/components/impact-guide-modal";
 import { RANKS, rankMeta, canSendProposals } from "@/lib/ranks";
 import { formatArabicDate } from "@/lib/utils";
 
@@ -36,6 +37,12 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
   REJECTED: { text: "مرفوض", color: "#b4443c" },
 };
 
+const DEVICE_TYPE_LABEL: Record<string, string> = {
+  mobile: "هاتف",
+  tablet: "جهاز لوحي",
+  desktop: "حاسوب",
+};
+
 const TABS: Array<{ key: string; href: string; label: string }> = [
   { key: "profile", href: "/profile", label: "ملفي وأثري" },
   { key: "settings", href: "/profile?tab=settings", label: "الإعدادات والتفضيلات" },
@@ -50,7 +57,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     redirect("/auth/login?callback=/profile");
   }
 
-  const [user, logs, comments] = await Promise.all([
+  const [user, logs, comments, loginLogs] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -85,7 +92,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       ? prisma.impactLog.findMany({
           where: { userId: session.user.id },
           orderBy: { createdAt: "desc" },
-          take: 12,
+          take: 5,
           select: {
             id: true,
             actionType: true,
@@ -107,6 +114,23 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             status: true,
             createdAt: true,
             article: { select: { slug: true, title: true } },
+          },
+        })
+      : Promise.resolve([]),
+    tab === "security"
+      ? prisma.loginLog.findMany({
+          where: { userId: session.user.id },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            deviceType: true,
+            browser: true,
+            os: true,
+            city: true,
+            country: true,
+            isNewDevice: true,
+            createdAt: true,
           },
         })
       : Promise.resolve([]),
@@ -214,6 +238,18 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                 <h1 className="font-body text-2xl font-bold" style={{ color: "var(--ink)" }}>
                   {displayName(user)}
                 </h1>
+                <Link
+                  href="/profile?tab=settings"
+                  prefetch={true}
+                  aria-label="تعديل الهوية المعروضة"
+                  title="تعديل الاسم والصورة والنبذة"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft)"
+                  style={{ color: "var(--ink-muted)" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                </Link>
                 {user.isVerified && (() => {
                   const sealColor = verificationSealColor(user.verificationType);
                   const sealLabel = verificationSealLabel(user.verificationType, user.verificationLabel);
@@ -269,6 +305,44 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             </div>
 
             <SignOutButton />
+          </div>
+        </section>
+
+        <section className="mx-auto mt-6 grid max-w-3xl grid-cols-3 gap-3 px-4 sm:px-6">
+          <div
+            className="rounded-2xl border p-4 text-center shadow-soft"
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+          >
+            <p className="font-body text-2xl font-bold" style={{ color: "var(--accent-strong)" }}>
+              {new Intl.NumberFormat("ar-EG").format(user._count.comments)}
+            </p>
+            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+              تعليقاتي
+            </p>
+          </div>
+          <Link
+            href="/saved"
+            prefetch={true}
+            className="rounded-2xl border p-4 text-center shadow-soft transition-all hover:scale-[1.02]"
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+          >
+            <p className="font-body text-2xl font-bold" style={{ color: "var(--accent-strong)" }}>
+              {new Intl.NumberFormat("ar-EG").format(user._count.savedArticles)}
+            </p>
+            <p className="mt-1 text-xs font-semibold" style={{ color: "var(--accent-strong)" }}>
+              محفوظاتي ↗
+            </p>
+          </Link>
+          <div
+            className="rounded-2xl border p-4 text-center shadow-soft"
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+          >
+            <p className="font-body text-2xl font-bold" style={{ color: "var(--accent-strong)" }}>
+              {new Intl.NumberFormat("ar-EG").format(user._count.interactions)}
+            </p>
+            <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+              تفاعلاتي
+            </p>
           </div>
         </section>
 
@@ -362,10 +436,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                 </span>
               ))}
             </div>
-            <p className="mt-3 text-[11px] leading-6" style={{ color: "var(--ink-muted)" }}>
-              {meta.hint}. تُكتسب النقاط بالقراءة المتأنية (+1)، والنقاش العميق مع الذكاء الاصطناعي (+1)،
-              والتعليق المعتمد (+2)، وإعجاب قارئ بتعليقك (+1)، وتمييز التحرير لتعليقك (+10).
-            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] leading-6" style={{ color: "var(--ink-muted)" }}>
+                {meta.hint}.
+              </p>
+              <ImpactGuideButton />
+            </div>
           </div>
         </section>
           </>
@@ -490,27 +566,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </section>
         )}
 
-        <section className="mx-auto mt-10 grid max-w-3xl grid-cols-3 gap-3 px-4 sm:px-6">
-          {[
-            { label: "تعليقاتي", value: user._count.comments },
-            { label: "محفوظاتي", value: user._count.savedArticles },
-            { label: "تفاعلاتي", value: user._count.interactions },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="rounded-2xl border p-4 text-center shadow-soft"
-              style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-            >
-              <p className="font-body text-2xl font-bold" style={{ color: "var(--accent-strong)" }}>
-                {new Intl.NumberFormat("ar-EG").format(s.value)}
-              </p>
-              <p className="mt-1 text-xs" style={{ color: "var(--ink-muted)" }}>
-                {s.label}
-              </p>
-            </div>
-          ))}
-        </section>
-
         <section className="mx-auto mt-10 max-w-3xl px-4 pb-24 sm:px-6">
           <h2 className="mb-4 font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
             تعليقاتي
@@ -602,15 +657,63 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             },
           ]}
         />
-        <section
-          data-tour="security-devices"
-          className="mx-auto mt-6 max-w-3xl rounded-2xl border p-5 shadow-soft sm:p-6"
-          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
-        >
-          <DevicesPanel />
+        <section data-tour="security-devices" className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <div
+            className="rounded-2xl border p-5 shadow-soft sm:p-6"
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+          >
+            <DevicesPanel />
+          </div>
         </section>
 
-        <section data-tour="security-danger" className="mx-auto mt-4 max-w-3xl px-4 pb-24 sm:px-6">
+        {loginLogs.length > 0 && (
+          <section className="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+            <div
+              className="rounded-2xl border p-5 shadow-soft sm:p-6"
+              style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+            >
+              <h2 className="font-ui text-base font-bold" style={{ color: "var(--ink)" }}>
+                آخر عمليات الدخول
+              </h2>
+              <p className="mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
+                سجل آخر 5 دخولات مسجلة لحسابك للاطمئنان ومراجعة أي نشاط غير مألوف.
+              </p>
+              <ul className="mt-4 space-y-2.5">
+                {loginLogs.map((l) => {
+                  const dev = DEVICE_TYPE_LABEL[l.deviceType ?? ""] ?? "جهاز";
+                  const agent = [l.browser, l.os].filter(Boolean).join(" · ");
+                  const loc = [l.city, l.country].filter(Boolean).join("، ");
+                  return (
+                    <li
+                      key={l.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5"
+                      style={{ background: "var(--bg-soft)", borderColor: "var(--border)" }}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold" style={{ color: "var(--ink)" }}>
+                          {dev}{agent ? ` — ${agent}` : ""}
+                        </p>
+                        <p className="mt-0.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                          {formatArabicDate(l.createdAt)}{loc ? ` · ${loc}` : ""}
+                        </p>
+                      </div>
+                      {l.isNewDevice && (
+                        <span
+                          className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+                          style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                        >
+                          جهاز جديد
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </section>
+        )}
+
+        <section data-tour="security-danger" className="mx-auto mt-6 max-w-3xl px-4 pb-24 sm:px-6">
           <AccountDangerZone />
         </section>
           </>
