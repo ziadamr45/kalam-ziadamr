@@ -50,7 +50,18 @@ function MorphBurger({ open }: { open: boolean }) {
 }
 
 export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const [clientPath, setClientPath] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setClientPath(window.location.pathname || "/");
+    }
+  }, [rawPathname]);
+
+  const effectivePath = rawPathname || clientPath || "/";
+  const pathname =
+    effectivePath.length > 1 ? effectivePath.replace(/\/+$/, "") : effectivePath || "/";
+
   const [solid, setSolid] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [immersed, setImmersed] = useState(false);
@@ -67,9 +78,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastY = useRef(0);
 
-  const isArticlePage = pathname?.startsWith("/article/") ?? false;
+  const isArticlePage = pathname.startsWith("/article/");
   const isHomeActive = pathname === "/";
-  const isSectionActive = (pathname?.startsWith("/section/") ?? false) || sectionsOpen;
+  const isSectionActive = pathname.startsWith("/section/") || sectionsOpen;
   const isAboutActive = pathname === "/about";
 
   /* إغلاق قائمة الأقسام المنسدلة عند الضغط خارجها */
@@ -308,6 +319,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
               style={{
                 background: isHomeActive ? "var(--accent-soft)" : "transparent",
                 color: isHomeActive ? "var(--accent-strong)" : "var(--ink)",
+                boxShadow: isHomeActive
+                  ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)"
+                  : undefined,
               }}
             >
               الرئيسية
@@ -328,6 +342,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
                 style={{
                   background: isSectionActive ? "var(--accent-soft)" : "transparent",
                   color: isSectionActive ? "var(--accent-strong)" : "var(--ink)",
+                  boxShadow: isSectionActive
+                    ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)"
+                    : undefined,
                 }}
                 aria-haspopup="true"
                 aria-expanded={sectionsOpen}
@@ -406,6 +423,9 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
               style={{
                 background: isAboutActive ? "var(--accent-soft)" : "transparent",
                 color: isAboutActive ? "var(--accent-strong)" : "var(--ink)",
+                boxShadow: isAboutActive
+                  ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)"
+                  : undefined,
               }}
             >
               عن المنصة

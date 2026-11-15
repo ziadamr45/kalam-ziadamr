@@ -4,12 +4,8 @@
    الأصول الثابتة كاش أولًا. القراءة دون اتصال عبر IndexedDB.
    ============================================================ */
 
-/* رفع الإصدار: إبعاد أصول Next.js وحمولات RSC عن أي كاش للسواتش —
-   الكاش القديم كان يخدم chunks وحمولات RSC من نسخة نشر سابقة بعد
-   كل تحديث، فينهار التنقيل بـ «Cannot read properties of undefined
-   (reading 'call')» عند طلب chunk محذوف من نسخة قديمة مفتوحة.
-   رفع النسخة يصفّي الكاش المسموم لدى كل المثبتين */
-const CACHE_VERSION = "kalam-v10";
+/* رفع الإصدار: تصفية الكاش القديم لضمان أحدث ترويسة وأيقونات */
+const CACHE_VERSION = "kalam-v11";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
