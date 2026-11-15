@@ -20,7 +20,7 @@ export function BrandMark({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 128 128"
+      viewBox="16 14 96 112"
       fill="none"
       aria-hidden
       style={{

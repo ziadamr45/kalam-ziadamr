@@ -49,7 +49,7 @@ export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?
             aria-label="كلام له لازمة"
           >
             <svg
-              viewBox="0 0 128 128"
+              viewBox="16 14 96 112"
               fill="none"
               className="h-full w-full"
               style={{ filter: "drop-shadow(0 2px 3px rgba(0, 0, 0, 0.18))" }}

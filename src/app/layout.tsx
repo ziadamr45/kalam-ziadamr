@@ -78,23 +78,23 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "كلام له لازمة",
       title,
       description: desc,
-      /* ?v=4 يكسر كاش تطبيقات المحادثات (واتساب/تليجرام) عند تحديث الصورة */
-      images: [{ url: "/og-default.png?v=4", width: 1200, height: 630 }],
+      /* ?v=5 يكسر كاش تطبيقات المحادثات (واتساب/تليجرام) عند تحديث الصورة */
+      images: [{ url: "/og-default.png?v=5", width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description: desc,
-      images: ["/og-default.png?v=4"],
+      images: ["/og-default.png?v=5"],
     },
     icons: {
       /* أيقونة التبويب المخصصة: شعار الكاف الأصلي المحدد —
          وأيقونات PWA الكاملة تبقى في manifest.ts للتثبيت على الموبايل */
       icon: [
-        { url: "/favicon.ico?v=4", type: "image/x-icon" },
-        { url: "/icons/favicon-tab.png?v=4", sizes: "96x96", type: "image/png" },
+        { url: "/favicon.ico?v=5", type: "image/x-icon" },
+        { url: "/icons/favicon-tab.png?v=5", sizes: "96x96", type: "image/png" },
       ],
-      apple: "/icons/apple-touch-icon.png?v=4",
+      apple: "/icons/apple-touch-icon.png?v=5",
     },
     manifest: "/manifest.webmanifest",
   };
@@ -133,7 +133,7 @@ export default async function RootLayout({
       "@type": "Organization",
       name,
       url: SITE_URL,
-      logo: { "@type": "ImageObject", url: `${SITE_URL}/icons/icon-512.png?v=4` },
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/icons/icon-512.png?v=5` },
     },
   };
 

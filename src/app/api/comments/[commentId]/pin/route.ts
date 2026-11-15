@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logEvent, writePublicTrail } from "@/lib/audit";
@@ -39,7 +40,7 @@ export async function POST(
 
     const comment = await prisma.comment.findUnique({
       where: { id: commentId },
-      select: { id: true, userId: true, articleId: true },
+      select: { id: true, userId: true, articleId: true, article: { select: { slug: true } } },
     });
     if (!comment) {
       return NextResponse.json({ error: "التعليق غير موجود" }, { status: 404 });
@@ -63,6 +64,11 @@ export async function POST(
         });
       }
     });
+
+    if (comment.article?.slug) {
+      revalidatePath(`/article/${comment.article.slug}`);
+      revalidatePath(`/article/${encodeURIComponent(comment.article.slug)}`);
+    }
 
     writePublicTrail({
       actorId: session.user.id,

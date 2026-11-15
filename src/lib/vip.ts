@@ -305,7 +305,7 @@ function vipEmailHtml(input: VipDispatchInput, name: string | null): string {
       <h1 style="margin:0 0 18px;font-size:22px;color:#1c1917;">${title}</h1>
       <div style="display:inline-block;padding:8px 22px;border-radius:999px;background:${color};color:#fff;font-size:14px;font-weight:700;margin-bottom:18px;">${badge}</div>
       <p style="margin:0;font-size:15px;line-height:2;color:#44403c;">${body}</p>
-      <p style="margin:22px 0 0;font-size:12px;color:#a8a29e;">${name ? `أهلاً ${name} — ` : ""}هذه رسالة نظامية من منظومة التوثيق، لا تحتاج ردًا.</p>
+      <p style="margin:22px 0 0;font-size:12px;color:#a8a29e;">${name ? `أهلًا ${name} — ` : ""}هذه رسالة نظامية من منظومة التوثيق، لا تحتاج ردًا.</p>
     </div>
     <p style="text-align:center;font-size:11px;color:#a8a29e;margin:16px 0 0;">نُشر بعناية.. لكلام له لازمة.</p>
   </div></body></html>`;

@@ -107,14 +107,14 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
 
   const icons: MetadataRoute.Manifest["icons"] = light
     ? [
-        { src: "/icons/icon-light-192.png?v=4", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/icons/icon-light-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/icons/icon-light-maskable-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: "/icons/icon-light-192.png?v=5", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-light-512.png?v=5", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-light-maskable-512.png?v=5", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ]
     : [
-        { src: "/icons/icon-192.png?v=4", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/icons/icon-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/icons/maskable-512.png?v=4", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: "/icons/icon-192.png?v=5", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-512.png?v=5", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icons/maskable-512.png?v=5", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ];
 
   const shortcuts: Shortcut[] = [...STATIC_SHORTCUTS];

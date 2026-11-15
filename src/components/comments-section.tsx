@@ -97,7 +97,10 @@ export function CommentsSection({
   isLoggedIn?: boolean;
 }) {
   const { data: session } = useSession();
-  const [comments] = useState(initialComments);
+  const [comments, setComments] = useState(initialComments);
+  useEffect(() => {
+    setComments(initialComments);
+  }, [initialComments]);
   const [content, setContent] = useState("");
   const [status, setStatus] = useState<"idle" | "blocked" | "sending" | "sent" | "error">("idle");
   const [blockReason, setBlockReason] = useState<string>("");
@@ -138,25 +141,43 @@ export function CommentsSection({
       .catch(() => {});
   }, [loggedIn]);
 
-  /* التثبيت الذاتي — يُنفذ في الخادم بعد فحص الصلاحية مرة أخرى */
+  /* التثبيت الذاتي — تحديث فوري في مكانه بلا إعادة تحميل الصفحة مع إعادة فرز قائمة الحوار */
   const togglePin = async (commentId: string, pin: boolean) => {
     if (pinBusy) return;
     setPinBusy(commentId);
+    const prevComments = comments;
+    const nextComments = comments
+      .map((c) => {
+        if (c.id === commentId) return { ...c, selfPinned: pin };
+        if (pin && myId && c.authorId === myId && c.selfPinned) return { ...c, selfPinned: false };
+        return c;
+      })
+      .sort(
+        (a, b) =>
+          Number(Boolean(b.isInspiring)) - Number(Boolean(a.isInspiring)) ||
+          Number(Boolean(b.selfPinned)) - Number(Boolean(a.selfPinned)) ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    setComments(nextComments);
     try {
       const res = await fetch(`/api/comments/${commentId}/pin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
       });
-      if (res.ok) {
-        /* إعادة تحميل خفيفة للصفحة تعكس الترتيب الجديد من الخادم */
-        window.location.reload();
-        return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setComments(prevComments);
+        setVoteNotice(data?.error ?? "تعذر تحديث التثبيت — جرّب مرة أخرى.");
+        window.setTimeout(() => setVoteNotice(null), 5000);
       }
     } catch {
-      /* صامت */
+      setComments(prevComments);
+      setVoteNotice("تعذر تحديث التثبيت — تحقق من اتصالك.");
+      window.setTimeout(() => setVoteNotice(null), 5000);
+    } finally {
+      setPinBusy(null);
     }
-    setPinBusy(null);
   };
 
   /* جلب الأعداد الحية للتفاعلات وأصواتي (يعمل للزائر والمسجل لكسر جمود كاش ISR) */
