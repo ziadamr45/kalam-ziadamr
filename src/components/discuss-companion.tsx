@@ -364,9 +364,12 @@ export function DiscussCompanion({
     messagesRef.current = combined;
     if (local.remaining !== null && remaining === null) {
       setRemaining(local.remaining);
+      if (local.remaining <= 0 && !unlimited) {
+        setExhausted(true);
+      }
     }
     return combined;
-  }, [readLocalMessages, remaining]);
+  }, [readLocalMessages, remaining, unlimited]);
 
   const persistSession = useCallback(
     (msgs: ChatMessage[], rem: number | null) => {
@@ -460,12 +463,13 @@ export function DiscussCompanion({
     [articleId, persistSession, pushLocalToServer, readLocalMessages, status],
   );
 
-  /* عند اكتمال جلسة المستخدم والنافذة مفتوحة، نعيد استرجاع ومزامنة السجل تحت معرفه الصحيح */
+  /* الجلب المسبق في الخلفية فور جاهزية جلسة القارئ:
+     حتى يظهر الرصيد المتبقي أو حالة نفاد الحصة وسجل الرسائل لحظيًا (0ms) عند فتح النافذة */
   useEffect(() => {
-    if (!open || status !== "authenticated") return;
+    if (status !== "authenticated") return;
     const local = restoreSession();
     void fetchQuota(local);
-  }, [open, status, session?.user?.id, restoreSession, fetchQuota]);
+  }, [status, session?.user?.id, articleId, restoreSession, fetchQuota]);
 
   const openDrawer = useCallback(() => {
     if (status === "unauthenticated") {
