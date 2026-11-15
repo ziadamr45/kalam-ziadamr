@@ -10,7 +10,7 @@ import { logEvent } from "@/lib/audit";
  * جغرافية موثوقة كاحتياط) + نوع الجهاز والمتصفح ونظام التشغيل.
  *
  * عند الدخول من جهاز غير معتاد يُطلق التنبيه الأمني الفوري عبر ثلاث قنوات:
- *  1) بريد أمني عبر Resend (يُفعَّل تلقائيًا عند إضافة RESEND_API_KEY للبيئة)
+ *  1) بريد أمني عبر Gmail SMTP (Nodemailer)
  *  2) إشعار ويب فوري Web Push لكل أجهزة المستخدم المسجلة
  *  3) إشعار داخلي في جرس المنصة (UserNotification)
  *
@@ -130,7 +130,7 @@ export function deviceFingerprint(userId: string, ua: string | null | undefined)
     .digest("hex");
 }
 
-/* ===================== البريد الأمني (Resend REST مباشرة — بلا تبعيات) ===================== */
+/* ===================== البريد الأمني (RTL مضمون داخل Gmail) ===================== */
 
 function securityEmailHtml(input: {
   deviceLabel: string;
@@ -139,29 +139,29 @@ function securityEmailHtml(input: {
 }): string {
   const { deviceLabel, locationLabel, whenLabel } = input;
   return `<!DOCTYPE html>
-<html lang="ar" dir="rtl"><body style="margin:0;padding:0;background:#f4f6f9;font-family:'Segoe UI',Tahoma,Arial,sans-serif;">
-<div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-  <div style="background:#ffffff;border:1px solid #e6eaf1;border-radius:16px;overflow:hidden;">
-    <div style="background:#0d1626;padding:24px;text-align:center;">
+<html lang="ar" dir="rtl"><body style="margin:0;padding:0;background:#f4f6f9;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;text-align:right;">
+<div dir="rtl" style="max-width:560px;margin:0 auto;padding:32px 16px;direction:rtl;text-align:right;">
+  <div dir="rtl" style="background:#ffffff;border:1px solid #e6eaf1;border-radius:16px;overflow:hidden;direction:rtl;text-align:right;">
+    <div dir="rtl" style="background:#0d1626;padding:24px;text-align:center;direction:rtl;">
       <div style="color:#a16a1f;font-size:22px;font-weight:700;">كلام له لازمة</div>
       <div style="color:#e6eaf1;font-size:13px;margin-top:4px;">إشعار أمني لحماية حسابك</div>
     </div>
-    <div style="padding:28px 24px;color:#0d1626;line-height:1.9;">
-      <p style="margin:0 0 14px;">مرحبًا،</p>
-      <p style="margin:0 0 14px;">رصدنا <b>تسجيل دخول جديد لحسابك</b> من جهاز أو موقع لم نعتد رؤيته منك. إن كنت أنت من قام بذلك فلا داعي لأي إجراء — هذه رسالة تعريفية لطمأنتك.</p>
-      <table style="width:100%;border-collapse:collapse;background:#f4f6f9;border-radius:12px;overflow:hidden;">
-        <tr><td style="padding:10px 14px;border-bottom:1px solid #e6eaf1;font-weight:700;width:35%;">الجهاز</td><td style="padding:10px 14px;border-bottom:1px solid #e6eaf1;">${deviceLabel}</td></tr>
-        <tr><td style="padding:10px 14px;border-bottom:1px solid #e6eaf1;font-weight:700;">الموقع التقريبي</td><td style="padding:10px 14px;border-bottom:1px solid #e6eaf1;">${locationLabel}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:700;">التاريخ والوقت</td><td style="padding:10px 14px;">${whenLabel}</td></tr>
+    <div dir="rtl" align="right" style="padding:28px 24px;color:#0d1626;line-height:1.9;direction:rtl;text-align:right;">
+      <p dir="rtl" style="margin:0 0 14px;direction:rtl;text-align:right;">مرحبًا،</p>
+      <p dir="rtl" style="margin:0 0 14px;direction:rtl;text-align:right;">رصدنا <b>تسجيل دخول جديد لحسابك</b> من جهاز أو موقع لم نعتد رؤيته منك. إن كنت أنت من قام بذلك فلا داعي لأي إجراء — هذه رسالة تعريفية لطمأنتك.</p>
+      <table dir="rtl" align="right" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;background:#f4f6f9;border-radius:12px;overflow:hidden;direction:rtl;text-align:right;">
+        <tr><td align="right" style="padding:10px 14px;border-bottom:1px solid #e6eaf1;font-weight:700;width:35%;text-align:right;">الجهاز</td><td align="right" style="padding:10px 14px;border-bottom:1px solid #e6eaf1;text-align:right;">${deviceLabel}</td></tr>
+        <tr><td align="right" style="padding:10px 14px;border-bottom:1px solid #e6eaf1;font-weight:700;text-align:right;">الموقع التقريبي</td><td align="right" style="padding:10px 14px;border-bottom:1px solid #e6eaf1;text-align:right;">${locationLabel}</td></tr>
+        <tr><td align="right" style="padding:10px 14px;font-weight:700;text-align:right;">التاريخ والوقت</td><td align="right" style="padding:10px 14px;text-align:right;">${whenLabel}</td></tr>
       </table>
-      <p style="margin:18px 0 6px;"><b>إن لم تكن أنت من سجّل الدخول:</b></p>
-      <ul style="margin:0;padding-right:20px;color:#41587a;">
-        <li>غيّر كلمة سر حساب Google الخاص بك فورًا من صفحة إعدادات حسابك.</li>
-        <li>فعّل التحقق بخطوتين (2-Step Verification) في حساب Google.</li>
-        <li>تواصل معنا لتأمين الحساب ومزامنة الهوية من جديد.</li>
+      <p dir="rtl" style="margin:18px 0 6px;direction:rtl;text-align:right;clear:both;"><b>إن لم تكن أنت من سجّل الدخول:</b></p>
+      <ul dir="rtl" style="margin:0;padding-right:20px;padding-left:0;color:#41587a;direction:rtl;text-align:right;">
+        <li style="text-align:right;">غيّر كلمة سر حساب Google الخاص بك فورًا من صفحة إعدادات حسابك.</li>
+        <li style="text-align:right;">فعّل التحقق بخطوتين (2-Step Verification) في حساب Google.</li>
+        <li style="text-align:right;">تواصل معنا لتأمين الحساب ومزامنة الهوية من جديد.</li>
       </ul>
     </div>
-    <div style="padding:16px 24px;background:#f4f6f9;color:#41587a;font-size:12px;text-align:center;border-top:1px solid #e6eaf1;">
+    <div dir="rtl" style="padding:16px 24px;background:#f4f6f9;color:#41587a;font-size:12px;text-align:center;border-top:1px solid #e6eaf1;direction:rtl;">
       هذه رسالة أمنية آلية من منصة «كلام له لازمة» — أُرسلت لحظة رصد الدخول حمايةً لحسابك.
     </div>
   </div>
