@@ -80,7 +80,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
 
   const isArticlePage = pathname.startsWith("/article/");
   const isHomeActive = pathname === "/";
-  const isSectionActive = pathname.startsWith("/section/") || sectionsOpen;
+  const isSectionActive = pathname.startsWith("/section/");
   const isAboutActive = pathname === "/about";
 
   /* إغلاق قائمة الأقسام المنسدلة عند الضغط خارجها */
@@ -308,12 +308,12 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             </span>
           </Link>
 
-          {/* تنقل سطح المكتب — مع تمييز واضح للصفحة النشطة ودعم الضغط والمرور لقائمة الأقسام */}
+          {/* تنقل سطح المكتب — تمييز موحد المقاس للصفحة النشطة فقط، وحالة هادئة لفتح قائمة الأقسام */}
           <nav className="hidden items-center gap-1 text-sm md:flex">
             <Link
               href="/"
               aria-current={isHomeActive ? "page" : undefined}
-              className={`rounded-full px-3.5 py-1.5 transition-colors hover:bg-(--accent-soft) ${
+              className={`inline-flex items-center rounded-full px-3.5 py-1.5 leading-5 transition-colors hover:bg-(--accent-soft) ${
                 isHomeActive ? "font-bold" : ""
               }`}
               style={{
@@ -336,11 +336,15 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
               <button
                 type="button"
                 onClick={() => setSectionsOpen((v) => !v)}
-                className={`flex cursor-pointer items-center gap-1 rounded-full px-3.5 py-1.5 transition-colors hover:bg-(--accent-soft) ${
+                className={`no-touch-grow inline-flex cursor-pointer items-center gap-1 rounded-full px-3.5 py-1.5 leading-5 transition-colors hover:bg-(--accent-soft) ${
                   isSectionActive ? "font-bold" : ""
                 }`}
                 style={{
-                  background: isSectionActive ? "var(--accent-soft)" : "transparent",
+                  background: isSectionActive
+                    ? "var(--accent-soft)"
+                    : sectionsOpen
+                      ? "color-mix(in srgb, var(--ink) 6%, transparent)"
+                      : "transparent",
                   color: isSectionActive ? "var(--accent-strong)" : "var(--ink)",
                   boxShadow: isSectionActive
                     ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)"
@@ -417,7 +421,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             <Link
               href="/about"
               aria-current={isAboutActive ? "page" : undefined}
-              className={`rounded-full px-3.5 py-1.5 transition-colors hover:bg-(--accent-soft) ${
+              className={`inline-flex items-center rounded-full px-3.5 py-1.5 leading-5 transition-colors hover:bg-(--accent-soft) ${
                 isAboutActive ? "font-bold" : ""
               }`}
               style={{
