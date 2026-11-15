@@ -15,14 +15,14 @@ const amiri = Amiri({
   weight: ["400", "700"],
   style: ["normal", "italic"],
   variable: "--font-next-body",
-  display: "swap",
+  display: "block",
 });
 
 const readex = Readex_Pro({
   subsets: ["arabic", "latin"],
   weight: ["300", "400", "500", "600", "700"],
   variable: "--font-next-ui",
-  display: "swap",
+  display: "block",
 });
 
 /* خط الرسم العثماني الفاخر للآيات القرآنية */
@@ -31,6 +31,7 @@ const amiriQuran = Amiri_Quran({
   subsets: ["arabic"],
   variable: "--font-quran",
   display: "swap",
+  preload: false,
 });
 
 /* خط النسخ الكلاسيكي الرصين للأحاديث النبوية */
@@ -39,6 +40,7 @@ const naskh = Noto_Naskh_Arabic({
   subsets: ["arabic"],
   variable: "--font-naskh",
   display: "swap",
+  preload: false,
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kalam-ziadamr.vercel.app";

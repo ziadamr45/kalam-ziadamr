@@ -86,23 +86,6 @@ function ServiceWorkerRegistrar() {
 
 /* ===================== حارس إبطال الجلسة عن بُعد ===================== */
 
-/**
- * بروتوكول إنهاء الجلسة المحروق (كسر حلقة التحديث اللانهائية):
- *
- * عند إبطال جهاز من صفحة الملف كانت الكوكيز القديمة تبقى حية
- * (نداء signout الخام بلا CSRF يفشل صامتًا) → كل تحديث يعيد اكتشاف
- * الإبطال → حلقة لا نهائية. البروتوكول الجديد بالترتيب الصارم:
- *  ١. /api/auth/revoke-cleanup → الخادم يمسح كوكيز الجلسة httpOnly
- *     في نفس الاستجابة (JavaScript لا يستطيع حذفها)
- *  ٢. signOut({ redirect: false }) → تنظيف حالة Auth.js كاملة من
- *     جهة العميل (بـ CSRF سليم داخليًا)
- *  ٣. تنظيف أثر الحساب المحلي + ختم إشارة «انتهت الجلسة»
- *  ٤. تحويل نظيف للرئيسية حيث يستقبل المستخدم تنبيهًا لطيفًا
- *
- * يغطي أيضًا معالجة الجانب العميل (Session Cleanup): جلسة فارغة
- * مع مؤشر تسجيل دخول سابق محفوظ → نفس التنظيف الكامل.
- */
-
 const WAS_LOGGED_IN_KEY = "kalam_was_logged_in";
 const SESSION_ENDED_KEY = "kalam_session_ended";
 
@@ -124,7 +107,7 @@ function SessionRevocationWatcher() {
     let cancelled = false;
 
     /** البروتوكول الكامل — يُنفَّذ مرة واحدة للحياة في الصفحة */
-    const terminateSession = async (): Promise<void> => {
+    const terminateSession = async (showNotice: boolean): Promise<void> => {
       if (terminating.current) return;
       terminating.current = true;
       try {
@@ -134,9 +117,11 @@ function SessionRevocationWatcher() {
         await signOut({ redirect: false }).catch(() => {});
       } catch {}
       try {
-        /* ٣: لا آثار محلية للحساب + ختم التنبيه اللطيف */
+        /* ٣: لا آثار محلية للحساب + ختم التنبيه فقط عند الإبطال الفعلي */
         window.localStorage.removeItem(WAS_LOGGED_IN_KEY);
-        window.sessionStorage.setItem(SESSION_ENDED_KEY, "1");
+        if (showNotice) {
+          window.sessionStorage.setItem(SESSION_ENDED_KEY, "1");
+        }
       } catch {}
       /* ٤: الرئيسية بنظافة كاملة — الكوكي مات فلا حلقة تعود */
       if (!cancelled) window.location.replace("/");
@@ -154,9 +139,9 @@ function SessionRevocationWatcher() {
         } | null;
         if (cancelled) return;
 
-        /* الحالة الأولى: خادم الحسابة أعلن الإبطال صراحة */
+        /* الحالة الأولى: الخادم أعلن إبطال الجهاز صراحة */
         if (data?.deviceRevoked) {
-          void terminateSession();
+          void terminateSession(true);
           return;
         }
 
@@ -166,9 +151,8 @@ function SessionRevocationWatcher() {
             /* جلسة حية — يُختم مؤشر الدخول للاستيقاظ عليه لاحقًا */
             window.localStorage.setItem(WAS_LOGGED_IN_KEY, "1");
           } else if (window.localStorage.getItem(WAS_LOGGED_IN_KEY) === "1") {
-            /* الحالة الثانية: جلسة فارغة/401 مع مؤشر دخول سابق
-               → تنظيف كامل يمنع إرسال طلبات متكررة بلا هوية */
-            void terminateSession();
+            /* جلسة انتهت أو خرج المستخدم — تنظيف صامت بلا رسالة إبطال */
+            window.localStorage.removeItem(WAS_LOGGED_IN_KEY);
           }
         } catch {}
       } catch {
@@ -188,11 +172,6 @@ function SessionRevocationWatcher() {
 
 /* ================== تنبيه «تم إنهاء جلستك» اللطيف ================== */
 
-/**
- * يستقبل إشارة kalam_session_ended بعد التحويل إلى الرئيسية
- * ويعرض تنبيهًا هادئًا يوضح سبب خروج المستخدم المفاجئ —
- * بلا ألوان إنذار، بل رسالة اطمئنان راقية بلغة المنصة.
- */
 function SessionEndedToast() {
   const [show, setShow] = useState(false);
 
@@ -228,7 +207,7 @@ function SessionEndedToast() {
         </svg>
         <div>
           <p className="font-ui text-sm font-bold" style={{ color: "var(--ink)", textAlign: "right" }}>
-            تم إنهاء جلستك على هذا الجهاز من لوحة التحكم
+            تم إنهاء جلستك على هذا الجهاز
           </p>
           <p className="font-body mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)", textAlign: "right" }}>
             يمكنك تسجيل الدخول مرة أخرى في أي وقت — قراءاتك محفوظة بأمان.
@@ -265,7 +244,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <NotificationToasts />
           {/* حارس إبطال الجلسة عن بُعد — مسح صارم للكوكيز يكسر حلقة التحديث */}
           <SessionRevocationWatcher />
-          {/* تنبيه «تم إنهاء جلستك من لوحة التحكم» بعد التحويل النظيف */}
+          {/* تنبيه انتهاء الجلسة بعد الإبطال الفعلي */}
           <SessionEndedToast />
           <ServiceWorkerRegistrar />
         </DialogProvider>
