@@ -30,6 +30,7 @@ Thumbs.db
 # Vercel
 .vercel
 
-# TypeScript
+# TypeScript والاختبارات
 *.tsbuildinfo
+.tmp-test/
 .env*
