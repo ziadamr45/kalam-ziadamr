@@ -44,6 +44,8 @@ const naskh = Noto_Naskh_Arabic({
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kalam-ziadamr.vercel.app";
+const OG_LIGHT_IMAGE =
+  "https://res.cloudinary.com/e2umhdt0/image/upload/v1794765233/kalam/brand/og-default-light.png";
 
 /* الوصف والعنوان الوصفي يُدارَان من لوحة التحكم (إعدادات الموقع) */
 async function getMeta() {
@@ -81,14 +83,13 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "كلام له لازمة",
       title,
       description: desc,
-      /* ?v=6 يكسر كاش تطبيقات المحادثات (واتساب/تليجرام) عند تحديث الصورة */
-      images: [{ url: "/og-default.png?v=6", width: 1200, height: 630 }],
+      images: [{ url: OG_LIGHT_IMAGE, width: 1200, height: 630, alt: "كلام له لازمة" }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description: desc,
-      images: ["/og-default.png?v=6"],
+      images: [OG_LIGHT_IMAGE],
     },
     icons: {
       /* أيقونة التبويب المخصصة: شعار الكاف الأصلي المحدد —

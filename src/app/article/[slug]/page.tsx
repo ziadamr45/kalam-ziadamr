@@ -32,6 +32,8 @@ import { formatReadingTime } from "@/lib/readingTime";
 
 const CLOUDINARY_UPLOAD_PREFIX = "https://res.cloudinary.com/e2umhdt0/image/upload/";
 const WATERMARK_TRANSFORM = "l_kalam:brand:watermark-pill,fl_relative,w_0.17,g_south_west,x_16,y_16/";
+const OG_LIGHT_IMAGE =
+  "https://res.cloudinary.com/e2umhdt0/image/upload/v1794765233/kalam/brand/og-default-light.png";
 
 function withCoverWatermark(url: string | null): string | null {
   if (!url) return null;
@@ -80,7 +82,7 @@ export async function generateMetadata({
       description: metaDescription,
       publishedTime: article.publishedAt?.toISOString(),
       modifiedTime: article.updatedAt.toISOString(),
-      images: [{ url: article.coverImage || "/og-default.png", width: 1200, height: 630 }],
+      images: [{ url: article.coverImage || OG_LIGHT_IMAGE, width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
@@ -121,7 +123,7 @@ export default async function ArticlePage({
     "@type": "Article",
     headline: article.title,
     description: cleanMetaText(article.summary),
-    image: [article.coverImage || `${siteUrl}/og-default.png`],
+    image: [article.coverImage || OG_LIGHT_IMAGE],
     datePublished: article.publishedAt?.toISOString(),
     dateModified: article.updatedAt.toISOString(),
     author: { "@type": "Organization", name: "كلام له لازمة" },

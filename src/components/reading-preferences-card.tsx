@@ -61,7 +61,7 @@ export function ReadingPreferencesCard() {
   const pickTashkeel = (on: boolean) => {
     setTashkeelState(on);
     try {
-      /* نفس مفتاح مفتاح التشكيل في صفحة المقال — الافتراضي الجديد يطبق من المقال القادم */
+      /* نفس مفتاح التشكيل في صفحة المقال — الافتراضي الجديد يطبق من المقال القادم */
       window.localStorage.setItem("kalam_tashkeel", on ? "on" : "off");
     } catch {}
   };
@@ -139,7 +139,7 @@ export function ReadingPreferencesCard() {
             </p>
             <div className="mt-2 flex gap-2">
               {[
-                { value: true, label: "مُشكول افتراضيًا" },
+                { value: true, label: "مشكول افتراضيًا" },
                 { value: false, label: "بلا تشكيل افتراضيًا" },
               ].map((o) => {
                 const active = tashkeel === o.value;
