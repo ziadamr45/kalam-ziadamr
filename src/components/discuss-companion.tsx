@@ -248,6 +248,9 @@ function MiniMarkdown({ text }: { text: string }) {
 const HISTORY_KEY = (articleId: string, userId?: string) =>
   userId ? `kalam_discuss_${userId}_${articleId}` : `kalam_discuss_${articleId}`;
 
+const DRAFT_KEY = (articleId: string, userId?: string) =>
+  userId ? `kalam_discuss_draft_${userId}_${articleId}` : `kalam_discuss_draft_${articleId}`;
+
 const LEGACY_KEY = (articleId: string) => `kalam_discuss_${articleId}`;
 
 function parseStoredTurns(raw: string | null): { messages: ChatMessage[]; remaining: number | null } {
@@ -353,6 +356,35 @@ export function DiscussCompanion({
   useEffect(() => {
     editingRef.current = editing;
   }, [editing]);
+
+  /* تمدد صندوق الكتابة تلقائيًا حتى 112px ثم التمرير الداخلي */
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
+  }, [input, open]);
+
+  /* استعادة المسودة غير المرسلة على نفس الجهاز عند فتح المقال/الجلسة */
+  useEffect(() => {
+    if (status === "loading" || editing !== null) return;
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY(articleId, session?.user?.id));
+      if (saved) setInput((prev) => (prev ? prev : saved));
+    } catch {}
+  }, [articleId, session?.user?.id, status, editing]);
+
+  const saveDraft = useCallback(
+    (val: string) => {
+      if (editingRef.current !== null) return;
+      try {
+        const key = DRAFT_KEY(articleId, session?.user?.id);
+        if (val.trim()) localStorage.setItem(key, val);
+        else localStorage.removeItem(key);
+      } catch {}
+    },
+    [articleId, session?.user?.id],
+  );
 
   const readLocalMessages = useCallback((): { messages: ChatMessage[]; remaining: number | null } => {
     try {
@@ -533,8 +565,13 @@ export function DiscussCompanion({
 
   const cancelEdit = useCallback(() => {
     setEditing(null);
-    setInput("");
-  }, []);
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY(articleId, session?.user?.id));
+      setInput(saved ?? "");
+    } catch {
+      setInput("");
+    }
+  }, [articleId, session?.user?.id]);
 
   const closeDrawer = useCallback(() => {
     setOpen(false);
@@ -764,6 +801,7 @@ export function DiscussCompanion({
     if (!text || sending || (exhausted && !unlimited)) return;
     const editIndex = editing;
     setInput("");
+    if (editIndex === null) saveDraft("");
     setEditing(null);
     const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
     await runDiscussTurn(text, baseMessages, editIndex, true);
@@ -788,6 +826,7 @@ export function DiscussCompanion({
       window.matchMedia("(hover: hover) and (pointer: fine)").matches;
     if (!isDesktopKeyboard) return;
     e.preventDefault();
+    if (sending) return;
     void send();
   };
 
@@ -1256,13 +1295,15 @@ export function DiscussCompanion({
                   data-tour="discuss-input"
                   value={input}
                   onChange={(e) => {
-                    setInput(e.target.value);
+                    const val = e.target.value;
+                    setInput(val);
+                    saveDraft(val);
                     setError("");
                   }}
                   onKeyDown={onInputKey}
                   enterKeyHint="enter"
                   rows={1}
-                  disabled={(exhausted && !unlimited) || sending}
+                  disabled={exhausted && !unlimited}
                   maxLength={1200}
                   placeholder={
                     exhausted && !unlimited
@@ -1271,7 +1312,7 @@ export function DiscussCompanion({
                         ? "عدّل رسالتك ثم أرسل.."
                         : "اسأل أو ناقش بهدوء واحترام.."
                   }
-                  className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent) disabled:opacity-50"
+                  className="max-h-28 min-h-[44px] flex-1 resize-none overflow-y-auto rounded-xl border bg-transparent px-3 py-2.5 text-sm leading-6 outline-hidden transition-colors focus:border-(--accent) disabled:opacity-50"
                   style={{ borderColor: "var(--border)", color: "var(--ink)" }}
                 />
                 {sending ? (

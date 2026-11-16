@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
  *    ويرتفع تلقائيًا فوق الكبسولة الصوتية العائمة لحظة نشاطها حتى لا يتداخلا أبدًا
  *    (تنسيق عبر حدث window «kalam:audio-capsule» الذي تصدره الكبسولة).
  * 4) محاذاة الإطار: على الشاشات الكبيرة يلتصق بعمود إطار المحتوى (max-w-5xl)
- *    بدل التطاير عند الحافة القصوى، مع هدف لمس ≥ 48×48px وتفاعل hover ناعم.
+ *    بدل التطاير عند الحافة القصوى، مع هدف لمس ≥ 44×44px على الهاتف وتفاعل hover ناعم.
  */
 
 const SHOW_THRESHOLD = 400; // px — عتبة التعمق في المقال
@@ -75,9 +75,9 @@ export function BackToTop() {
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="العودة إلى أعلى الصفحة"
       title="العودة إلى أعلى الصفحة"
-      className={`no-print fixed z-30 flex h-12 w-12 items-center justify-center rounded-full shadow-lift transition-all duration-300 ease-out
+      className={`no-print fixed z-30 flex h-11 w-11 items-center justify-center rounded-full shadow-lift transition-all duration-300 ease-out sm:h-12 sm:w-12
         ${bottomClass}
-        left-6 lg:left-[max(1.5rem,calc(50%-30.5rem))]
+        left-4 sm:left-6 lg:left-[max(1.5rem,calc(50%-30.5rem))]
         hover:scale-110 active:scale-95
         ${
           visible
@@ -90,7 +90,7 @@ export function BackToTop() {
         border: "1px solid var(--border)",
       }}
     >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg className="h-[18px] w-[18px] sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 19V5M5 12l7-7 7 7" />
       </svg>
     </button>

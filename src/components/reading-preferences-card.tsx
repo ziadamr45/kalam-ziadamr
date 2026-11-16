@@ -75,7 +75,7 @@ export function ReadingPreferencesCard() {
         تفضيلات القراءة الافتراضية
       </h2>
       <p className="mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
-        يُحفظ اختيارك لحظة الضغط ويُطبق على كل زيارة قادمة — بلا زر حفظ ولا انتظار.
+        يُحفظ اختيارك لحظة الضغط ويُطبق على كل زيارة قادمة، بلا زر حفظ ولا انتظار.
       </p>
 
       {!ready ? (

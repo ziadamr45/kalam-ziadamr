@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
+import { ProfileAvatarLightbox } from "@/components/profile-avatar-lightbox";
 import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { DevicesPanel } from "@/components/devices-panel";
 import { ReadingPreferencesCard } from "@/components/reading-preferences-card";
@@ -212,13 +213,9 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             <div className="flex flex-col items-center gap-2">
               <div className="relative">
                 {user.customImage || user.image ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
+                  <ProfileAvatarLightbox
                     src={user.customImage || (user.image as string)}
                     alt={displayName(user)}
-                    referrerPolicy="no-referrer"
-                    className="h-22 w-22 rounded-full border-4 object-cover"
-                    style={{ borderColor: "var(--accent-soft)" }}
                   />
                 ) : (
                   <span
