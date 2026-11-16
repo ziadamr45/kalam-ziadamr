@@ -501,6 +501,8 @@ export function CommentsSection({
     const myVote = myVotes[c.id] ?? null;
     const isEditing = editId === c.id;
     const childReplies = !isReply ? (repliesByParent.get(c.id) ?? []) : [];
+    const showVip = Boolean(c.authorIsVip && c.authorBadgeTitle);
+    const showRank = Boolean(c.authorRank && c.authorRank !== "قارئ متأمل");
 
     return (
       <li
@@ -535,8 +537,8 @@ export function CommentsSection({
             تعليق فكري ملهم — مثبَّت أعلى الحوار بتمييز التحرير
           </p>
         )}
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
+        <div className="mb-2.5 flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-start gap-2.5">
             <FramedAvatar
               src={c.authorImage}
               alt={c.authorName}
@@ -544,13 +546,13 @@ export function CommentsSection({
               frameId={c.authorFrame}
               size="sm"
             />
-            <div>
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
                 {c.authorVerified && c.authorCard ? (
                   <button
                     type="button"
                     onClick={() => setCardFor(cardFor === c.id ? null : c.id)}
-                    className="cursor-pointer text-sm font-bold underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-(--accent-strong)"
+                    className="cursor-pointer truncate text-sm font-bold underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-(--accent-strong)"
                     style={{ color: "var(--ink)" }}
                     title="اضغط لعرض البطاقة الفكرية الموسعة"
                     aria-expanded={cardFor === c.id}
@@ -558,7 +560,7 @@ export function CommentsSection({
                     {c.authorName}
                   </button>
                 ) : (
-                  <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>
+                  <p className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
                     {c.authorName}
                   </p>
                 )}
@@ -568,26 +570,14 @@ export function CommentsSection({
                     title={c.authorSealLabel || "حساب موثّق"}
                   />
                 )}
-                {c.authorIsVip && c.authorBadgeTitle && (
-                  <span
-                    className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                    style={{
-                      background: `${c.authorBadgeColor || "#7C3AED"}1f`,
-                      color: c.authorBadgeColor || "#7C3AED",
-                    }}
-                  >
-                    {c.authorBadgeTitle}
-                  </span>
-                )}
-                {mine && (
-                  <span className="text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
-                    (أنت)
-                  </span>
-                )}
-                {c.authorRank && c.authorRank !== "قارئ متأمل" && <RankBadge rank={c.authorRank} />}
               </div>
-              <p className="flex flex-wrap items-center gap-1.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
                 <span>{formatArabicDate(c.createdAt)}</span>
+                {mine && (
+                  <span className="font-semibold" style={{ color: "var(--accent-strong)" }}>
+                    · تعليقك
+                  </span>
+                )}
                 {c.editedAt && (
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
@@ -598,6 +588,22 @@ export function CommentsSection({
                   </span>
                 )}
               </p>
+              {(showVip || showRank) && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {showVip && (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                      style={{
+                        background: `${c.authorBadgeColor || "#7C3AED"}1f`,
+                        color: c.authorBadgeColor || "#7C3AED",
+                      }}
+                    >
+                      {c.authorBadgeTitle}
+                    </span>
+                  )}
+                  {showRank && <RankBadge rank={c.authorRank!} />}
+                </div>
+              )}
             </div>
           </div>
 
@@ -624,7 +630,7 @@ export function CommentsSection({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -665,7 +671,7 @@ export function CommentsSection({
               </div>
             )
           ) : reportSent === c.id ? (
-            <span className="text-xs" style={{ color: "var(--accent-strong)" }}>
+            <span className="shrink-0 text-xs" style={{ color: "var(--accent-strong)" }}>
               تم استلام الإبلاغ، شكرًا لك
             </span>
           ) : (
@@ -674,7 +680,7 @@ export function CommentsSection({
                 setReportFor(reportFor === c.id ? null : c.id);
                 setReportError(null);
               }}
-              className="rounded-full p-2 text-xs transition-colors hover:bg-(--accent-soft)"
+              className="shrink-0 rounded-full p-2 text-xs transition-colors hover:bg-(--accent-soft)"
               style={{ color: "var(--ink-muted)" }}
               title="إبلاغ عن التعليق"
               aria-label="إبلاغ عن التعليق"
