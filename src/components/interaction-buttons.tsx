@@ -7,7 +7,7 @@ import { easternDigits } from "@/lib/utils";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 
 /**
- * أزرار الإعجاب/عدم الإعجاب — تحديث تفاؤلي فوري (0ms) بلا تعطيل ولا انتظار،
+ * أزرار «نعم، له لازمة» / «لم أجد فيه جديدًا» — تحديث تفاؤلي فوري (0ms) بلا تعطيل ولا انتظار،
  * تصويت واحد لكل زائر، إلغاء التصويت بالنقر على نفس الزر.
  * الصفحة ISR ثابتة — لذا يجلب المكوّن تصويت الزائر الحالي بنفسه عبر
  * GET /api/interactions فور التركيب بدل اعتماد بيانات الخادم الثابتة.
@@ -118,10 +118,11 @@ export function InteractionSlot({
   );
 
   return (
-    <div className="flex w-full items-center justify-center gap-3 sm:w-auto">
+    <div className="flex w-full flex-wrap items-center justify-center gap-3 sm:w-auto">
       <button
         onClick={() => void vote(1)}
         aria-pressed={myVote === 1}
+        aria-label="نعم، هذا الكلام له لازمة"
         className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-200 ease-fluid active:scale-95 hover:-translate-y-0.5 sm:flex-none"
         style={
           myVote === 1
@@ -129,16 +130,17 @@ export function InteractionSlot({
             : { borderColor: "var(--border)", color: "var(--ink)" }
         }
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill={myVote === 1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={myVote === 1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
         </svg>
-        أعجبني
+        <span>نعم، له لازمة</span>
         <span className="text-xs opacity-80">{easternDigits(likes)}</span>
       </button>
 
       <button
         onClick={() => void vote(-1)}
         aria-pressed={myVote === -1}
+        aria-label="لم أجد فيه جديدًا"
         className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-200 ease-fluid active:scale-95 hover:translate-y-0.5 sm:flex-none"
         style={
           myVote === -1
@@ -146,10 +148,10 @@ export function InteractionSlot({
             : { borderColor: "var(--border)", color: "var(--ink-muted)" }
         }
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill={myVote === -1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={myVote === -1 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }} aria-hidden>
           <path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
         </svg>
-        لم يعجبني
+        <span>لم أجد فيه جديدًا</span>
         <span className="text-xs opacity-80">{easternDigits(dislikes)}</span>
       </button>
     </div>

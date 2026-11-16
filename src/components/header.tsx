@@ -597,8 +597,7 @@ export function Header({ navSections = [] }: { navSections?: NavSection[] }) {
             <div className="space-y-1">
               {[
                 { href: "/about", label: "عن المنصة" },
-                { href: "/saved", label: "قراءاتي المحفوظة" },
-                { href: "/profile", label: "ملفي ورصيد أثري" },
+                { href: "/profile?tab=settings", label: "الإعدادات والتفضيلات" },
                 { href: "/contact", label: "اتصل بنا" },
               ].map((l) => {
                 const activeLink = pathname === l.href;

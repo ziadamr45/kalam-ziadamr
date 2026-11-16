@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
@@ -585,7 +586,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           <ReadingPreferencesCard />
         </section>
 
-        <section data-tour="settings-privacy" className="mx-auto mt-5 max-w-3xl px-4 pb-16 sm:px-6">
+        <section data-tour="settings-privacy" className="mx-auto mt-5 max-w-3xl px-4 pb-16 sm:px-6 sm:pb-20">
           <PrivacyToolsCard />
         </section>
           </>
@@ -646,7 +647,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </section>
         )}
 
-        <section className="mx-auto mt-8 max-w-3xl px-4 pb-16 sm:px-6">
+        <section className="mx-auto mt-8 max-w-3xl px-4 pb-16 sm:px-6 sm:pb-20">
           <h2 className="mb-4 font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
             تعليقاتي
           </h2>
@@ -793,13 +794,14 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           </section>
         )}
 
-        <section data-tour="security-danger" className="mx-auto mt-5 max-w-3xl px-4 pb-16 sm:px-6">
+        <section data-tour="security-danger" className="mx-auto mt-5 max-w-3xl px-4 pb-16 sm:px-6 sm:pb-20">
           <AccountDangerZone />
         </section>
           </>
         )}
       </main>
       <PushPromptCapsule />
+      <SiteFooter />
     </>
   );
 }

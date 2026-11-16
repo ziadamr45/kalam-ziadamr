@@ -36,7 +36,7 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
     name: "بلا إطار",
     unlockHint: "متاح لك منذ التسجيل",
     minScore: 0,
-    ringBackground: "var(--accent-soft)",
+    ringBackground: "var(--border)",
   },
   {
     id: "satr-bidaya",

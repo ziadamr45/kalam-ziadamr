@@ -8,7 +8,7 @@ import { aiModerate } from "@/lib/ai-moderation";
 import { dispatchAdminEvent } from "@/lib/notifications/dispatcher";
 import { awardImpact } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
-import { rateLimit, requestIp, logSecurityEvent } from "@/lib/rate-limit";
+import { requestIp, logSecurityEvent } from "@/lib/rate-limit";
 import { recordServerError } from "@/lib/error-alert";
 import { hasPrivilege } from "@/lib/vip";
 
@@ -170,7 +170,10 @@ export async function POST(request: Request) {
 
     const trimmed = content.trim();
 
-    /* ============ «اعتماد التعليقات تلقائيًا» — المفتاح الحي من لوحة الأدمن ============\n       الاعتماد الآمن فقط: تعليق نظيف من الفلترة الأخلاقية والرقابة AI وخطورة منخفضة.\n       المُعلَّم بالفلترة أو ذو الخطورة المرتفعة يبقى PENDING للمراجعة البشرية مهما\n       كان المفتاح — فالأتمتة لا تتجاوز الحارس أبدًا. */
+    /* ============ «اعتماد التعليقات تلقائيًا» — المفتاح الحي من لوحة الأدمن ============
+       الاعتماد الآمن فقط: تعليق نظيف من الفلترة الأخلاقية والرقابة AI وخطورة منخفضة.
+       المُعلَّم بالفلترة أو ذو الخطورة المرتفعة يبقى PENDING للمراجعة البشرية مهما
+       كان المفتاح — فالأتمتة لا تتجاوز الحارس أبدًا. */
     const autoApprove = await readAutoApprove();
     const autoApproved = autoApprove && !verdict.flagged && verdict.riskScore < 0.4;
 
@@ -195,7 +198,10 @@ export async function POST(request: Request) {
       } catch {}
     }
 
-    /* ============ «التعليق الهادف المعتمد» +2 نقطة أثر ============\n       تُمنح للتعليق الذي اجتاز الفلترة الأخلاقية متعددة المستويات أعلاه\n       واستوفى شروط الطول والمضمون (40 حرفًا فأكثر، بخطورة منخفضة)،\n       بسقف يومي 3 تعليقات محتسبة حمايةً من تربية النقاط. */
+    /* ============ «التعليق الهادف المعتمد» +2 نقطة أثر ============
+       تُمنح للتعليق الذي اجتاز الفلترة الأخلاقية متعددة المستويات أعلاه
+       واستوفى شروط الطول والمضمون (40 حرفًا فأكثر، بخطورة منخفضة)،
+       بسقف يومي 3 تعليقات محتسبة حمايةً من تربية النقاط. */
     let impact: Awaited<ReturnType<typeof awardImpact>> | null = null;
     if (trimmed.length >= 40 && verdict.riskScore < 0.4) {
       try {
@@ -249,5 +255,46 @@ export async function POST(request: Request) {
       url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors`,
     });
     return NextResponse.json({ error: "خطأ داخلي" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "تسجيل الدخول مطلوب" }, { status: 401 });
+    }
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id")?.trim();
+    if (!id || id.length > 64) {
+      return NextResponse.json({ error: "معرّف التعليق غير صالح" }, { status: 400 });
+    }
+    const comment = await prisma.comment.findUnique({
+      where: { id },
+      select: { id: true, userId: true, status: true, article: { select: { slug: true } } },
+    });
+    if (!comment) {
+      return NextResponse.json({ error: "التعليق غير موجود" }, { status: 404 });
+    }
+    if (comment.userId !== session.user.id) {
+      return NextResponse.json({ error: "لا تملك صلاحية حذف هذا التعليق" }, { status: 403 });
+    }
+    await prisma.comment.delete({ where: { id: comment.id } });
+    if (comment.status === "APPROVED" && comment.article?.slug) {
+      try {
+        revalidatePath(`/article/${comment.article.slug}`);
+      } catch {}
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    await recordServerError({
+      err,
+      app: "PUBLIC",
+      path: "/api/comments",
+      method: "DELETE",
+      requestId: request.headers.get("x-kalam-rid"),
+      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors`,
+    });
+    return NextResponse.json({ error: "تعذر حذف التعليق" }, { status: 500 });
   }
 }

@@ -105,6 +105,8 @@ export function CommentsSection({
   const [reportError, setReportError] = useState<string | null>(null);
   const [impactNote, setImpactNote] = useState<string>("");
   const [cardFor, setCardFor] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
   const [honey, setHoney] = useState("");
 
   const [myVotes, setMyVotes] = useState<Record<string, "LIKE" | "DISLIKE">>({});
@@ -165,6 +167,29 @@ export function CommentsSection({
       window.setTimeout(() => setVoteNotice(null), 5000);
     } finally {
       setPinBusy(null);
+    }
+  };
+
+  const deleteOwnComment = async (commentId: string) => {
+    if (deleteBusy) return;
+    setDeleteBusy(commentId);
+    try {
+      const res = await fetch(`/api/comments?id=${encodeURIComponent(commentId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setVoteNotice(data?.error ?? "تعذر حذف التعليق — جرّب مرة أخرى.");
+        window.setTimeout(() => setVoteNotice(null), 5000);
+        return;
+      }
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setDeleteConfirm(null);
+    } catch {
+      setVoteNotice("تعذر حذف التعليق — تحقق من اتصالك.");
+      window.setTimeout(() => setVoteNotice(null), 5000);
+    } finally {
+      setDeleteBusy(null);
     }
   };
 
@@ -398,7 +423,7 @@ export function CommentsSection({
       {loggedIn ? (
         <form
           onSubmit={submit}
-          className="rounded-2xl border p-5 shadow-soft"
+          className="mb-6 rounded-2xl border p-5 shadow-soft"
           style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         >
           <input
@@ -427,10 +452,13 @@ export function CommentsSection({
             </p>
           )}
 
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
-              مراجعة فريق التحرير قبل الظهور — للحفاظ على رقيّ الحوار
-            </span>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--ink-muted)" }}>
+              <span>مراجعة فريق التحرير قبل الظهور — للحفاظ على رقيّ الحوار</span>
+              <span className="tabular-nums opacity-80">
+                {new Intl.NumberFormat("ar-EG").format(content.length)} / ١٬٢٠٠
+              </span>
+            </div>
             <button
               type="submit"
               disabled={status === "sending" || status === "blocked" || !content.trim()}
@@ -455,7 +483,7 @@ export function CommentsSection({
         </form>
       ) : (
         <div
-          className="mb-8 flex flex-col items-center justify-between gap-4 rounded-2xl border p-5 sm:flex-row"
+          className="mb-6 flex flex-col items-center justify-between gap-4 rounded-2xl border p-5 sm:flex-row"
           style={{ background: "var(--bg-soft)", borderColor: "var(--border)" }}
         >
           <p className="font-body leading-8" style={{ color: "var(--ink-muted)" }}>
@@ -473,7 +501,7 @@ export function CommentsSection({
         </div>
       )}
 
-      <ul className="space-y-4">
+      <ul className="mt-6 space-y-4">
         {comments.map((c) => {
           const mine = Boolean(myId && c.authorId && c.authorId === myId);
           const counts = voteCounts[c.id] ?? { likes: c.likes, dislikes: c.dislikes };
@@ -486,7 +514,10 @@ export function CommentsSection({
                 c.authorAccent
                   ? { background: "var(--surface)", borderColor: c.authorAccent, borderWidth: 2 }
                   : mine
-                    ? { background: "#FFFBEB", borderColor: "#FCD34D" }
+                    ? {
+                        background: "color-mix(in srgb, var(--accent) 10%, var(--surface))",
+                        borderColor: "color-mix(in srgb, var(--accent) 45%, var(--border))",
+                      }
                     : c.isInspiring
                       ? { background: "var(--accent-soft)", borderColor: "var(--accent)" }
                       : { background: "var(--surface)", borderColor: "var(--border)" }
@@ -508,7 +539,7 @@ export function CommentsSection({
                   تعليق فكري ملهم — مثبَّت أعلى الحوار بتمييز التحرير
                 </p>
               )}
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <FramedAvatar
                     src={c.authorImage}
@@ -553,7 +584,9 @@ export function CommentsSection({
                         </span>
                       )}
                       {mine && (
-                        <span className="text-amber-500 font-medium text-xs">(أنت)</span>
+                        <span className="text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
+                          (أنت)
+                        </span>
                       )}
                       {c.authorRank && c.authorRank !== "قارئ متأمل" && <RankBadge rank={c.authorRank} />}
                     </div>
@@ -563,7 +596,43 @@ export function CommentsSection({
                   </div>
                 </div>
 
-                {reportSent === c.id ? (
+                {mine ? (
+                  deleteConfirm === c.id ? (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <button
+                        type="button"
+                        disabled={deleteBusy === c.id}
+                        onClick={() => void deleteOwnComment(c.id)}
+                        className="rounded-full px-2.5 py-1 font-bold text-white transition-opacity disabled:opacity-60"
+                        style={{ background: "#b4443c" }}
+                      >
+                        {deleteBusy === c.id ? "جارٍ الحذف…" : "تأكيد الحذف"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deleteBusy === c.id}
+                        onClick={() => setDeleteConfirm(null)}
+                        className="rounded-full border px-2.5 py-1 font-semibold"
+                        style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirm(c.id)}
+                      className="rounded-full p-2 text-xs transition-colors hover:bg-(--accent-soft)"
+                      style={{ color: "var(--ink-muted)" }}
+                      title="حذف تعليقي"
+                      aria-label="حذف تعليقي"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      </svg>
+                    </button>
+                  )
+                ) : reportSent === c.id ? (
                   <span className="text-xs" style={{ color: "var(--accent-strong)" }}>
                     تم استلام الإبلاغ، شكرًا لك
                   </span>
@@ -653,7 +722,7 @@ export function CommentsSection({
                   className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
                   style={
                     myVote === "DISLIKE"
-                      ? { background: "#DC2626", color: "#fff", borderColor: "#DC2626" }
+                      ? { background: "var(--bg-soft)", color: "var(--ink)", borderColor: "var(--ink-muted)" }
                       : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
                   }
                   title="عدم إعجاب"

@@ -131,47 +131,49 @@ export function AccountMenu() {
         data-tour="account-avatar"
         className="relative flex h-8 w-8 items-center justify-center self-center rounded-full transition-all duration-300 hover:scale-110"
       >
-        <span
-          className={`flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ${
-            hasCustomFrame ? "p-[2px]" : "border"
-          }`}
-          style={
-            hasCustomFrame
-              ? { background: frame.ringBackground, boxShadow: frame.ringGlow }
-              : { borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.35)" }
-          }
-        >
-          {u.image ? (
-            <Image
-              src={u.image}
-              alt={u.name || "صورة الحساب"}
-              width={28}
-              height={28}
-              referrerPolicy="no-referrer"
-              className={`block h-full w-full rounded-full object-cover ${
-                hasCustomFrame ? "ring-[1.5px] ring-(--surface)" : ""
-              }`}
-            />
-          ) : (
+        <span className="relative flex h-7 w-7 items-center justify-center">
+          <span
+            className={`flex h-full w-full items-center justify-center overflow-hidden rounded-full ${
+              hasCustomFrame ? "p-[2px]" : "border"
+            }`}
+            style={
+              hasCustomFrame
+                ? { background: frame.ringBackground, boxShadow: frame.ringGlow }
+                : { borderColor: open ? "var(--accent)" : "var(--border)" }
+            }
+          >
+            {u.image ? (
+              <Image
+                src={u.image}
+                alt={u.name || "صورة الحساب"}
+                width={28}
+                height={28}
+                referrerPolicy="no-referrer"
+                className={`block h-full w-full rounded-full object-cover ${
+                  hasCustomFrame ? "ring-[1.5px] ring-(--surface)" : ""
+                }`}
+              />
+            ) : (
+              <span
+                className={`flex h-full w-full items-center justify-center rounded-full text-xs font-bold ${
+                  hasCustomFrame ? "ring-[1.5px] ring-(--surface)" : ""
+                }`}
+                style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+              >
+                {(u.name || "ق").trim().charAt(0)}
+              </span>
+            )}
+          </span>
+          {frame.badgeKind && (
             <span
-              className={`flex h-full w-full items-center justify-center rounded-full text-xs font-bold ${
-                hasCustomFrame ? "ring-[1.5px] ring-(--surface)" : ""
-              }`}
-              style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+              aria-hidden
+              className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border text-white shadow-soft"
+              style={{ background: frame.badgeBg ?? "var(--accent)", borderColor: "var(--surface)" }}
             >
-              {(u.name || "ق").trim().charAt(0)}
+              <FrameGlyph kind={frame.badgeKind} size={7} />
             </span>
           )}
         </span>
-        {frame.badgeKind && (
-          <span
-            aria-hidden
-            className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border text-white shadow-soft"
-            style={{ background: frame.badgeBg ?? "var(--accent)", borderColor: "var(--surface)" }}
-          >
-            <FrameGlyph kind={frame.badgeKind} size={7} />
-          </span>
-        )}
       </button>
 
       {open && (
@@ -179,13 +181,17 @@ export function AccountMenu() {
           className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border shadow-lift animate-fade-in"
           style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         >
-          <div className="border-b px-4 py-3" style={{ borderColor: "var(--border)" }}>
+          <div className="border-b px-4 py-3 text-right" style={{ borderColor: "var(--border)" }}>
             <p className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
               {u.name || "قارئ كلام له لازمة"}
             </p>
-            <p className="mt-0.5 truncate text-[11px]" dir="ltr" style={{ color: "var(--ink-muted)" }}>
-              {u.email}
-            </p>
+            {u.email && (
+              <p className="mt-0.5 text-right text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                <span dir="ltr" className="inline-block max-w-full truncate align-bottom">
+                  {u.email}
+                </span>
+              </p>
+            )}
           </div>
           <nav className="p-2 text-sm">
             <Link
