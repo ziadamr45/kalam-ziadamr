@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayName, validateCustomName, validateBio } from "@/lib/identity";
+import { getAvatarFrameMeta } from "@/lib/avatar-frames";
 import {
   SOCIAL_LINK_KEYS,
   SOCIAL_LINK_LABELS,
@@ -13,12 +14,6 @@ import {
  * ============================================================
  * محرّر الهوية المعروضة — استقلالية القارئ عن بيانات Google
  * ============================================================
- * - تعديل الاسم المعروض مع فحص فوري لمنع الأسماء المسيئة أو الفارغة.
- * - رفع صورة شخصية مباشر (من الهاتف أو الكمبيوتر).
- * - استرجاع صورة Google الأصلية بنقرة زر واحدة.
- * - البطاقة الفكرية الموسعة (نبذة + روابط شخصية) — لحاملي التوثيق الرسمي.
- * - زر حفظ موحّد بتنبيه فوري بالنجاح أو الخطأ.
- * بيانات التوثيق الأصلية (email/googleId) لا تُمس إطلاقًا.
  */
 
 type Initial = {
@@ -32,11 +27,13 @@ type Initial = {
 export function ProfileEditor({
   googleName,
   googleImage,
+  avatarFrame,
   initial,
   isVerified = false,
 }: {
   googleName: string | null;
   googleImage: string | null;
+  avatarFrame?: string | null;
   initial: Initial;
   isVerified?: boolean;
 }) {
@@ -50,10 +47,10 @@ export function ProfileEditor({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
-  /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
   const [extendedBio, setExtendedBio] = useState(initial.extendedBio ?? "");
   const [links, setLinks] = useState<VerifiedSocialLinks>(initial.verifiedSocialLinks ?? {});
 
+  const frame = getAvatarFrameMeta(avatarFrame);
   const currentAvatar = imageUrl || googleImage;
   const nameError = name.trim() ? validateCustomName(name) : null;
   const bioError = bio.trim() ? validateBio(bio) : null;
@@ -165,13 +162,16 @@ export function ProfileEditor({
             }}
             disabled={uploading}
             aria-label="تغيير الصورة الشخصية"
-            className={`group relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-full border-4 transition-all hover:brightness-95 ${
-              dragging ? "scale-105 border-dashed" : ""
+            className={`group relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-full p-[4px] transition-all hover:brightness-95 ${
+              dragging ? "scale-105 outline-dashed outline-2 outline-(--accent)" : ""
             } disabled:opacity-70`}
-            style={{ borderColor: "var(--accent-soft)" }}
+            style={{
+              background: frame.ringBackground,
+              boxShadow: frame.ringGlow,
+            }}
             title="انقر أو أفلِت صورتك هنا — تُحسَّن تلقائيًا وتُرفع بجودة مناسبة"
           >
-            <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full">
+            <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full ring-2 ring-(--surface)">
               {currentAvatar ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
@@ -230,7 +230,6 @@ export function ProfileEditor({
             )}
           </div>
 
-          {/* تنبيه فوري أسفل الصورة على الهاتف حتى يراه المستخدم دون الحاجة للنزول لأسفل */}
           {message && (
             <div
               className="mt-1 flex w-full flex-col items-center gap-2 rounded-2xl px-3.5 py-2.5 text-center text-xs font-bold leading-6 sm:hidden"
@@ -320,7 +319,6 @@ export function ProfileEditor({
             </p>
           </div>
 
-          {/* ==================== البطاقة الفكرية الموسعة — لحاملي التوثيق الرسمي ==================== */}
           {isVerified && (
             <div
               className="rounded-2xl border p-4"

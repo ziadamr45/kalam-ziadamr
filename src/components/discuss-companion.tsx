@@ -14,11 +14,6 @@ const STARTER_CHIPS = [
   "كيف أطبّق هذه الفكرة عمليًا؟",
 ];
 
-/**
- * عارض ماركداون غني لردود المحاور:
- * عناوين (##)، جداول (| ... |)، اقتباسات (> )، قوائم نقطية ومرقمة،
- * عريض (**)، مائل (*)، وسوم (`...`)، وروابط قابلة للضغط ([نص](url) أو https:// أو mailto:).
- */
 function MiniMarkdown({ text }: { text: string }) {
   const nodes: React.ReactNode[] = [];
   const lines = text.replace(/\r\n/g, "\n").split("\n");
@@ -315,7 +310,6 @@ export function DiscussCompanion({
 }) {
   const [open, setOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [cfgBadge, setCfgBadge] = useState("مساعد ذكاء اصطناعي");
   const [cfgOpening, setCfgOpening] = useState(
     "أنا هنا لأحاورك حول الأفكار الواردة في هذا المقال ومساعدتك في تحليلها واستخراج أبعادها.",
   );
@@ -358,6 +352,15 @@ export function DiscussCompanion({
   useEffect(() => {
     editingRef.current = editing;
   }, [editing]);
+
+  /* تمرير صندوق تأكيد إعادة المحاولة أو الحذف ليظهر بوضوح فور فتحه */
+  useEffect(() => {
+    if (confirmRetryIdx === null && confirmDeleteIdx === null) return;
+    requestAnimationFrame(() => {
+      const box = listRef.current?.querySelector("[data-confirm-box='true']") as HTMLElement | null;
+      box?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [confirmRetryIdx, confirmDeleteIdx]);
 
   /* تمدد صندوق الكتابة تلقائيًا حتى 112px ثم التمرير الداخلي */
   useEffect(() => {
@@ -472,13 +475,13 @@ export function DiscussCompanion({
           setExhausted(!data.unlimited && data.remaining <= 0);
         }
         if (data.unlimited === true) setUnlimited(true);
-        if (Array.isArray(data.messages) && data.messages.length > 0) {
-          const merged = mergeChatLists(data.messages, messagesRef.current);
-          if (!sameChatLists(messagesRef.current, merged)) {
-            setMessages(merged);
-            messagesRef.current = merged;
+        if (Array.isArray(data.messages)) {
+          const serverMsgs = data.messages.slice(-40);
+          if (!sameChatLists(messagesRef.current, serverMsgs)) {
+            setMessages(serverMsgs);
+            messagesRef.current = serverMsgs;
           }
-          persistSession(merged, typeof data.remaining === "number" ? data.remaining : remaining);
+          persistSession(serverMsgs, typeof data.remaining === "number" ? data.remaining : remaining);
         }
       } catch {}
     },
@@ -497,6 +500,7 @@ export function DiscussCompanion({
         const data = (await res.json()) as {
           remaining: number;
           limit: number;
+          used?: number;
           unlimited?: boolean;
           messages?: ChatMessage[];
         };
@@ -508,8 +512,19 @@ export function DiscussCompanion({
 
         const serverMsgs = Array.isArray(data.messages) ? data.messages.slice(-40) : [];
         const localMsgs = localSnapshot ?? readLocalMessages().messages;
-        const merged = mergeChatLists(serverMsgs, mergeChatLists(messagesRef.current, localMsgs));
 
+        /* للمسجلين: الخادم هو المرجع الأوحد بعد أول مزامنة حتى ينعكس الحذف والتعديل وإعادة المحاولة عبر كل الأجهزة دون عودة الرسائل المحذوفة */
+        const hasServerHistory = typeof data.used === "number" && data.used > 0;
+        if (status === "authenticated" && (serverMsgs.length > 0 || hasServerHistory)) {
+          if (!sameChatLists(messagesRef.current, serverMsgs)) {
+            setMessages(serverMsgs);
+            messagesRef.current = serverMsgs;
+          }
+          persistSession(serverMsgs, data.remaining);
+          return;
+        }
+
+        const merged = mergeChatLists(serverMsgs, mergeChatLists(messagesRef.current, localMsgs));
         if (merged.length > 0) {
           if (!sameChatLists(messagesRef.current, merged)) {
             setMessages(merged);
@@ -585,8 +600,7 @@ export function DiscussCompanion({
   useEffect(() => {
     fetch("/api/public-config")
       .then((r) => r.json())
-      .then((c: { DISCUSS_BADGE?: string; DISCUSS_OPENING?: string; DISCUSS_DISCLAIMER?: string }) => {
-        if (c?.DISCUSS_BADGE) setCfgBadge(c.DISCUSS_BADGE);
+      .then((c: { DISCUSS_OPENING?: string; DISCUSS_DISCLAIMER?: string }) => {
         if (c?.DISCUSS_OPENING) setCfgOpening(c.DISCUSS_OPENING);
         if (c?.DISCUSS_DISCLAIMER) setCfgDisclaimer(c.DISCUSS_DISCLAIMER);
       })
@@ -694,6 +708,7 @@ export function DiscussCompanion({
     baseMessages: ChatMessage[],
     editIndex: number | null,
     restoreInputOnFail: boolean,
+    abortFallbackMessages?: ChatMessage[],
   ) => {
     syncSeqRef.current += 1;
 
@@ -736,16 +751,17 @@ export function DiscussCompanion({
       };
 
       if (!res.ok || !data.reply) {
+        const rollback = abortFallbackMessages ?? baseMessages;
         if (data.exhausted) {
           setExhausted(true);
           setRemaining(0);
-          persistSession(baseMessages, 0);
+          persistSession(rollback, 0);
           setError("");
         } else {
           setError(data.error || "تعذر إرسال الرسالة — أعد المحاولة");
         }
-        setMessages(baseMessages);
-        messagesRef.current = baseMessages;
+        setMessages(rollback);
+        messagesRef.current = rollback;
         if (restoreInputOnFail) setInput(text);
         if (editIndex !== null) setEditing(editIndex);
         return;
@@ -779,18 +795,19 @@ export function DiscussCompanion({
         } catch {}
       }
     } catch (err) {
+      const rollback = abortFallbackMessages ?? baseMessages;
       if (err instanceof DOMException && err.name === "AbortError") {
-        setMessages(baseMessages);
-        messagesRef.current = baseMessages;
-        persistSession(baseMessages, remaining);
+        setMessages(rollback);
+        messagesRef.current = rollback;
+        persistSession(rollback, remaining);
         if (restoreInputOnFail) setInput(text);
         if (editIndex !== null) setEditing(editIndex);
         setError("");
         return;
       }
       setError("انقطع الاتصال — أعد المحاولة");
-      setMessages(baseMessages);
-      messagesRef.current = baseMessages;
+      setMessages(rollback);
+      messagesRef.current = rollback;
       if (restoreInputOnFail) setInput(text);
       if (editIndex !== null) setEditing(editIndex);
     } finally {
@@ -808,15 +825,16 @@ export function DiscussCompanion({
     if (editIndex === null) saveDraft("");
     setEditing(null);
     const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
-    await runDiscussTurn(text, baseMessages, editIndex, true);
+    await runDiscussTurn(text, baseMessages, editIndex, true, messages);
   };
 
   const confirmRetry = async (modelIdx: number) => {
     if (sending || (exhausted && !unlimited)) return;
     const userMsg = messages[modelIdx - 1];
     if (!userMsg || userMsg.role !== "user") return;
+    const snapshotBeforeRetry = messages;
     const baseMessages = messages.slice(0, modelIdx - 1);
-    await runDiscussTurn(userMsg.text, baseMessages, null, false);
+    await runDiscussTurn(userMsg.text, baseMessages, null, false, snapshotBeforeRetry);
   };
 
   const stopGenerating = () => {
@@ -894,13 +912,18 @@ export function DiscussCompanion({
           style={{ background: "var(--surface)" }}
         >
           <header
-            className="border-b px-4 py-3"
+            className="border-b px-4 py-2.5"
             style={{ borderColor: "var(--border)" }}
           >
             <div className="flex items-center justify-between gap-2">
-              <p className="font-ui min-w-0 truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
-                محاورة المقال فكريًا
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="font-ui truncate text-sm font-bold leading-6" style={{ color: "var(--ink)" }}>
+                  محاورة المقال فكريًا
+                </p>
+                <p className="truncate text-xs leading-5" style={{ color: "var(--ink-muted)" }} title={articleTitle}>
+                  {articleTitle}
+                </p>
+              </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 {impactNote && (
                   <span
@@ -926,7 +949,7 @@ export function DiscussCompanion({
                       <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
                       <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
                     </svg>
-                    وصول غير محدود
+                    غير محدود
                   </span>
                 ) : (
                   remaining !== null && (
@@ -939,7 +962,7 @@ export function DiscussCompanion({
                       }}
                       title="الرسائل المتبقية في حصة هذا المقال — تتمدد حصتك مع ترقية رتبتك"
                     >
-                      متبقٍ {arabicNum(remaining)} من {arabicNum(limit)}
+                      {arabicNum(remaining)} / {arabicNum(limit)}
                     </span>
                   )
                 )}
@@ -979,26 +1002,6 @@ export function DiscussCompanion({
                   </svg>
                 </button>
               </div>
-            </div>
-            <div className="mt-1.5 flex items-center justify-between gap-2">
-              <p className="min-w-0 flex-1 truncate text-xs font-medium leading-5" style={{ color: "var(--ink-muted)" }} title={articleTitle}>
-                {articleTitle}
-              </p>
-              <span
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
-                style={{
-                  background: "var(--accent-soft)",
-                  color: "var(--accent-strong)",
-                  borderColor: "var(--accent)",
-                }}
-                title="تحاور نموذج ذكاء اصطناعي تحليلي مبنيًا على متن هذا المقال"
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
-                  <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
-                </svg>
-                {cfgBadge}
-              </span>
             </div>
           </header>
 
@@ -1182,6 +1185,7 @@ export function DiscussCompanion({
 
                     {confirmRetryIdx === i && !sending && (
                       <div
+                        data-confirm-box="true"
                         className="mt-2 rounded-xl border px-3 py-2 text-[11px] font-semibold"
                         style={{
                           borderColor: "rgba(245,158,11,0.4)",
@@ -1211,6 +1215,7 @@ export function DiscussCompanion({
 
                     {confirmDeleteIdx === i && !sending && (
                       <div
+                        data-confirm-box="true"
                         className="mt-2 rounded-xl border px-3 py-2 text-[11px] font-semibold"
                         style={{
                           borderColor: "rgba(220,38,38,0.35)",
