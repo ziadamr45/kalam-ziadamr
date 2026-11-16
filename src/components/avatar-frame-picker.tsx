@@ -7,6 +7,7 @@ import {
   isFrameUnlocked,
   type AvatarFrameId,
 } from "@/lib/avatar-frames";
+import { FramedAvatar } from "@/components/avatar-frame";
 
 export function AvatarFramePickerCard({
   avatarUrl,
@@ -104,11 +105,11 @@ export function AvatarFramePickerCard({
             متى يُفتح كل إطار؟
           </p>
           <ul className="mt-2 space-y-1.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
-            <li>• <strong style={{ color: "var(--ink)" }}>بلا إطار:</strong> متاح للجميع منذ التسجيل.</li>
-            <li>• <strong style={{ color: "var(--ink)" }}>مداد هادئ:</strong> يُفتح تلقائيًا عند بلوغ ٥٠ نقطة أثر (رتبة «محاور واعد»).</li>
-            <li>• <strong style={{ color: "var(--ink)" }}>غصن الزمرد:</strong> يُفتح تلقائيًا عند بلوغ ١٥٠ نقطة أثر (رتبة «عقل رصين»).</li>
-            <li>• <strong style={{ color: "var(--ink)" }}>تاج أهل الكلمة:</strong> يُفتح تلقائيًا عند بلوغ ٣٥٠ نقطة أثر (رتبة «أهل الكلمة»).</li>
-            <li>• <strong style={{ color: "var(--ink)" }}>الختم الملكي:</strong> يُفتح لحاملي التوثيق الرسمي أو العضوية المميزة VIP أو عند بلوغ ٥٠٠+ نقطة أثر.</li>
+            {AVATAR_FRAMES.map((f) => (
+              <li key={f.id}>
+                • <strong style={{ color: "var(--ink)" }}>{f.name}:</strong> {f.unlockHint}.
+              </li>
+            ))}
           </ul>
           <p className="mt-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
             كل الإطارات مجانية وتقديرية — التبديل بينها لا يخصم أي نقطة من رصيد أثرك.
@@ -116,7 +117,7 @@ export function AvatarFramePickerCard({
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {AVATAR_FRAMES.map((frame) => {
           const unlocked = isFrameUnlocked(frame.id, { impactScore, isVerified, isVip });
           const active = selected === frame.id;
@@ -135,40 +136,13 @@ export function AvatarFramePickerCard({
                 background: active ? "var(--accent-soft)" : "var(--bg-soft)",
               }}
             >
-              <span
-                className="relative inline-flex rounded-full p-[3.5px]"
-                style={{
-                  background: frame.ringBackground,
-                  boxShadow: frame.ringGlow,
-                }}
-              >
-                {avatarUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={avatarUrl}
-                    alt={frame.name}
-                    referrerPolicy="no-referrer"
-                    className="h-12 w-12 rounded-full object-cover ring-2 ring-(--surface)"
-                    style={{ background: "var(--surface)" }}
-                  />
-                ) : (
-                  <span
-                    className="flex h-12 w-12 items-center justify-center rounded-full text-base font-bold ring-2 ring-(--surface)"
-                    style={{ background: "var(--surface)", color: "var(--accent-strong)" }}
-                  >
-                    {fallbackLetter}
-                  </span>
-                )}
-                {frame.badgeChar && (
-                  <span
-                    aria-hidden
-                    className="absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full border text-[9px] font-bold text-white"
-                    style={{ background: frame.badgeBg ?? "var(--accent)", borderColor: "var(--surface)" }}
-                  >
-                    {frame.badgeChar}
-                  </span>
-                )}
-              </span>
+              <FramedAvatar
+                src={avatarUrl}
+                alt={frame.name}
+                fallbackLetter={fallbackLetter}
+                frameId={frame.id}
+                size="md"
+              />
 
               <span className="text-xs font-bold" style={{ color: "var(--ink)" }}>
                 {frame.name}

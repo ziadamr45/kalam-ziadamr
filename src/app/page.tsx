@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
+import { auth } from "@/lib/auth";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
+import { PersonalizedShelf } from "@/components/personalized-shelf";
 import { FirstVisitHint } from "@/components/first-visit-hint";
-import { getLatestArticles, getActiveSections } from "@/lib/db-queries";
+import { getLatestArticles, getActiveSections, getPersonalizedArticles } from "@/lib/db-queries";
 import { getSiteConfig } from "@/lib/site-config";
 import { SECTIONS } from "@/lib/sections";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
@@ -32,10 +34,14 @@ const PHILOSOPHY = [
 ];
 
 export default async function HomePage() {
-  const [articles, dbSections, cfg] = await Promise.all([
+  const session = await auth().catch(() => null);
+  const userId = session?.user?.id ?? null;
+
+  const [articles, dbSections, cfg, personalized] = await Promise.all([
     getLatestArticles(9),
     getActiveSections(),
     getSiteConfig().catch(() => null),
+    userId ? getPersonalizedArticles(userId, 3) : Promise.resolve([]),
   ]);
 
   const sections =
@@ -143,6 +149,19 @@ export default async function HomePage() {
             </div>
           )}
         </section>
+
+        {personalized.length > 0 && (
+          <PersonalizedShelf
+            articles={personalized.map((a) => ({
+              id: a.id,
+              slug: a.slug,
+              title: a.title,
+              summary: a.summary,
+              readingTimeSec: a.readingTimeSec,
+              section: a.section ? { name: a.section.name, slug: a.section.slug } : null,
+            }))}
+          />
+        )}
 
         <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6">
           <h2 className="font-ui mb-8 text-2xl font-bold" style={{ color: "var(--ink)" }}>

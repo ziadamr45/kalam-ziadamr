@@ -56,6 +56,8 @@ export function ArticleReader({
 }) {
   const [tashkeel, setTashkeel] = useState(false);
   const [tashkeelGateLifted, setTashkeelGateLifted] = useState(false);
+  const [coverLightboxOpen, setCoverLightboxOpen] = useState(false);
+
   useIsomorphicLayoutEffect(() => {
     let prefOn = false;
     try {
@@ -64,6 +66,20 @@ export function ArticleReader({
     setTashkeel(prefOn);
     setTashkeelGateLifted(true);
   }, [tashkeelAllowed]);
+
+  useEffect(() => {
+    if (!coverLightboxOpen) return;
+    const prevOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCoverLightboxOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.documentElement.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [coverLightboxOpen]);
 
   const contentRef = useRef<HTMLDivElement | null>(null);
 
@@ -621,12 +637,54 @@ export function ArticleReader({
 
       {watermarkedCover && (
         <div className="print-cover page-chrome mt-8 overflow-hidden rounded-2xl shadow-soft">
+          <button
+            type="button"
+            onClick={() => setCoverLightboxOpen(true)}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label={`عرض غلاف المقال كاملًا: ${article.title}`}
+            title="اضغط لعرض الغلاف كاملًا"
+            className="block w-full cursor-zoom-in focus:outline-hidden"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={watermarkedCover}
+              alt={article.title}
+              draggable={false}
+              className="pointer-events-none w-full select-none object-cover"
+              loading="eager"
+            />
+          </button>
+        </div>
+      )}
+
+      {coverLightboxOpen && watermarkedCover && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`غلاف: ${article.title}`}
+          onContextMenu={(e) => e.preventDefault()}
+          className="fixed inset-0 z-90 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in"
+          onClick={() => setCoverLightboxOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setCoverLightboxOpen(false)}
+            aria-label="إغلاق معاينة الغلاف"
+            className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={watermarkedCover}
             alt={article.title}
-            className="w-full object-cover"
-            loading="eager"
+            draggable={false}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+            className="max-h-[85dvh] max-w-[92vw] select-none rounded-2xl object-contain shadow-2xl"
           />
         </div>
       )}

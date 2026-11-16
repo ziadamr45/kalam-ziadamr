@@ -3,18 +3,12 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayName, validateCustomName, validateBio } from "@/lib/identity";
-import { getAvatarFrameMeta } from "@/lib/avatar-frames";
+import { FramedAvatar } from "@/components/avatar-frame";
 import {
   SOCIAL_LINK_KEYS,
   SOCIAL_LINK_LABELS,
   type VerifiedSocialLinks,
 } from "@/lib/verification-meta";
-
-/**
- * ============================================================
- * محرّر الهوية المعروضة — استقلالية القارئ عن بيانات Google
- * ============================================================
- */
 
 type Initial = {
   customName: string | null;
@@ -50,7 +44,6 @@ export function ProfileEditor({
   const [extendedBio, setExtendedBio] = useState(initial.extendedBio ?? "");
   const [links, setLinks] = useState<VerifiedSocialLinks>(initial.verifiedSocialLinks ?? {});
 
-  const frame = getAvatarFrameMeta(avatarFrame);
   const currentAvatar = imageUrl || googleImage;
   const nameError = name.trim() ? validateCustomName(name) : null;
   const bioError = bio.trim() ? validateBio(bio) : null;
@@ -144,7 +137,6 @@ export function ProfileEditor({
       </p>
 
       <div className="flex flex-col gap-6 sm:flex-row">
-        {/* ==================== الصورة الرمزية ==================== */}
         <div className="flex flex-col items-center gap-2">
           <button
             type="button"
@@ -162,33 +154,18 @@ export function ProfileEditor({
             }}
             disabled={uploading}
             aria-label="تغيير الصورة الشخصية"
-            className={`group relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-full p-[4px] transition-all hover:brightness-95 ${
+            className={`group relative inline-flex cursor-pointer items-center justify-center rounded-full transition-all hover:brightness-95 ${
               dragging ? "scale-105 outline-dashed outline-2 outline-(--accent)" : ""
             } disabled:opacity-70`}
-            style={{
-              background: frame.ringBackground,
-              boxShadow: frame.ringGlow,
-            }}
             title="انقر أو أفلِت صورتك هنا — تُحسَّن تلقائيًا وتُرفع بجودة مناسبة"
           >
-            <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full ring-2 ring-(--surface)">
-              {currentAvatar ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={currentAvatar}
-                  alt="صورتي الشخصية"
-                  className="h-full w-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span
-                  className="flex h-full w-full items-center justify-center text-3xl font-bold"
-                  style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                >
-                  {displayName({ customName: name, name: googleName }).charAt(0)}
-                </span>
-              )}
-            </span>
+            <FramedAvatar
+              src={currentAvatar}
+              alt="صورتي الشخصية"
+              fallbackLetter={displayName({ customName: name, name: googleName }).charAt(0)}
+              frameId={avatarFrame}
+              size="lg"
+            />
             <span
               aria-hidden
               className="absolute -bottom-0.5 -left-0.5 flex h-8 w-8 items-center justify-center rounded-full border-2 shadow-soft transition-transform group-hover:scale-110"
@@ -266,7 +243,6 @@ export function ProfileEditor({
           />
         </div>
 
-        {/* ==================== الاسم والنبذة ==================== */}
         <div className="min-w-0 flex-1 space-y-4">
           <div>
             <label htmlFor="custom-name" className="mb-1.5 block text-xs font-bold" style={{ color: "var(--ink)" }}>

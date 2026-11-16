@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAvatarFrameMeta } from "@/lib/avatar-frames";
+import { FramedAvatar } from "@/components/avatar-frame";
 
 export function ProfileAvatarLightbox({
   src,
@@ -13,7 +13,6 @@ export function ProfileAvatarLightbox({
   frameId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const frame = getAvatarFrameMeta(frameId);
 
   useEffect(() => {
     if (!open) return;
@@ -36,29 +35,15 @@ export function ProfileAvatarLightbox({
         onClick={() => setOpen(true)}
         aria-label="عرض الصورة الشخصية كاملة"
         title="اضغط لعرض الصورة كاملة"
-        className="group relative inline-flex cursor-zoom-in rounded-full p-[4px] transition-transform hover:scale-[1.03] focus:outline-hidden focus-visible:ring-2"
-        style={{
-          background: frame.ringBackground,
-          boxShadow: frame.ringGlow,
-        }}
+        className="group relative inline-flex cursor-zoom-in rounded-full transition-transform hover:scale-[1.03] focus:outline-hidden focus-visible:ring-2"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <FramedAvatar
           src={src}
           alt={alt}
-          referrerPolicy="no-referrer"
-          className="h-22 w-22 rounded-full object-cover ring-2 ring-(--surface)"
-          style={{ background: "var(--surface)" }}
+          fallbackLetter={alt.charAt(0)}
+          frameId={frameId}
+          size="lg"
         />
-        {frame.badgeChar && (
-          <span
-            aria-hidden
-            className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold text-white shadow-soft"
-            style={{ background: frame.badgeBg ?? "var(--accent)", borderColor: "var(--surface)" }}
-          >
-            {frame.badgeChar}
-          </span>
-        )}
       </button>
 
       {open && (

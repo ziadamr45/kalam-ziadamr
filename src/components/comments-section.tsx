@@ -8,7 +8,7 @@ import { getVisitorFingerprint } from "@/lib/fingerprint";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { formatArabicDate } from "@/lib/utils";
 import { RankBadge } from "@/components/rank-badge";
-import { getAvatarFrameMeta } from "@/lib/avatar-frames";
+import { FramedAvatar } from "@/components/avatar-frame";
 import { SOCIAL_LINK_LABELS, type VerifiedSocialLinks } from "@/lib/verification-meta";
 
 type PublicComment = {
@@ -478,7 +478,6 @@ export function CommentsSection({
           const mine = Boolean(myId && c.authorId && c.authorId === myId);
           const counts = voteCounts[c.id] ?? { likes: c.likes, dislikes: c.dislikes };
           const myVote = myVotes[c.id] ?? null;
-          const frame = getAvatarFrameMeta(c.authorFrame);
           return (
             <li
               key={c.id}
@@ -511,33 +510,13 @@ export function CommentsSection({
               )}
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <span
-                    className="inline-flex shrink-0 rounded-full p-[2.5px]"
-                    style={{
-                      background: frame.ringBackground,
-                      boxShadow: frame.ringGlow,
-                    }}
-                  >
-                    {c.authorImage ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={c.authorImage}
-                        alt={c.authorName}
-                        width={36}
-                        height={36}
-                        referrerPolicy="no-referrer"
-                        className="h-9 w-9 rounded-full object-cover ring-[1.5px] ring-(--surface)"
-                        style={{ background: "var(--surface)" }}
-                      />
-                    ) : (
-                      <span
-                        className="flex h-9 w-9 items-center justify-center rounded-full font-bold ring-[1.5px] ring-(--surface)"
-                        style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                      >
-                        {c.authorName.charAt(0)}
-                      </span>
-                    )}
-                  </span>
+                  <FramedAvatar
+                    src={c.authorImage}
+                    alt={c.authorName}
+                    fallbackLetter={c.authorName.charAt(0)}
+                    frameId={c.authorFrame}
+                    size="sm"
+                  />
                   <div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {c.authorVerified && c.authorCard ? (

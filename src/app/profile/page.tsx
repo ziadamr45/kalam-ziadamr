@@ -9,6 +9,7 @@ import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
 import { AvatarFramePickerCard } from "@/components/avatar-frame-picker";
 import { ProfileAvatarLightbox } from "@/components/profile-avatar-lightbox";
+import { FramedAvatar } from "@/components/avatar-frame";
 import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { DevicesPanel } from "@/components/devices-panel";
 import { ReadingPreferencesCard } from "@/components/reading-preferences-card";
@@ -17,7 +18,6 @@ import { FirstVisitHint } from "@/components/first-visit-hint";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
 import { parsePrivileges, PRIVILEGE_LABELS, roleLabelAr } from "@/lib/vip";
-import { getAvatarFrameMeta } from "@/lib/avatar-frames";
 import { verificationSealColor, verificationSealLabel, parseSocialLinks } from "@/lib/verification-meta";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 import { displayName } from "@/lib/identity";
@@ -46,10 +46,10 @@ const DEVICE_TYPE_LABEL: Record<string, string> = {
 };
 
 const RANK_STAGE_PERKS: Record<string, string> = {
-  "قارئ متأمل": "بداية الرحلة • ٦ رسائل في المحاور الفكري لكل مقال",
-  "محاور واعد": "يُفتح إطار «مداد هادئ» • ٦ رسائل في المحاور الفكري",
-  "عقل رصين": "يُفتح إطار «غصن الزمرد» • تتمدد حصة المحاور إلى ٩ رسائل",
-  "أهل الكلمة": "يُفتح إطار «تاج أهل الكلمة» + ١٢ رسالة للمحاور + قناة المقترحات الخاصة",
+  "قارئ متأمل": "بداية الرحلة • إطار «سطر بداية» عند ٢٥ نقطة • ٦ رسائل في المحاور الفكري",
+  "محاور واعد": "يُفتح إطار «مدادٌ رصين» • ٦ رسائل في المحاور الفكري",
+  "عقل رصين": "يُفتح إطار «غصن الأثر» • وعند ٢٥٠ «كلمة لها لازمة» • ٩ رسائل للمحاور",
+  "أهل الكلمة": "يُفتح إطار «منارة الفكر» + ١٢ رسالة للمحاور + قناة المقترحات الخاصة",
 };
 
 const TABS: Array<{ key: string; href: string; label: string }> = [
@@ -157,7 +157,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const progress = next
     ? Math.min(100, Math.round(((user.impactScore - prevMin) / (next.min - prevMin)) * 100))
     : 100;
-  const activeFrame = getAvatarFrameMeta(user.avatarFrame);
 
   return (
     <>
@@ -230,29 +229,13 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                     frameId={user.avatarFrame}
                   />
                 ) : (
-                  <span
-                    className="relative inline-flex rounded-full p-[4px]"
-                    style={{
-                      background: activeFrame.ringBackground,
-                      boxShadow: activeFrame.ringGlow,
-                    }}
-                  >
-                    <span
-                      className="flex h-22 w-22 items-center justify-center rounded-full text-3xl font-bold ring-2 ring-(--surface)"
-                      style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                    >
-                      {displayName(user).charAt(0)}
-                    </span>
-                    {activeFrame.badgeChar && (
-                      <span
-                        aria-hidden
-                        className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold text-white shadow-soft"
-                        style={{ background: activeFrame.badgeBg ?? "var(--accent)", borderColor: "var(--surface)" }}
-                      >
-                        {activeFrame.badgeChar}
-                      </span>
-                    )}
-                  </span>
+                  <FramedAvatar
+                    src={null}
+                    alt={displayName(user)}
+                    fallbackLetter={displayName(user).charAt(0)}
+                    frameId={user.avatarFrame}
+                    size="lg"
+                  />
                 )}
               </div>
               <RankBadge rank={user.intellectualRank} size="md" />
@@ -500,8 +483,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             </div>
 
             <div className="mt-3 rounded-xl border px-3 py-2.5 text-[11px] leading-5" style={{ borderColor: "var(--border)", background: "var(--bg-soft)", color: "var(--ink-muted)" }}>
-              <strong style={{ color: "var(--ink)" }}>التوثيق والختم الملكي:</strong>{" "}
-              التوثيق الرسمي يُمنح للكتّاب والأعضاء المعتمدين من إدارة المنصة، كما يُفتح إطار «الختم الملكي» لحاملي التوثيق أو العضوية المميزة VIP أو عند بلوغ ٥٠٠+ نقطة أثر.
+              <strong style={{ color: "var(--ink)" }}>التوثيق والإطارات العليا:</strong>{" "}
+              عند ٥٠٠ نقطة يُفتح إطار «حبر الأصالة»، كما يُفتح إطار «ختم الثقة» لحاملي التوثيق الرسمي أو العضوية المميزة VIP أو عند بلوغ ٧٠٠+ نقطة أثر.
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
