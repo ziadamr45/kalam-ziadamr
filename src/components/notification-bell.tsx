@@ -62,7 +62,7 @@ function exactTime(iso: string): string {
 type IconMeta = { color: string; label: string };
 
 export function typeIconMeta(type: string): IconMeta {
-  if (type.startsWith("ADMIN_")) return { color: "#EA580C", label: "حدث سيادة" };
+  if (type.startsWith("ADMIN_")) return { color: "#EA580C", label: "إشعار إداري" };
   if (type === "SECURITY_NEW_LOGIN") return { color: "#DC2626", label: "أمان" };
   if (type === "IMPACT_POINTS_EARNED") return { color: "#D97706", label: "أثر" };
   if (type.startsWith("COMMENT_")) return { color: "#0D9488", label: "نقاش" };

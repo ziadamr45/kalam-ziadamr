@@ -113,7 +113,10 @@ export function CommentsSection({
   const [editContent, setEditContent] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState<string | null>(null);
-  const [replyFor, setReplyFor] = useState<string | null>(null);
+
+  /* الردود على نمط فيسبوك ويوتيوب: مطوية افتراضيًا + مستوى واحد مع إشارة @الاسم */
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const [replyFor, setReplyFor] = useState<{ commentId: string; rootId: string; authorName: string } | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [replyError, setReplyError] = useState<string | null>(null);
   const [replyBusy, setReplyBusy] = useState<string | null>(null);
@@ -243,14 +246,14 @@ export function CommentsSection({
     }
   };
 
-  const submitReply = async (parentId: string) => {
+  const submitReply = async (target: { commentId: string; rootId: string }) => {
     if (replyBusy || !replyContent.trim()) return;
     const verdict = analyzeComment(replyContent);
     if (verdict.status === "REJECT") {
       setReplyError(verdict.reasons[0] ?? "الرد يخالف أدب الحوار");
       return;
     }
-    setReplyBusy(parentId);
+    setReplyBusy(target.commentId);
     setReplyError(null);
     try {
       const res = await fetch("/api/comments", {
@@ -258,7 +261,7 @@ export function CommentsSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           articleId,
-          parentId,
+          parentId: target.commentId,
           content: replyContent.trim(),
           fp: getVisitorFingerprint(),
           honey,
@@ -271,7 +274,8 @@ export function CommentsSection({
       }
       setReplyContent("");
       setReplyFor(null);
-      setReplySentFor(parentId);
+      setReplySentFor(target.rootId);
+      setExpandedReplies((prev) => ({ ...prev, [target.rootId]: true }));
       setVoteNotice(data?.message ?? "تم إرسال ردك بنجاح.");
       window.setTimeout(() => setVoteNotice(null), 5000);
     } catch {
@@ -495,12 +499,30 @@ export function CommentsSection({
     list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
+  const openReplyBox = (c: PublicComment, isReply: boolean) => {
+    if (!loggedIn) {
+      requestAuth({ kind: "comment" });
+      return;
+    }
+    const rootId = isReply ? (c.parentId || c.id) : c.id;
+    if (replyFor?.commentId === c.id) {
+      setReplyFor(null);
+      setReplyError(null);
+      return;
+    }
+    setReplyFor({ commentId: c.id, rootId, authorName: c.authorName });
+    setReplyContent(isReply ? `@${c.authorName} ` : "");
+    setReplyError(null);
+    setReplySentFor(null);
+  };
+
   const renderCommentCard = (c: PublicComment, isReply = false) => {
     const mine = Boolean(myId && c.authorId && c.authorId === myId);
     const counts = voteCounts[c.id] ?? { likes: c.likes, dislikes: c.dislikes };
     const myVote = myVotes[c.id] ?? null;
     const isEditing = editId === c.id;
     const childReplies = !isReply ? (repliesByParent.get(c.id) ?? []) : [];
+    const repliesOpen = Boolean(expandedReplies[c.id]);
     const showVip = Boolean(c.authorIsVip && c.authorBadgeTitle);
     const showRank = Boolean(c.authorRank && c.authorRank !== "قارئ متأمل");
 
@@ -575,7 +597,7 @@ export function CommentsSection({
                 <span>{formatArabicDate(c.createdAt)}</span>
                 {mine && (
                   <span className="font-semibold" style={{ color: "var(--accent-strong)" }}>
-                    · تعليقك
+                    — تعليقك
                   </span>
                 )}
                 {c.editedAt && (
@@ -789,92 +811,102 @@ export function CommentsSection({
           </p>
         )}
 
+        {/* شريط التفاعل: على تعليقات الآخرين (إعجاب + لم يعجبني + رد)، وعلى تعليقك الخاص (تثبيت فقط لو متاح + إحصاء صامت إن وُجد) */}
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <button
-            onClick={() => void vote(c.id, "LIKE")}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
-            style={
-              myVote === "LIKE"
-                ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
-                : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
-            }
-            title="إعجاب"
-            aria-label="أبدى إعجابي بهذا التعليق"
-            aria-pressed={myVote === "LIKE"}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "LIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
-            <span>{counts.likes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.likes) : "إعجاب"}</span>
-          </button>
-          <button
-            onClick={() => void vote(c.id, "DISLIKE")}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
-            style={
-              myVote === "DISLIKE"
-                ? { background: "var(--bg-soft)", color: "var(--ink)", borderColor: "var(--ink-muted)" }
-                : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
-            }
-            title="عدم إعجاب"
-            aria-label="أبدى عدم إعجابي بهذا التعليق"
-            aria-pressed={myVote === "DISLIKE"}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
-            <span>{counts.dislikes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.dislikes) : "لم يعجبني"}</span>
-          </button>
-          {!isReply && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!loggedIn) {
-                  requestAuth({ kind: "comment" });
-                  return;
+          {!mine ? (
+            <>
+              <button
+                onClick={() => void vote(c.id, "LIKE")}
+                className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
+                style={
+                  myVote === "LIKE"
+                    ? { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }
+                    : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
                 }
-                setReplyFor(replyFor === c.id ? null : c.id);
-                setReplyError(null);
-                setReplySentFor(null);
-              }}
-              className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
-              style={
-                replyFor === c.id
-                  ? { background: "var(--accent-soft)", color: "var(--accent-strong)", borderColor: "var(--accent)" }
-                  : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
-              }
-              title="الرد على هذا التعليق"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <polyline points="9 14 4 9 9 4" />
-                <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
-              </svg>
-              <span>رد</span>
-            </button>
-          )}
-          {!isReply && mine && canSelfPin && (
-            <button
-              onClick={() => togglePin(c.id, !c.selfPinned)}
-              disabled={pinBusy === c.id}
-              className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-75"
-              style={
-                c.selfPinned
-                  ? { background: c.authorAccent ?? "var(--accent)", color: "#fff", borderColor: c.authorAccent ?? "var(--accent)" }
-                  : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
-              }
-              title={c.selfPinned ? "فك التثبيت" : "ثبّت تعليقك أعلى النقاش"}
-            >
-              {pinBusy === c.id ? (
-                <>
-                  <MiniSpinner size={13} />
-                  <span>{c.selfPinned ? "جارٍ الفك…" : "جارٍ التثبيت…"}</span>
-                </>
-              ) : (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l5 5-1.4 1.4-1-1-4.2 4.2.6 4.6-1.4 1.4-3.5-3.5L6 19.4 4.6 18l4.3-4.1-3.5-3.5L6.8 9l4.6.6L15.6 5.4l-1-1L16 3z" /></svg>
-                  <span>{c.selfPinned ? "مثبَّت" : "تثبيت"}</span>
-                </>
+                title="إعجاب"
+                aria-label="أبدى إعجابي بهذا التعليق"
+                aria-pressed={myVote === "LIKE"}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "LIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                <span>{counts.likes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.likes) : "إعجاب"}</span>
+              </button>
+              <button
+                onClick={() => void vote(c.id, "DISLIKE")}
+                className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
+                style={
+                  myVote === "DISLIKE"
+                    ? { background: "var(--bg-soft)", color: "var(--ink)", borderColor: "var(--ink-muted)" }
+                    : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                }
+                title="عدم إعجاب"
+                aria-label="أبدى عدم إعجابي بهذا التعليق"
+                aria-pressed={myVote === "DISLIKE"}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+                <span>{counts.dislikes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.dislikes) : "لم يعجبني"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openReplyBox(c, isReply)}
+                className="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 hover:scale-105"
+                style={
+                  replyFor?.commentId === c.id
+                    ? { background: "var(--accent-soft)", color: "var(--accent-strong)", borderColor: "var(--accent)" }
+                    : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                }
+                title={`الرد على ${c.authorName}`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="9 14 4 9 9 4" />
+                  <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                </svg>
+                <span>رد</span>
+              </button>
+            </>
+          ) : (
+            <>
+              {counts.likes > 0 && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ background: "var(--bg-soft)", color: "var(--ink-muted)" }}
+                  title="إعجابات القرّاء بتعليقك"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+                  </svg>
+                  {new Intl.NumberFormat("ar-EG").format(counts.likes)}
+                </span>
               )}
-            </button>
+              {!isReply && canSelfPin && (
+                <button
+                  onClick={() => togglePin(c.id, !c.selfPinned)}
+                  disabled={pinBusy === c.id}
+                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 disabled:opacity-75"
+                  style={
+                    c.selfPinned
+                      ? { background: c.authorAccent ?? "var(--accent)", color: "#fff", borderColor: c.authorAccent ?? "var(--accent)" }
+                      : { background: "transparent", color: "var(--ink-muted)", borderColor: "var(--border)" }
+                  }
+                  title={c.selfPinned ? "فك التثبيت" : "ثبّت تعليقك أعلى النقاش"}
+                >
+                  {pinBusy === c.id ? (
+                    <>
+                      <MiniSpinner size={13} />
+                      <span>{c.selfPinned ? "جارٍ الفك…" : "جارٍ التثبيت…"}</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l5 5-1.4 1.4-1-1-4.2 4.2.6 4.6-1.4 1.4-3.5-3.5L6 19.4 4.6 18l4.3-4.1-3.5-3.5L6.8 9l4.6.6L15.6 5.4l-1-1L16 3z" /></svg>
+                      <span>{c.selfPinned ? "مثبَّت" : "تثبيت"}</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </>
           )}
         </div>
 
-        {!isReply && replyFor === c.id && (
+        {replyFor?.commentId === c.id && (
           <div className="mt-3 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}>
             <textarea
               value={replyContent}
@@ -884,7 +916,7 @@ export function CommentsSection({
               }}
               rows={2}
               maxLength={1200}
-              placeholder={`اكتب ردك على ${c.authorName} بهدوء واحترام..`}
+              placeholder={`اكتب ردك على ${replyFor.authorName} بهدوء واحترام..`}
               className="w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent)"
               style={{ borderColor: "var(--border)", color: "var(--ink)" }}
             />
@@ -913,7 +945,7 @@ export function CommentsSection({
                 <button
                   type="button"
                   disabled={replyBusy === c.id || !replyContent.trim()}
-                  onClick={() => void submitReply(c.id)}
+                  onClick={() => void submitReply(replyFor)}
                   className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity disabled:opacity-50"
                   style={{ background: "var(--accent)" }}
                 >
@@ -997,13 +1029,50 @@ export function CommentsSection({
           </div>
         )}
 
-        {childReplies.length > 0 && (
-          <ul
-            className="mt-4 space-y-3 border-r-2 pr-3 sm:mr-2 sm:pr-4"
-            style={{ borderColor: "var(--border)" }}
-          >
-            {childReplies.map((r) => renderCommentCard(r, true))}
-          </ul>
+        {/* ردود مطوية افتراضيًا على نهج فيسبوك ويوتيوب */}
+        {!isReply && childReplies.length > 0 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedReplies((prev) => ({ ...prev, [c.id]: !prev[c.id] }))
+              }
+              aria-expanded={repliesOpen}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors hover:bg-(--accent-soft)"
+              style={{ color: "var(--accent-strong)" }}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`transition-transform duration-200 ${repliesOpen ? "rotate-180" : ""}`}
+                aria-hidden
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span>
+                {repliesOpen
+                  ? "إخفاء الردود"
+                  : childReplies.length === 1
+                    ? "عرض رد واحد"
+                    : `عرض الردود (${new Intl.NumberFormat("ar-EG").format(childReplies.length)})`}
+              </span>
+            </button>
+
+            {repliesOpen && (
+              <ul
+                className="mt-3 space-y-3 border-r-2 pr-3 sm:mr-2 sm:pr-4"
+                style={{ borderColor: "var(--border)" }}
+              >
+                {childReplies.map((r) => renderCommentCard(r, true))}
+              </ul>
+            )}
+          </div>
         )}
       </li>
     );

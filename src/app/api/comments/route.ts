@@ -107,10 +107,6 @@ export async function POST(request: Request) {
     }
 
     const rateKey = session.user.id;
-    /* معفوّو مهلة التعليقات بنيويًا:
-       1) الحسابات الموثقة رسميًا (علامة التوثيق تحمل إعفاءً ثابتًا)
-       2) حاملو صلاحية bypassRateLimits/bypassCooldowns من العضوية المميزة
-       — لكن الفلترة الأخلاقية ومراجعة التحرير تبقى على الجميع بلا استثناء */
     const cooldownExempt =
       user.isVerified ||
       hasPrivilege(user.vipPrivileges, "bypassRateLimits") ||
@@ -129,10 +125,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: verdict.reasons[0], rejected: true }, { status: 422 });
     }
 
-    /* الرقابة الأخلاقية الفورية بالذكاء الاصطناعي — نداء خفيف قبل الحفظ،
-       ومعاييره الصارمة: الألفاظ النابية، التجريح الشخصي، الشريعة والقيم الإسلامية،
-       العادات والتقاليد العربية والمصرية الأصيلة، وحجب السبام.
-       عند أي عطل تُهمل النتيجة وتكمل الفلترة المحلية ومراجعة التحرير عملهما. */
     const ai = await aiModerate(content);
     if (ai.checked && !ai.approved) {
       return NextResponse.json(
@@ -151,7 +143,6 @@ export async function POST(request: Request) {
     if (!article) {
       return NextResponse.json({ error: "المقال غير موجود" }, { status: 404 });
     }
-    /* باب التعليق لكل مقال — يُطوى من التيرمينال السيادي دون نشر */
     if (article.commentsEnabled === false) {
       return NextResponse.json(
         { error: "التعليقات مغلقة على هذا المقال بإدارة المنصة" },
@@ -159,25 +150,29 @@ export async function POST(request: Request) {
       );
     }
 
-    let parentComment: { id: string; userId: string | null; articleId: string; status: string; parentId: string | null } | null = null;
+    /* الرد على تعليق أو رد: يُربط بصريًا بالتعليق الجذر (مستوى واحد مثل فيسبوك ويوتيوب) */
+    let rootParentId: string | null = null;
+    let replyTargetUserId: string | null = null;
     if (parentId) {
-      parentComment = await prisma.comment.findUnique({
+      const targetComment = await prisma.comment.findUnique({
         where: { id: parentId },
         select: { id: true, userId: true, articleId: true, status: true, parentId: true },
       });
       if (
-        !parentComment ||
-        parentComment.articleId !== articleId ||
-        parentComment.status !== "APPROVED" ||
-        parentComment.parentId !== null
+        !targetComment ||
+        targetComment.articleId !== articleId ||
+        targetComment.status !== "APPROVED"
       ) {
         return NextResponse.json({ error: "التعليق الأصلي غير متاح للرد" }, { status: 400 });
       }
+      if (targetComment.userId === session.user.id) {
+        return NextResponse.json({ error: "لا يمكنك الرد على تعليقك نفسه" }, { status: 400 });
+      }
+      rootParentId = targetComment.parentId ?? targetComment.id;
+      replyTargetUserId = targetComment.userId;
     }
 
-    /* التثبيت الذاتي — حصري لحاملي صلاحية selfPinComment، وتثبيت
-       جديد يفك تثبيت تعليقهم السابق في المقال نفسه (واحد لكل كاتب) */
-    const canSelfPin = !parentId && selfPin && hasPrivilege(user.vipPrivileges, "selfPinComment");
+    const canSelfPin = !rootParentId && selfPin && hasPrivilege(user.vipPrivileges, "selfPinComment");
     if (canSelfPin) {
       await prisma.comment.updateMany({
         where: { articleId, userId: session.user.id, selfPinnedAt: { not: null } },
@@ -187,17 +182,13 @@ export async function POST(request: Request) {
 
     const trimmed = content.trim();
 
-    /* ============ «اعتماد التعليقات تلقائيًا» — المفتاح الحي من لوحة الأدمن ============
-       الاعتماد الآمن فقط: تعليق نظيف من الفلترة الأخلاقية والرقابة AI وخطورة منخفضة.
-       المُعلَّم بالفلترة أو ذو الخطورة المرتفعة يبقى PENDING للمراجعة البشرية مهما
-       كان المفتاح — فالأتمتة لا تتجاوز الحارس أبدًا. */
     const autoApprove = await readAutoApprove();
     const autoApproved = autoApprove && !verdict.flagged && verdict.riskScore < 0.4;
 
     const created = await prisma.comment.create({
       data: {
         articleId,
-        parentId: parentComment ? parentComment.id : null,
+        parentId: rootParentId,
         userId: session.user.id,
         content: trimmed,
         status: autoApproved ? "APPROVED" : "PENDING",
@@ -209,67 +200,58 @@ export async function POST(request: Request) {
       },
     });
 
-    /* الاعتماد التلقائي يجعل التعليق حاضرًا لحظته — إعادة توليد فورية لصفحة المقال */
     if (autoApproved) {
       try {
         revalidatePath(`/article/${article.slug}`);
       } catch {}
 
-      if (parentComment?.userId && parentComment.userId !== session.user.id) {
+      if (replyTargetUserId && replyTargetUserId !== session.user.id) {
         void dispatchNotification({
-          userId: parentComment.userId,
+          userId: replyTargetUserId,
           type: "COMMENT_REPLY",
           title: "رد جديد على تعليقك",
           message: `${session.user.name ?? "قارئ"} ردّ على تعليقك في مقال «${article.title}»: ${trimmed.slice(0, 100)}${trimmed.length > 100 ? "…" : ""}`,
           link: `/article/${article.slug}#comments`,
-          pushTag: `comment-reply-${parentComment.id}`,
+          pushTag: `comment-reply-${rootParentId}`,
         }).catch(() => {});
       }
     }
 
-    /* ============ «التعليق الهادف المعتمد» +2 نقطة أثر ============
-       تُمنح للتعليق الذي اجتاز الفلترة الأخلاقية متعددة المستويات أعلاه
-       واستوفى شروط الطول والمضمون (40 حرفًا فأكثر، بخطورة منخفضة)،
-       بسقف يومي 3 تعليقات محتسبة حمايةً من تربية النقاط. */
     let impact: Awaited<ReturnType<typeof awardImpact>> | null = null;
     if (trimmed.length >= 40 && verdict.riskScore < 0.4) {
       try {
         impact = await awardImpact({
           userId: session.user.id,
           actionType: "COMMENT_APPROVED",
-          /* الوزن الحي من التكوين السيادي — الافتراضي +2 */
           articleId,
           dedupKey: `COMMENT:${created.id}`,
           dailyCap: 3,
         });
       } catch {
-        impact = null; // المنح زينة لا يعطل إرسال التعليق أبدًا
+        impact = null;
       }
     }
 
-    /* حدث سيادة: تعليق جديد وارد — إن اعتُمد آليًا بدون اشتباه يُرصد في الجرس داخل
-       المنصة فقط دون رنين لهاتف الأدمن، أما التعليق المشتبه به أو المعلق للمراجعة
-       فيُبث فورًا لهاتف الإدارة. */
     void dispatchAdminEvent({
       type: "ADMIN_NEW_COMMENT",
       title: autoApproved
-        ? `${parentComment ? "رد" : "تعليق"} منشور آليًا على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`
-        : `${parentComment ? "رد" : "تعليق"} بانتظار المراجعة على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
+        ? `${rootParentId ? "رد" : "تعليق"} جديد على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`
+        : `${rootParentId ? "رد" : "تعليق"} بانتظار المراجعة على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
       message: `${session.user.name ?? "قارئ"}: ${trimmed.slice(0, 110)}${
         trimmed.length > 110 ? "…" : ""
       }`,
       link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments`,
       pushTag: "new-comment",
       skipDevicePush: autoApproved,
-      metadata: { articleId, parentId: parentComment?.id ?? null, authorEmail: session.user.email ?? null, autoApproved },
+      metadata: { articleId, parentId: rootParentId, authorEmail: session.user.email ?? null, autoApproved },
     });
 
     return NextResponse.json({
       ok: true,
       autoApproved,
       message: autoApproved
-        ? (parentComment ? "ردك منشور الآن" : "تعليقك منشور الآن — أُعتمد تلقائيًا لكلامٍ له لازمة")
-        : (parentComment ? "ردك وصل وسيظهر بعد مراجعة فريق التحرير" : "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير"),
+        ? (rootParentId ? "ردك منشور الآن" : "تعليقك منشور الآن — لكلامٍ له لازمة")
+        : (rootParentId ? "ردك وصل وسيظهر بعد مراجعة فريق التحرير" : "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير"),
       impact: impact?.awarded
         ? { points: impact.points, impactScore: impact.impactScore, rank: impact.rank, rankUp: impact.rankUp }
         : null,
