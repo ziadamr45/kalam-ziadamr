@@ -597,7 +597,7 @@ export function CommentsSection({
                 <span>{formatArabicDate(c.createdAt)}</span>
                 {mine && (
                   <span className="font-semibold" style={{ color: "var(--accent-strong)" }}>
-                    — تعليقك
+                    | تعليقك
                   </span>
                 )}
                 {c.editedAt && (
