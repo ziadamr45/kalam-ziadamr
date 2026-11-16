@@ -271,8 +271,10 @@ export default async function ArticlePage({
               articleSlug={article.slug}
               initialComments={comments.map((c) => ({
                 id: c.id,
+                parentId: c.parentId ?? null,
                 content: c.content,
                 createdAt: c.createdAt.toISOString(),
+                editedAt: c.editedAt ? c.editedAt.toISOString() : null,
                 authorId: c.user?.id ?? null,
                 authorName: displayName(c.user),
                 authorImage: displayAvatar(c.user),

@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeComment } from "@/lib/moderation";
 import { aiModerate } from "@/lib/ai-moderation";
-import { dispatchAdminEvent } from "@/lib/notifications/dispatcher";
+import { dispatchAdminEvent, dispatchNotification } from "@/lib/notifications/dispatcher";
 import { awardImpact } from "@/lib/impact";
 import { getSiteConfigFresh } from "@/lib/site-config";
 import { requestIp, logSecurityEvent } from "@/lib/rate-limit";
@@ -48,6 +48,7 @@ function allow(key: string): boolean {
 
 const commentSchema = z.object({
   articleId: z.string().min(1).max(64),
+  parentId: z.string().min(1).max(64).optional().nullable(),
   content: z.string().min(1).max(4000),
   fp: z.string().max(128).optional().default(""),
   /* فخ الروبوتات — حقل مخفي لا يراه الإنسان */
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
     }
-    const { articleId, content, fp, honey, selfPin } = parsed.data;
+    const { articleId, parentId, content, fp, honey, selfPin } = parsed.data;
 
     /* فخ السبام — بوت يملأ الحقل المخفي: تجاهل صامت بلا أي معالجة */
     if (honey) {
@@ -158,9 +159,25 @@ export async function POST(request: Request) {
       );
     }
 
+    let parentComment: { id: string; userId: string | null; articleId: string; status: string; parentId: string | null } | null = null;
+    if (parentId) {
+      parentComment = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { id: true, userId: true, articleId: true, status: true, parentId: true },
+      });
+      if (
+        !parentComment ||
+        parentComment.articleId !== articleId ||
+        parentComment.status !== "APPROVED" ||
+        parentComment.parentId !== null
+      ) {
+        return NextResponse.json({ error: "التعليق الأصلي غير متاح للرد" }, { status: 400 });
+      }
+    }
+
     /* التثبيت الذاتي — حصري لحاملي صلاحية selfPinComment، وتثبيت
        جديد يفك تثبيت تعليقهم السابق في المقال نفسه (واحد لكل كاتب) */
-    const canSelfPin = selfPin && hasPrivilege(user.vipPrivileges, "selfPinComment");
+    const canSelfPin = !parentId && selfPin && hasPrivilege(user.vipPrivileges, "selfPinComment");
     if (canSelfPin) {
       await prisma.comment.updateMany({
         where: { articleId, userId: session.user.id, selfPinnedAt: { not: null } },
@@ -180,6 +197,7 @@ export async function POST(request: Request) {
     const created = await prisma.comment.create({
       data: {
         articleId,
+        parentId: parentComment ? parentComment.id : null,
         userId: session.user.id,
         content: trimmed,
         status: autoApproved ? "APPROVED" : "PENDING",
@@ -196,6 +214,17 @@ export async function POST(request: Request) {
       try {
         revalidatePath(`/article/${article.slug}`);
       } catch {}
+
+      if (parentComment?.userId && parentComment.userId !== session.user.id) {
+        void dispatchNotification({
+          userId: parentComment.userId,
+          type: "COMMENT_REPLY",
+          title: "رد جديد على تعليقك",
+          message: `${session.user.name ?? "قارئ"} ردّ على تعليقك في مقال «${article.title}»: ${trimmed.slice(0, 100)}${trimmed.length > 100 ? "…" : ""}`,
+          link: `/article/${article.slug}#comments`,
+          pushTag: `comment-reply-${parentComment.id}`,
+        }).catch(() => {});
+      }
     }
 
     /* ============ «التعليق الهادف المعتمد» +2 نقطة أثر ============
@@ -224,23 +253,23 @@ export async function POST(request: Request) {
     void dispatchAdminEvent({
       type: "ADMIN_NEW_COMMENT",
       title: autoApproved
-        ? `تعليق منشور آليًا على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`
-        : `تعليق بانتظار المراجعة على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
+        ? `${parentComment ? "رد" : "تعليق"} منشور آليًا على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`
+        : `${parentComment ? "رد" : "تعليق"} بانتظار المراجعة على مقال: ${(article.title || "بدون عنوان").slice(0, 80)}`,
       message: `${session.user.name ?? "قارئ"}: ${trimmed.slice(0, 110)}${
         trimmed.length > 110 ? "…" : ""
       }`,
       link: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/comments`,
       pushTag: "new-comment",
       skipDevicePush: autoApproved,
-      metadata: { articleId, authorEmail: session.user.email ?? null, autoApproved },
+      metadata: { articleId, parentId: parentComment?.id ?? null, authorEmail: session.user.email ?? null, autoApproved },
     });
 
     return NextResponse.json({
       ok: true,
       autoApproved,
       message: autoApproved
-        ? "تعليقك منشور الآن — أُعتمد تلقائيًا لكلامٍ له لازمة"
-        : "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير",
+        ? (parentComment ? "ردك منشور الآن" : "تعليقك منشور الآن — أُعتمد تلقائيًا لكلامٍ له لازمة")
+        : (parentComment ? "ردك وصل وسيظهر بعد مراجعة فريق التحرير" : "تعليقك وصل وسيظهر بعد مراجعة فريق التحرير"),
       impact: impact?.awarded
         ? { points: impact.points, impactScore: impact.impactScore, rank: impact.rank, rankUp: impact.rankUp }
         : null,
@@ -313,6 +342,7 @@ export async function PATCH(request: Request) {
       comment.status === "APPROVED" &&
       (autoApprove || (!verdict.flagged && verdict.riskScore < 0.4));
 
+    const now = new Date();
     const updated = await prisma.comment.update({
       where: { id: comment.id },
       data: {
@@ -321,8 +351,9 @@ export async function PATCH(request: Request) {
         flagged: verdict.flagged,
         flagReasons: verdict.reasons,
         riskScore: verdict.riskScore,
+        editedAt: now,
       },
-      select: { id: true, content: true, status: true },
+      select: { id: true, content: true, status: true, editedAt: true },
     });
 
     if (comment.article?.slug) {
@@ -331,7 +362,15 @@ export async function PATCH(request: Request) {
       } catch {}
     }
 
-    return NextResponse.json({ ok: true, comment: updated });
+    return NextResponse.json({
+      ok: true,
+      comment: {
+        id: updated.id,
+        content: updated.content,
+        status: updated.status,
+        editedAt: updated.editedAt?.toISOString() ?? now.toISOString(),
+      },
+    });
   } catch (err) {
     await recordServerError({
       err,
