@@ -9,12 +9,8 @@ type Cue = { t: number; id: string };
 type BlockMeta = { id: string; words: number };
 type WordTiming = { w: string; s: number; e: number };
 
-/* layout effect متزامن على العميل — تفضيلات الاستماع تُستعاد قبل أول رسم
-   بعد الترطيب فلا يُرى الزران على الافتراضي ثم يتبدلان */
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-/* تفضيلات الاستماع الدائمة (عبر المقالات وإعادة التحميل) — سرعة التشغيل
-   ووضع التتبع التلقائي حقّا قارئ لا جلسة، فلا يُعاد ضبطهما مع كل صفحة */
 const RATE_KEY = "kalam_audio_rate";
 const FOLLOW_KEY = "kalam_audio_follow";
 
@@ -25,15 +21,6 @@ function fmtTime(sec: number): string {
   return `${easternDigits(m)}:${easternDigits(String(s).padStart(2, "0"))}`;
 }
 
-/**
- * المشغل الصوتي الكاريوكي — قراءة الصوت مع تظليل الكلمة المقروءة لحظيًا،
- * تمرير تلقائي يبقي الفقرة في منتصف الشاشة، ونقر أي كلمة يقفز بها الصوت إليها.
- *
- * - وضع الكلمات: مصفوفة audioWords [{w,s,e}] المولّدة بالذكاء الاصطناعي.
- * - وضع الفقرات: audioCues اليدوية أو توزيع تناسبي (توافقية رفع يدوي).
- * - Media Session: تحكم الشاشة المقفلة والخلفية على الهواتف.
- * - كاش محلي (IndexedDB): الزائر المتكرر لا يعيد تحميل الصوت إطلاقًا.
- */
 export function AudioPlayer({
   src,
   durationSec,
@@ -53,9 +40,7 @@ export function AudioPlayer({
   cues: Cue[] | null;
   blocks: BlockMeta[];
   words?: WordTiming[] | null;
-  /* خريطة فهرس الصوت ← فهرس العرض (مواءمة تجريد التشكيل) — null = هوية */
   highlightMap?: number[] | null;
-  /* خريطة فهرس العرض ← فهرس الصوت للقفز بالنقر على كلمة */
   jumpMap?: number[] | null;
   slug: string;
   syncKey?: string;
@@ -69,18 +54,12 @@ export function AudioPlayer({
   const [duration, setDuration] = useState(durationSec ?? 0);
   const [rate, setRate] = useState(1);
   const [follow, setFollow] = useState(true);
-  /* جلسة صوتية نشطة (بدأ التشغيل ولم ينتهِ) — تحكم ظهور الكبسولة العائمة */
   const [sessionActive, setSessionActive] = useState(false);
-  /* موضع استئناف مُعاد من جلسة سابقة (0 = لا يوجد) — يُظهر زر «من البداية» فقط */
   const [resumedFrom, setResumedFrom] = useState(0);
-  /* حارس سباق: ضغطة «من البداية» قبل اكتمال تحميل البيانات الوصفية تلغي تطبيق الموضع المحفوظ */
   const clearedResumeRef = useRef(false);
-  /* نافذة كتم التظليل حول لحظة الاستئناف فقط — ضبط currentTime على عنصر متوقف
-     يولّد timeupdate يمر على مسار التظليل فتُضاء الكلمة وتُسحب الشاشة، والاستئناف
-     الصامت لا يُبرز ولا يُسحب — قفزات المستخدم اليدوية بعدها تظلل طبيعيًا */
   const silenceHighlightUntilRef = useRef(0);
+  const seekingBarRef = useRef(false);
 
-  /* بث حالة الكبسولة للعناصر العائمة الأخرى — زر العودة للأعلى يرتفع فوقها تلقائيًا */
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("kalam:audio-capsule", { detail: { active: sessionActive } }),
@@ -95,7 +74,6 @@ export function AudioPlayer({
   const cachedRef = useRef(false);
   const activeWordRef = useRef<number>(-1);
 
-  /* حفظ موضع الصوت — استئناف الجلسة بعد إعادة تحميل الصفحة */
   const posKey = `kalam-audio-pos:${slug}`;
   const lastSaveRef = useRef(0);
   const savePos = useCallback(
@@ -112,15 +90,8 @@ export function AudioPlayer({
     [words],
   );
 
-  /* ==================== معايرة التوقيتات على المدة الفعلية ====================
-     دمج مقاطع MP3 يضيف حشوة ترميز صغيرة لكل مقطع فيصبح الملف الفعلي أطول
-     من مجموع مدد الـPCM المفترضة — ومع الوقت يسبق التظليل الصوت بتراكمي.
-     لحظة معرفة المدة الحقيقية من المتصفح تُمدَّد/تُضاغط كل الطوابع بنسبة
-     المدة الفعلية إلى آخر نهاية كلمة — تصحيح عالمي يحمي كل المقالات القديمة. */
   const [calibrated, setCalibrated] = useState<WordTiming[] | null>(null);
   const effWords = calibrated ?? wordList;
-
-  /* ==================== كاش الصوت المحلي (IndexedDB) ==================== */
 
   const resolveSrc = useCallback(async (): Promise<string> => {
     try {
@@ -148,8 +119,6 @@ export function AudioPlayer({
     } catch {}
   }, [slug, src]);
 
-  /* ==================== عناصر الكلمات (إعادة بناء عند تبديل التشكيل) ==================== */
-
   useEffect(() => {
     wordElsRef.current = null;
     return () => {
@@ -157,13 +126,6 @@ export function AudioPlayer({
     };
   }, [syncKey]);
 
-  /* أحدث نسخ من الدوال للمزامنة — تُستدعى من تأثير syncKey دون إعادة تشغيله
-     (تُعرّف بعد إعلان setActiveWord وactiveWordIndex أسفل لتفادي TDZ) */
-
-  /* ============ تطهير التحديد الشبحي عند تبديل وضع التشكيل ============
-     أي تظليل ثابت معلّق يُزال فورًا من الـ DOM، ثم يستدعى
-     requestAnimationFrame لإعادة رسم كبسولة التظليل النشطة على
-     موقع الكلمة الحالية الصحيح وفق أبعاد النص الجديدة */
   useEffect(() => {
     document
       .querySelectorAll(".audio-word-active")
@@ -196,8 +158,6 @@ export function AudioPlayer({
     return wordElsRef.current;
   }, []);
 
-  /* ==================== إبراز الكلمة الحالية + التمرير الانسيابي ==================== */
-
   const setActiveWord = useCallback(
     (idx: number) => {
       const prev = activeWordRef.current;
@@ -210,8 +170,6 @@ export function AudioPlayer({
       }
       activeWordRef.current = idx;
 
-      /* المواءمة الموحدة: فهرس الصوت ← فهرس كلمة العرض المعروضة
-         (المشكول أو المجرد) — بلا مطابقة نصية ولا اعتماد على الأطوال */
       const domIdx =
         idx >= 0 && highlightMap ? (highlightMap[idx] ?? -1) : idx;
 
@@ -221,7 +179,6 @@ export function AudioPlayer({
         const blockEl = el.closest("[id^='blk-']");
         blockEl?.classList.add("audio-active");
 
-        /* تمرير تلقائي هادئ: يتحرك فقط حين تخرج الكلمة من النطاق المريح */
         if (follow) {
           const rect = el.getBoundingClientRect();
           const topBand = window.innerHeight * 0.22;
@@ -238,7 +195,6 @@ export function AudioPlayer({
     [follow, highlightMap, wordElements],
   );
 
-  /** البحث الثنائي عن الكلمة المقروءة الآن */
   const activeWordIndex = useCallback(
     (t: number): number => {
       if (!effWords) return -1;
@@ -261,8 +217,6 @@ export function AudioPlayer({
     [effWords],
   );
 
-  /* أحدث نسخ من الدوال للمزامنة — يستدعيهما تأثير تطهير syncKey أعلاه
-     عبر المراجع دون إعادة تشغيله عند كل تغيّر تبعية */
   const setActiveWordRef = useRef(setActiveWord);
   useEffect(() => {
     setActiveWordRef.current = setActiveWord;
@@ -272,8 +226,6 @@ export function AudioPlayer({
     activeWordIndexRef.current = activeWordIndex;
   }, [activeWordIndex]);
 
-  /* ==================== وضع الفقرات (توافقية الرفع اليدوي) ==================== */
-
   const timings = useMemo(() => {
     const totalWords = blocks.reduce((a, b) => a + b.words, 0) || 1;
     const dur = duration || durationSec || 0;
@@ -282,7 +234,7 @@ export function AudioPlayer({
       for (const c of cues) map.set(c.id, c.t);
       return map;
     }
-    if (effWords) return map; // وضع الكلمات لا يحتاج توقيتات فقرات
+    if (effWords) return map;
     let acc = 0;
     for (const b of blocks) {
       map.set(b.id, dur * (acc / totalWords));
@@ -312,10 +264,8 @@ export function AudioPlayer({
         }
       }
     },
-    [current, follow, playing, timings, wordList],
+    [current, effWords, follow, playing, timings],
   );
-
-  /* ==================== Media Session — التحكم من الخلفية وقفل الشاشة ==================== */
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
@@ -358,8 +308,6 @@ export function AudioPlayer({
     [duration, rate],
   );
 
-  /* ==================== تحكم التشغيل ==================== */
-
   const toggle = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -371,14 +319,11 @@ export function AudioPlayer({
     }
   }, [resolveSrc]);
 
-  /* «من البداية» — المخرج الواعي من الاستئناف: يمسح الموضع المحفوظ ويعيد
-     المؤشر إلى صفر المقال ويزيل أي تظليل — بلا تشغيل تلقائي، القرار للمستخدم */
   const startFromBeginning = useCallback(async () => {
     clearedResumeRef.current = true;
     try {
       localStorage.removeItem(posKey);
     } catch {}
-    /* صدّ الحفظ الدوري ثانيتين — timeupdate قفزة الصفر لا يُعيد كتابة المفتاح المحموم */
     lastSaveRef.current = Date.now();
     setResumedFrom(0);
     document.querySelectorAll(".audio-word-active").forEach((n) => n.classList.remove("audio-word-active"));
@@ -411,8 +356,6 @@ export function AudioPlayer({
     const next = rate === 1 ? 1.25 : rate === 1.25 ? 1.5 : 1;
     setRate(next);
     if (audioRef.current) {
-      /* defaultPlaybackRate معًا: خوارزمية تحميل عنصر الوسائط تُصفّر
-         playbackRate عند تعيين src جديد — الافتراضية هي التي تثبت */
       audioRef.current.defaultPlaybackRate = next;
       audioRef.current.playbackRate = next;
     }
@@ -421,7 +364,6 @@ export function AudioPlayer({
     } catch {}
   }, [rate]);
 
-  /* إيقاف/تشغيل التتبع التلقائي — تفضيل دائم يُحفظ مثل السرعة */
   const toggleFollow = useCallback(() => {
     const next = !follow;
     setFollow(next);
@@ -430,8 +372,6 @@ export function AudioPlayer({
     } catch {}
   }, [follow]);
 
-  /* استعادة تفضيلات الاستماع المحفوظة — قبل أول رسم بعد الترطيب،
-   ومزامنة العنصر الصوتي مع أي تغيير لاحق للسرعة ضمانًا */
   useIsomorphicLayoutEffect(() => {
     try {
       const saved = parseFloat(localStorage.getItem(RATE_KEY) ?? "");
@@ -458,9 +398,8 @@ export function AudioPlayer({
     const audio = audioRef.current;
     if (!audio) return;
     const t = audio.currentTime;
-    setCurrent(t);
+    if (!seekingBarRef.current) setCurrent(t);
     updatePositionState(t);
-    /* حفظ دوري خفيف (كل ثانيتين) — مصدر استئناف الجلسة بعد التحديث */
     const now = Date.now();
     if (now - lastSaveRef.current > 2000) {
       lastSaveRef.current = now;
@@ -476,23 +415,25 @@ export function AudioPlayer({
     }
   }, [activeWordIndex, effWords, savePos, setActiveBlock, setActiveWord, updatePositionState]);
 
-  const seekFromBar = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
+  const seekAtClientX = useCallback(
+    async (clientX: number, rect: DOMRect, rtl: boolean) => {
       const audio = audioRef.current;
-      if (!audio || !duration) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const ratio = 1 - (e.clientX - rect.left) / rect.width; // RTL
-      audio.currentTime = Math.max(0, Math.min(duration - 0.2, ratio * duration));
+      const effDur = duration || durationSec || 0;
+      if (!audio || !effDur || rect.width <= 0) return;
+      const rawRatio = (clientX - rect.left) / rect.width;
+      const clamped = Math.max(0, Math.min(1, rtl ? 1 - rawRatio : rawRatio));
+      const target = Math.max(0, Math.min(effDur - 0.15, clamped * effDur));
+      setCurrent(target);
+      if (!audio.src) {
+        audio.src = await resolveSrc();
+      }
+      try {
+        audio.currentTime = target;
+      } catch {}
     },
-    [duration],
+    [duration, durationSec, resolveSrc],
   );
 
-  /* ==================== استئناف الجلسة الصوتية بعد إعادة التحميل ====================
-     موضع الصوت والسرعة يُحفظان دوريًا محليًا، وعند العودة للمقال خلال ساعة
-     يُعاد مؤشر شريط التقدم لنفس الكلمة بالضبط — استئناف صامت: بلا تشغيل
-     تلقائي ولا خطف لأول لمسة ولا سحب للشاشة إلى موضع الكلمة ولا تظليل مفروض،
-     فلا يبدأ الصوت إلا بضغطة واعية على زر التشغيل — وزر «من البداية» يمحو
-     الموضع المحفوظ لمن لا يريد الاستكمال */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -537,10 +478,8 @@ export function AudioPlayer({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posKey, resolveSrc]);
 
-  /* لقطة أخيرة عند مغادرة الصفحة — التحديث أثناء التشغيل لا يفقد شيئًا */
   useEffect(() => {
     const onSave = () => {
       const audio = audioRef.current;
@@ -551,14 +490,11 @@ export function AudioPlayer({
     return () => window.removeEventListener("beforeunload", onSave);
   }, [savePos]);
 
-  /* حفظ فوري عند تغيير سرعة التشغيل أثناء الاستماع */
   useEffect(() => {
     const audio = audioRef.current;
     if (audio && audio.src && !audio.paused) savePos(audio.currentTime, true);
   }, [rate, savePos]);
 
-  /* القفز بالنقر على أي كلمة داخل المقال — الفهرس المعروض يُترجم
-     إلى فهرس الصوت عبر خريطة المواءمة (تجريد التشكيل) قبل القفز */
   useEffect(() => {
     if (!effWords) return;
     const handler = (e: Event) => {
@@ -585,7 +521,6 @@ export function AudioPlayer({
     return () => body?.removeEventListener("click", handler);
   }, [effWords, jumpMap, resolveSrc]);
 
-  /* تنظيف الإبراز عند التفكيك */
   useEffect(() => {
     return () => {
       document.querySelectorAll(".audio-word-active, #article-body .audio-active").forEach((n) =>
@@ -620,7 +555,7 @@ export function AudioPlayer({
         onPlay={() => {
           setPlaying(true);
           setSessionActive(true);
-          lastSaveRef.current = 0; /* احفظ فورًا في أول تحديث زمني */
+          lastSaveRef.current = 0;
         }}
         onPause={() => {
           setPlaying(false);
@@ -634,10 +569,10 @@ export function AudioPlayer({
           setResumedFrom(0);
           lastSaveRef.current = 0;
           try {
-            localStorage.removeItem(posKey); /* جلسة منتهية — لا استئناف */
+            localStorage.removeItem(posKey);
           } catch {}
           document.querySelectorAll("#article-body .audio-active").forEach((el) => el.classList.remove("audio-active"));
-          void cacheAudio(); /* تخزين محلي للزائر المتكرر — بلا استهلاك شبكة إضافي */
+          void cacheAudio();
         }}
         onError={() => setActiveWord(-1)}
       />
@@ -663,17 +598,13 @@ export function AudioPlayer({
           )}
         </button>
 
-        {/* إرجاع ١٠ ثوانٍ — سهم دائري رأسه لليمين (الرجوع عكس اتجاه التقدم في الـRTL) + الرقم في المركز */}
         <button onClick={() => skip(-10)} aria-label="إرجاع ١٠ ثوانٍ إلى الخلف" className="order-3 rounded-full p-2 text-sm transition-colors hover:bg-(--accent-soft) sm:order-none" style={{ color: "var(--ink-muted)" }} title="إرجاع ١٠ ثوانٍ إلى الخلف">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><g transform="scale(-1,1) translate(-24,0)"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></g><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
-        {/* تقديم ١٠ ثوانٍ — سهم دائري رأسه لليسار (اتجاه التقدم في الـRTL) + الرقم في المركز */}
         <button onClick={() => skip(10)} aria-label="تقديم ١٠ ثوانٍ إلى الأمام" className="order-3 rounded-full p-2 text-sm transition-colors hover:bg-(--accent-soft) sm:order-none" style={{ color: "var(--ink-muted)" }} title="تقديم ١٠ ثوانٍ إلى الأمام">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
 
-        {/* من البداية — يظهر فقط حين يوجد موضع استئناف محفوظ: يمحوه ويعيد المؤشر
-            إلى صفر المقال بلا تشغيل تلقائي — مخرج واعٍ لمن لا يريد الاستكمال */}
         {resumedFrom > 0 && (
           <button
             onClick={() => void startFromBeginning()}
@@ -689,26 +620,41 @@ export function AudioPlayer({
           </button>
         )}
 
-        {/* شريط التقدم RTL */}
+        {/* شريط التقدم RTL — يدعم السحب والنقر بالإصبع والماوس بمساحة لمس مريحة */}
         <div className="order-2 min-w-[calc(100%-4rem)] flex-1 sm:order-none sm:min-w-0">
           <div
-            onClick={seekFromBar}
-            className="group relative h-2.5 cursor-pointer overflow-hidden rounded-full"
-            style={{ background: "var(--border)" }}
+            onPointerDown={(e) => {
+              seekingBarRef.current = true;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), true);
+            }}
+            onPointerMove={(e) => {
+              if (!seekingBarRef.current) return;
+              void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), true);
+            }}
+            onPointerUp={() => {
+              seekingBarRef.current = false;
+            }}
+            onPointerCancel={() => {
+              seekingBarRef.current = false;
+            }}
+            className="group relative flex h-6 cursor-pointer touch-none items-center"
             role="slider"
             aria-label="شريط تقدم الصوت"
             aria-valuenow={Math.round(current)}
             aria-valuemax={Math.round(duration)}
           >
-            <div
-              className="absolute inset-y-0 right-0 rounded-full transition-[width] duration-200"
-              style={{
-                width: duration ? `${(current / duration) * 100}%` : "0%",
-                background: "linear-gradient(90deg, var(--accent-strong), var(--accent))",
-              }}
-            />
+            <span className="relative block h-2.5 w-full overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
+              <span
+                className="absolute inset-y-0 right-0 rounded-full transition-[width] duration-75"
+                style={{
+                  width: duration ? `${(current / duration) * 100}%` : "0%",
+                  background: "linear-gradient(90deg, var(--accent-strong), var(--accent))",
+                }}
+              />
+            </span>
           </div>
-          <div className="mt-1 flex justify-between text-[11px]" style={{ color: "var(--ink-muted)" }}>
+          <div className="flex justify-between text-[11px]" style={{ color: "var(--ink-muted)" }}>
             <span>{fmtTime(current)}</span>
             <span>{fmtTime(duration)}</span>
           </div>
@@ -735,29 +681,12 @@ export function AudioPlayer({
       </div>
       </div>
 
-      {/* ==================== كبسولة التحكم الصوتي العائمة ====================
-          تُرسَم عبر Portal إلى جسم الصفحة مباشرة حتى لا يخفيها وضع الغمر
-          (body.immersion يُعتم عناصر page-chrome التي يقع داخلها المشغل)،
-          وتبقى ثابتة مهما تحركت الصفحة تلقائيًا أو يدويًا — إيقاف الصوت
-          بلمسة واحدة دون البحث عن المشغل.
-
-          الهندسة والمسافات:
-          - أسفل الشاشة فوق شريط أدوات القراءة المثبت (bottom-0 بحوالي 64px):
-            هامش سفلي 4rem + safe-area لأجهزة Android/iOS ذات الشاشات الكاملة.
-          - عند الإيقاف المؤقت يخفت المشغل (opacity-35) ليكشف نصوص المقال
-            خلفه، ويعود مصمتًا عند التحويم أو استئناف التشغيل.
-          - أفقياً: قرب الحافة (left) على الهواتف، ومحاذاة إطار المحتوى
-            max-w-5xl على الشاشات العريضة (حافة المحتوى اليسرى + padding).
-          - هدف لمس زر التشغيل/الإيقاف 48×48px + حالة hover ناعمة للحاسوب. */}
       {sessionActive &&
         createPortal(
           <div dir="ltr" className="no-print pointer-events-none fixed inset-x-0 bottom-0 z-40">
             <div className="flex justify-start pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
                 className={`pointer-events-auto flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-zinc-900 py-2 pl-2 pr-3.5 text-white shadow-2xl transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] dark:bg-white dark:text-zinc-900 sm:py-2.5 ${
-                  /* عند الإيقاف المؤقت يخفت المشغل ليكشف نص المقال خلفه — ويتوهج عند التحويم أو التشغيل.
-                     التوهج بالتحويم محصور بأجهزة المؤشر الحقيقي (hover:hover) — فالهواتف اللمسية
-                     تُبقي حالة hover معلقة بعد أي لمسة فكانت تلغي الخفتة تمامًا على الهاتف */
                   playing ? "opacity-100" : "opacity-35 [@media(hover:hover)]:hover:opacity-100"
                 }`}
                 role="group"
@@ -775,8 +704,7 @@ export function AudioPlayer({
                   )}
                 </button>
 
-                {/* المؤشر المصغر للوقت + شريط تقدم مصغر */}
-                <div className="flex select-none flex-col items-start gap-1.5">
+                <div className="flex select-none flex-col items-start gap-1">
                   <span className="font-ui flex items-center gap-1.5 text-xs font-bold tabular-nums leading-none">
                     <span
                       aria-hidden
@@ -784,20 +712,37 @@ export function AudioPlayer({
                     />
                     {fmtTime(current)} / {fmtTime(duration)}
                   </span>
-                  <span
-                    aria-hidden
-                    className="relative block h-1 w-16 overflow-hidden rounded-full bg-white/25 dark:bg-zinc-900/20 sm:w-20"
+                  <div
+                    onPointerDown={(e) => {
+                      seekingBarRef.current = true;
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), false);
+                    }}
+                    onPointerMove={(e) => {
+                      if (!seekingBarRef.current) return;
+                      void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), false);
+                    }}
+                    onPointerUp={() => {
+                      seekingBarRef.current = false;
+                    }}
+                    onPointerCancel={() => {
+                      seekingBarRef.current = false;
+                    }}
+                    role="slider"
+                    aria-label="شريط تقدم الصوت المصغر"
+                    aria-valuenow={Math.round(current)}
+                    aria-valuemax={Math.round(duration)}
+                    className="flex h-4 w-20 cursor-pointer touch-none items-center sm:w-24"
                   >
-                    <span
-                      className="absolute inset-y-0 left-0 rounded-full bg-amber-400 transition-[width] duration-200"
-                      style={{ width: duration ? `${Math.min(100, (current / duration) * 100)}%` : "0%" }}
-                    />
-                  </span>
+                    <span className="relative block h-1.5 w-full overflow-hidden rounded-full bg-white/25 dark:bg-zinc-900/20">
+                      <span
+                        className="absolute inset-y-0 left-0 rounded-full bg-amber-400 transition-[width] duration-75"
+                        style={{ width: duration ? `${Math.min(100, (current / duration) * 100)}%` : "0%" }}
+                      />
+                    </span>
+                  </div>
                 </div>
 
-                {/* سرعة التشغيل — نفس دورة المشغل الكبير (١ ← ١.٢٥ ← ١.٥ ← ١)
-                    والحالة واحدة فالزران يبقيان متزامنين دائمًا — no-touch-grow
-                    تمنع قاعدة اللمس من تضخيمه 44px فتبقى المسافات واحدة على كل الأجهزة */}
                 <button
                   onClick={cycleRate}
                   aria-label="سرعة التشغيل"
@@ -807,9 +752,6 @@ export function AudioPlayer({
                   ×{easternDigits(rate)}
                 </button>
 
-                {/* زر الإغلاق — يوقف الصوت ويشيّل الكبسولة العائمة لمن انتهى منه —
-                    no-touch-grow تمنع تضخيمه على اللمس فتقلّ المسافة الزائدة حوله
-                    ويبقى شكله ومسافاته مطابقة للتابلت والكمبيوتر */}
                 <button
                   onClick={() => {
                     audioRef.current?.pause();

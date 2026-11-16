@@ -49,7 +49,7 @@ const RANK_STAGE_PERKS: Record<string, string> = {
   "قارئ متأمل": "بداية الرحلة • إطار «سطر بداية» عند ٢٥ نقطة • ٦ رسائل في المحاور الفكري",
   "محاور واعد": "يُفتح إطار «مدادٌ رصين» • ٦ رسائل في المحاور الفكري",
   "عقل رصين": "يُفتح إطار «غصن الأثر» • وعند ٢٥٠ «كلمة لها لازمة» • ٩ رسائل للمحاور",
-  "أهل الكلمة": "يُفتح إطار «منارة الفكر» + ١٢ رسالة للمحاور + قناة المقترحات الخاصة",
+  "أهل الكلمة": "أعلى رتبة فكرية • إطار «منارة الفكر» + ١٢ رسالة للمحاور + قناة المقترحات الخاصة",
 };
 
 const TABS: Array<{ key: string; href: string; label: string }> = [
@@ -157,6 +157,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const progress = next
     ? Math.min(100, Math.round(((user.impactScore - prevMin) / (next.min - prevMin)) * 100))
     : 100;
+  const hasHibrAsala = user.impactScore >= 500;
+  const hasRoyalSeal = Boolean(user.isVerified || user.isVip || user.impactScore >= 700);
 
   return (
     <>
@@ -482,9 +484,19 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               })}
             </div>
 
-            <div className="mt-3 rounded-xl border px-3 py-2.5 text-[11px] leading-5" style={{ borderColor: "var(--border)", background: "var(--bg-soft)", color: "var(--ink-muted)" }}>
-              <strong style={{ color: "var(--ink)" }}>التوثيق والإطارات العليا:</strong>{" "}
-              عند ٥٠٠ نقطة يُفتح إطار «حبر الأصالة»، كما يُفتح إطار «ختم الثقة» لحاملي التوثيق الرسمي أو العضوية المميزة VIP أو عند بلوغ ٧٠٠+ نقطة أثر.
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[11px] leading-5" style={{ borderColor: "var(--border)", background: "var(--bg-soft)", color: "var(--ink-muted)" }}>
+              <span>
+                <strong style={{ color: "var(--ink)" }}>إطارات تقديرية إضافية بعد الرتب:</strong>{" "}
+                «حبر الأصالة» عند ٥٠٠+ نقطة {hasHibrAsala ? "(مفتوح لك ✓)" : ""}، و«ختم الثقة» لحاملي التوثيق أو VIP أو ٧٠٠+ نقطة {hasRoyalSeal ? "(مفتوح لك ✓)" : ""}.
+              </span>
+              <Link
+                href="/profile?tab=settings"
+                prefetch={true}
+                className="shrink-0 font-bold underline underline-offset-2"
+                style={{ color: "var(--accent-strong)" }}
+              >
+                اختر إطارك ←
+              </Link>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
