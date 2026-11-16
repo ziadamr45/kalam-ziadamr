@@ -501,7 +501,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] leading-6" style={{ color: "var(--ink-muted)" }}>
-                {meta.hint}
+                {next ? meta.hint : "كلمتك لها وزن خاص عند إدارة المنصة — واصل أثرك الطيب."}
               </p>
               <ImpactGuideButton />
             </div>
@@ -520,6 +520,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               selector: "[data-tour='settings-editor']",
               title: "تخصيص هويتك المعروضة",
               text: "من هنا تعدّل اسمك وصورتك ونبذتك الفكرية كما تظهر أمام القرّاء.",
+            },
+            {
+              selector: "[data-tour='settings-frames']",
+              title: "إطارات الصورة الشخصية",
+              text: "هنا تختار إطار صورتك الشخصي من الإطارات المفتوحة لرتبتك وتوثيقك — مجانًا ودون خصم أي نقاط.",
             },
             {
               selector: "[data-tour='settings-notifications']",
@@ -554,7 +559,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           />
         </section>
 
-        <section className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
+        <section data-tour="settings-frames" className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
           <AvatarFramePickerCard
             avatarUrl={user.customImage || user.image || null}
             fallbackLetter={displayName(user).charAt(0)}
