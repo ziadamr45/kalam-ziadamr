@@ -11,18 +11,8 @@ import {
 } from "@/lib/legal-defaults";
 import { formatArabicDate } from "@/lib/utils";
 
-/**
- * عارض الصفحات القانونية الموحد — يقرأ المحتوى المُدار من لوحة التحكم،
- * وإن لم يُحرَّر بعد يعرض النص الافتراضي الرصين المضمّن في الكود.
- */
-
 export const LEGAL_SLUGS: LegalSlug[] = ["privacy", "terms", "dialogue-ethics"];
 
-/**
- * يقرأ محتوى الصفحة + تاريخ آخر تحديث الفعلي:
- * إن وُجدت نسخة محفوظة في قاعدة البيانات → updatedAt منها (يتجدد تلقائيًا مع كل حفظ إداري)
- * وإلا → تاريخ آخر تدقيق للنص الافتراضي
- */
 export async function getLegalContent(slug: LegalSlug) {
   try {
     const row = await prisma.legalPage.findUnique({ where: { slug } });
@@ -54,7 +44,7 @@ export async function LegalPageView({ slug }: { slug: LegalSlug }) {
   const blocks = parseBlocks(content);
 
   return (
-    <section className="mx-auto max-w-3xl px-4 pb-24 pt-28 sm:px-6">
+    <section className="mx-auto max-w-3xl px-4 pb-16 pt-28 sm:px-6 sm:pb-20">
       <header className="page-chrome text-center">
         <h1 className="font-body text-3xl font-bold leading-[1.8] sm:text-4xl" style={{ color: "var(--ink)" }}>
           {title}
@@ -69,7 +59,6 @@ export async function LegalPageView({ slug }: { slug: LegalSlug }) {
         <ArticleBlocks blocks={blocks} />
       </div>
 
-      {/* التاريخ الفعلي لآخر تحديث — وعدٌ نصّي مُطبَّق برمجيًا: يتجدد تلقائيًا مع كل حفظ إداري */}
       <p
         className="mt-12 border-t pt-6 text-center text-xs leading-7"
         style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}

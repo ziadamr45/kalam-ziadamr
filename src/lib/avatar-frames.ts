@@ -34,13 +34,13 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   {
     id: "none",
     name: "بلا إطار",
-    unlockHint: "متاح للجميع منذ التسجيل",
+    unlockHint: "متاح لك منذ التسجيل",
     minScore: 0,
     ringBackground: "var(--accent-soft)",
   },
   {
     id: "satr-bidaya",
-    name: "سطر بداية",
+    name: "سطرك الأول",
     unlockHint: "يُفتح عند ٢٥ نقطة أثر",
     minScore: 25,
     ringBackground: "linear-gradient(135deg, #d6cfc2 0%, #9b8e7b 55%, #6f6556 100%)",
@@ -48,7 +48,7 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   },
   {
     id: "ink-calm",
-    name: "مدادٌ رصين",
+    name: "مدادك الرصين",
     unlockHint: "يُفتح عند ٥٠ نقطة (محاور واعد)",
     minScore: 50,
     ringBackground: "linear-gradient(135deg, #e8c87e 0%, #c08a2d 48%, #734614 100%)",
@@ -56,7 +56,7 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   },
   {
     id: "emerald-leaf",
-    name: "غصن الأثر",
+    name: "غصن أثرك",
     unlockHint: "يُفتح عند ١٥٠ نقطة (عقل رصين)",
     minScore: 150,
     ringBackground: "linear-gradient(135deg, #9ad9aa 0%, #3c7a4e 50%, #1e4d2b 100%)",
@@ -64,7 +64,7 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   },
   {
     id: "kalam-lazma",
-    name: "كلمة لها لازمة",
+    name: "كلمتك لها لازمة",
     unlockHint: "يُفتح عند ٢٥٠ نقطة أثر",
     minScore: 250,
     ringBackground: "linear-gradient(135deg, #f5ebd3 0%, #a16a1f 45%, #1c1917 100%)",
@@ -74,7 +74,7 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   },
   {
     id: "kalam-gold",
-    name: "منارة الفكر",
+    name: "منارة فكرك",
     unlockHint: "يُفتح عند ٣٥٠ نقطة (أهل الكلمة)",
     minScore: 350,
     ringBackground: "linear-gradient(135deg, #fff3c4 0%, #e6b84c 35%, #b87d1e 70%, #f5ebd3 100%)",
@@ -84,7 +84,7 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   },
   {
     id: "hibr-asala",
-    name: "حبر الأصالة",
+    name: "حبر أصالتك",
     unlockHint: "يُفتح عند ٥٠٠ نقطة أثر",
     minScore: 500,
     ringBackground: "linear-gradient(135deg, #d9a441 0%, #6b431c 50%, #292524 100%)",
@@ -94,7 +94,7 @@ export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   },
   {
     id: "royal-seal",
-    name: "ختم الثقة",
+    name: "ختم ثقتك",
     unlockHint: "لحاملي التوثيق الرسمي أو VIP أو ٧٠٠+ نقطة",
     requiresPrivilegeOrScore: 700,
     ringBackground: "linear-gradient(135deg, #c4b5fd 0%, #7c3aed 40%, #d9a441 85%, #fef08a 100%)",

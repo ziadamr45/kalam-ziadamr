@@ -5,9 +5,15 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+import { getAvatarFrameMeta } from "@/lib/avatar-frames";
 
 const AVATAR_CACHE_KEY = "kalam_avatar_cache";
-type CachedAvatar = { name?: string | null; image?: string | null; email?: string | null };
+type CachedAvatar = {
+  name?: string | null;
+  image?: string | null;
+  email?: string | null;
+  avatarFrame?: string | null;
+};
 
 function LoginIcon() {
   return (
@@ -35,22 +41,45 @@ export function AccountMenu() {
 
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      const next: CachedAvatar = {
+      const base: CachedAvatar = {
         name: session.user.name ?? null,
         image: session.user.image ?? null,
         email: session.user.email ?? null,
       };
-      setCached(next);
-      try {
-        window.localStorage.setItem(AVATAR_CACHE_KEY, JSON.stringify(next));
-      } catch {}
+      setCached((prev) => ({ ...base, avatarFrame: prev?.avatarFrame ?? null }));
+      fetch("/api/profile", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          const p = d?.profile as {
+            customName?: string | null;
+            name?: string | null;
+            customImage?: string | null;
+            image?: string | null;
+            avatarFrame?: string | null;
+          } | undefined;
+          const next: CachedAvatar = {
+            name: p?.customName || p?.name || base.name,
+            image: p?.customImage || p?.image || base.image,
+            email: base.email,
+            avatarFrame: p?.avatarFrame ?? null,
+          };
+          setCached(next);
+          try {
+            window.localStorage.setItem(AVATAR_CACHE_KEY, JSON.stringify(next));
+          } catch {}
+        })
+        .catch(() => {
+          try {
+            window.localStorage.setItem(AVATAR_CACHE_KEY, JSON.stringify(base));
+          } catch {}
+        });
     } else if (status === "unauthenticated") {
       setCached(null);
       try {
         window.localStorage.removeItem(AVATAR_CACHE_KEY);
       } catch {}
     }
-  }, [status, session?.user]);
+  }, [status, session?.user, pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,7 +116,9 @@ export function AccountMenu() {
     );
   }
 
-  const u = session?.user ?? cached!;
+  const u = cached ?? session?.user ?? {};
+  const frame = getAvatarFrameMeta((u as CachedAvatar).avatarFrame);
+  const hasCustomFrame = frame.id !== "none";
 
   return (
     <div className="relative" ref={menuRef}>
@@ -100,10 +131,14 @@ export function AccountMenu() {
         className="flex h-8 w-8 items-center justify-center self-center rounded-full transition-all duration-300 hover:scale-110"
       >
         <span
-          className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border"
-          style={{
-            borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.35)",
-          }}
+          className={`flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ${
+            hasCustomFrame ? "p-[2px]" : "border"
+          }`}
+          style={
+            hasCustomFrame
+              ? { background: frame.ringBackground, boxShadow: frame.ringGlow }
+              : { borderColor: open ? "var(--accent)" : "rgba(245, 158, 11, 0.35)" }
+          }
         >
           {u.image ? (
             <Image
@@ -112,11 +147,15 @@ export function AccountMenu() {
               width={28}
               height={28}
               referrerPolicy="no-referrer"
-              className="block h-full w-full object-cover"
+              className={`block h-full w-full rounded-full object-cover ${
+                hasCustomFrame ? "ring-[1.5px] ring-(--surface)" : ""
+              }`}
             />
           ) : (
             <span
-              className="flex h-full w-full items-center justify-center text-xs font-bold"
+              className={`flex h-full w-full items-center justify-center rounded-full text-xs font-bold ${
+                hasCustomFrame ? "ring-[1.5px] ring-(--surface)" : ""
+              }`}
               style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
             >
               {(u.name || "ق").trim().charAt(0)}

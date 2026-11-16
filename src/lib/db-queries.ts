@@ -122,7 +122,6 @@ export async function getActiveSections() {
   return null;
 }
 
-/** مقالات ذات صلة: من نفس القسم أولًا، ثم تكمل من بقية المنصة حتى يظهر القسم دائمًا */
 export async function getRelatedArticles(
   articleId: string,
   sectionId: string | null,
@@ -161,7 +160,8 @@ export async function getRelatedArticles(
   return [...sameSection, ...fallback];
 }
 
-/** مختارات مخصصة لحساب القارئ: بحسب أقسام محفوظاته وتفاعلاته وتقدمه، أو الأكثر قراءة */
+/** مختارات مخصصة لحساب القارئ: بحسب أقسام محفوظاته وتفاعلاته وتقدمه،
+ * وإذا أتمّ قراءة المقالات الحالية كلها يرشّح أبرز مقالات المنصة الأقرب لاهتماماته */
 export async function getPersonalizedArticles(
   userId: string,
   limit = 3,
@@ -200,7 +200,7 @@ export async function getPersonalizedArticles(
     );
 
     if (preferredSectionIds.length > 0) {
-      const matched = await prisma.article.findMany({
+      const unreadMatched = await prisma.article.findMany({
         where: {
           ...publishedWhere,
           sectionId: { in: preferredSectionIds },
@@ -210,13 +210,25 @@ export async function getPersonalizedArticles(
         take: limit,
         include: { section: true },
       });
-      if (matched.length > 0) return matched;
+      if (unreadMatched.length > 0) return unreadMatched;
     }
 
-    return await prisma.article.findMany({
+    const unreadGeneral = await prisma.article.findMany({
       where: {
         ...publishedWhere,
         ...(completedIds.length > 0 ? { id: { notIn: completedIds } } : {}),
+      },
+      orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
+      take: limit,
+      include: { section: true },
+    });
+    if (unreadGeneral.length > 0) return unreadGeneral;
+
+    /* إذا أتمّ القارئ قراءة المقالات المنشورة كلها، نعرض له أبرز مقالات اهتماماته أو الأكثر قراءة */
+    return await prisma.article.findMany({
+      where: {
+        ...publishedWhere,
+        ...(preferredSectionIds.length > 0 ? { sectionId: { in: preferredSectionIds } } : {}),
       },
       orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
       take: limit,
