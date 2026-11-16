@@ -46,10 +46,10 @@ const DEVICE_TYPE_LABEL: Record<string, string> = {
 };
 
 const RANK_STAGE_PERKS: Record<string, string> = {
-  "قارئ متأمل": "بداية الرحلة • إطار «سطر بداية» عند ٢٥ نقطة • ٦ رسائل في المحاور الفكري",
-  "محاور واعد": "يُفتح إطار «مدادٌ رصين» • ٦ رسائل في المحاور الفكري",
-  "عقل رصين": "يُفتح إطار «غصن الأثر» • وعند ٢٥٠ «كلمة لها لازمة» • ٩ رسائل للمحاور",
-  "أهل الكلمة": "أعلى رتبة فكرية • إطار «منارة الفكر» + ١٢ رسالة للمحاور + قناة المقترحات الخاصة",
+  "قارئ متأمل": "بداية الرحلة • إطار «سطرك الأول» عند ٢٥ نقطة • ٦ رسائل في المحاور الفكري",
+  "محاور واعد": "يُفتح إطار «مدادك الرصين» • ٦ رسائل في المحاور الفكري",
+  "عقل رصين": "يُفتح إطار «غصن أثرك» • وعند ٢٥٠ «كلمتك لها لازمة» • ٩ رسائل للمحاور",
+  "أهل الكلمة": "أعلى رتبة فكرية • إطار «منارة فكرك» + ١٢ رسالة للمحاور + قناة المقترحات الخاصة",
 };
 
 const TABS: Array<{ key: string; href: string; label: string }> = [
@@ -487,7 +487,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[11px] leading-5" style={{ borderColor: "var(--border)", background: "var(--bg-soft)", color: "var(--ink-muted)" }}>
               <span>
                 <strong style={{ color: "var(--ink)" }}>إطارات تقديرية إضافية بعد الرتب:</strong>{" "}
-                «حبر الأصالة» عند ٥٠٠+ نقطة {hasHibrAsala ? "(مفتوح لك ✓)" : ""}، و«ختم الثقة» لحاملي التوثيق أو VIP أو ٧٠٠+ نقطة {hasRoyalSeal ? "(مفتوح لك ✓)" : ""}.
+                «حبر أصالتك» عند ٥٠٠+ نقطة {hasHibrAsala ? "(مفتوح لك ✓)" : ""}، و«ختم ثقتك» لحاملي التوثيق أو VIP أو ٧٠٠+ نقطة {hasRoyalSeal ? "(مفتوح لك ✓)" : ""}.
               </span>
               <Link
                 href="/profile?tab=settings"
