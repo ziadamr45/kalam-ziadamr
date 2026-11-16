@@ -6,6 +6,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 
 export type ArticleWithSection = Article & { section: Section | null };
+export type PersonalizedArticle = ArticleWithSection & { reason: string };
 
 const publishedWhere: Prisma.ArticleWhereInput = {
   OR: [
@@ -160,14 +161,13 @@ export async function getRelatedArticles(
   return [...sameSection, ...fallback];
 }
 
-/** مختارات مخصصة لحساب القارئ: بحسب أقسام محفوظاته وتفاعلاته وتقدمه،
- * وإذا أتمّ قراءة المقالات الحالية كلها يرشّح أبرز مقالات المنصة الأقرب لاهتماماته */
+/** مختارات مخصصة لحساب القارئ: تعرض مقالًا أو مقالين بحد أقصى (وليس كل المنصة) مع سبب الاختيار */
 export async function getPersonalizedArticles(
   userId: string,
-  limit = 3,
-): Promise<ArticleWithSection[]> {
+): Promise<PersonalizedArticle[]> {
   try {
-    const [saved, interactions, progresses] = await Promise.all([
+    const [totalPublished, saved, interactions, progresses] = await Promise.all([
+      prisma.article.count({ where: publishedWhere }),
       prisma.savedArticle.findMany({
         where: { userId },
         take: 10,
@@ -188,7 +188,10 @@ export async function getPersonalizedArticles(
       }),
     ]);
 
+    if (totalPublished === 0) return [];
+    const pickLimit = totalPublished <= 4 ? 1 : 2;
     const completedIds = progresses.filter((p) => p.progress >= 90).map((p) => p.articleId);
+    const inProgressIds = progresses.filter((p) => p.progress > 5 && p.progress < 90).map((p) => p.articleId);
     const preferredSectionIds = Array.from(
       new Set(
         [
@@ -199,6 +202,18 @@ export async function getPersonalizedArticles(
       ),
     );
 
+    if (inProgressIds.length > 0) {
+      const resumeRows = await prisma.article.findMany({
+        where: { ...publishedWhere, id: { in: inProgressIds } },
+        orderBy: { updatedAt: "desc" },
+        take: pickLimit,
+        include: { section: true },
+      });
+      if (resumeRows.length > 0) {
+        return resumeRows.map((a) => ({ ...a, reason: "بدأت قراءته ولم تُتمه بعد" }));
+      }
+    }
+
     if (preferredSectionIds.length > 0) {
       const unreadMatched = await prisma.article.findMany({
         where: {
@@ -207,10 +222,15 @@ export async function getPersonalizedArticles(
           ...(completedIds.length > 0 ? { id: { notIn: completedIds } } : {}),
         },
         orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
-        take: limit,
+        take: pickLimit,
         include: { section: true },
       });
-      if (unreadMatched.length > 0) return unreadMatched;
+      if (unreadMatched.length > 0) {
+        return unreadMatched.map((a) => ({
+          ...a,
+          reason: a.section ? `من قسم «${a.section.name}» الذي يهمك` : "مقترح بحسب اهتماماتك",
+        }));
+      }
     }
 
     const unreadGeneral = await prisma.article.findMany({
@@ -219,21 +239,26 @@ export async function getPersonalizedArticles(
         ...(completedIds.length > 0 ? { id: { notIn: completedIds } } : {}),
       },
       orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
-      take: limit,
+      take: pickLimit,
       include: { section: true },
     });
-    if (unreadGeneral.length > 0) return unreadGeneral;
+    if (unreadGeneral.length > 0) {
+      return unreadGeneral.map((a) => ({ ...a, reason: "الأكثر تفاعلًا ولم تقرأه بعد" }));
+    }
 
-    /* إذا أتمّ القارئ قراءة المقالات المنشورة كلها، نعرض له أبرز مقالات اهتماماته أو الأكثر قراءة */
-    return await prisma.article.findMany({
+    const topFallback = await prisma.article.findMany({
       where: {
         ...publishedWhere,
         ...(preferredSectionIds.length > 0 ? { sectionId: { in: preferredSectionIds } } : {}),
       },
-      orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
-      take: limit,
+      orderBy: [{ views: "desc" }, { completedReads: "desc" }],
+      take: pickLimit,
       include: { section: true },
     });
+    return topFallback.map((a) => ({
+      ...a,
+      reason: "الأكثر تفاعلًا من اهتماماتك",
+    }));
   } catch {
     return [];
   }

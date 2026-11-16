@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { getAvatarFrameMeta } from "@/lib/avatar-frames";
+import { FrameGlyph } from "@/components/avatar-frame";
 
 const AVATAR_CACHE_KEY = "kalam_avatar_cache";
 type CachedAvatar = {
@@ -128,7 +129,7 @@ export function AccountMenu() {
         aria-expanded={open}
         title={u.name || "حسابي"}
         data-tour="account-avatar"
-        className="flex h-8 w-8 items-center justify-center self-center rounded-full transition-all duration-300 hover:scale-110"
+        className="relative flex h-8 w-8 items-center justify-center self-center rounded-full transition-all duration-300 hover:scale-110"
       >
         <span
           className={`flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ${
@@ -162,6 +163,15 @@ export function AccountMenu() {
             </span>
           )}
         </span>
+        {frame.badgeKind && (
+          <span
+            aria-hidden
+            className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border text-white shadow-soft"
+            style={{ background: frame.badgeBg ?? "var(--accent)", borderColor: "var(--surface)" }}
+          >
+            <FrameGlyph kind={frame.badgeKind} size={7} />
+          </span>
+        )}
       </button>
 
       {open && (

@@ -41,7 +41,7 @@ export default async function HomePage() {
     getLatestArticles(9),
     getActiveSections(),
     getSiteConfig().catch(() => null),
-    userId ? getPersonalizedArticles(userId, 3) : Promise.resolve([]),
+    userId ? getPersonalizedArticles(userId) : Promise.resolve([]),
   ]);
 
   const sections =
@@ -81,7 +81,7 @@ export default async function HomePage() {
             {
               selector: "[data-tour='account-avatar']",
               title: "تسجيل الدخول وحسابك",
-              text: "من هنا تسجّل دخولك بحساب جوجل بضغطة واحدة لحفظ المقالات، والمشاركة في الحوار، ومتابعة رصيد أثرك وإعداداتك.",
+              text: "من هنا تسجّل دخولك بحساب جوجل بضغطة واحدة لحفظ المقالات، والمشاركة في الحوار، ومتابعة رصيد أثرك وإطاراتك وإعداداتك.",
             },
           ]}
         />
@@ -158,6 +158,7 @@ export default async function HomePage() {
               title: a.title,
               summary: a.summary,
               readingTimeSec: a.readingTimeSec,
+              reason: a.reason,
               section: a.section ? { name: a.section.name, slug: a.section.slug } : null,
             }))}
           />
