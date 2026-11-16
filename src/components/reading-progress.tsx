@@ -5,13 +5,15 @@ import { useEffect, useRef, useState } from "react";
 /**
  * شريط تقدم القراءة — حصر الحساب في حاوية متن المقال (Container-Bound):
  *
- * نقطة البداية (0%) عندما يلمس أعلى المتن قمة نافذة العرض، ونقطة النهاية
- * (100%) عندما يبلغ أسفل آخر فقرة في المتن أسفل الشاشة — دون احتساب
+ * نقطة البداية (0%) عندما يبلغ أعلى المتن خط القراءة العلوي (64px من قمة النافذة)،
+ * ونقطة النهاية (100%) عندما يبلغ أسفل آخر فقرة في المتن أسفل الشاشة — دون احتساب
  * التعليقات أو المقالات المقترحة أو الفوتر في المعادلة إطلاقًا.
  *
- * مرجع الحاوية ثابت برمجيًا (#article-body) مع مراقب أبعاد يعيد الحساب
- * فور تغير ارتفاع المحتوى (تحميل الغلاف/الخطوط) فلا قفزات زائفة.
+ * بهذا يبدأ الشريط من 0% تمامًا عند أعلى الصفحة في الوضع العادي ووضع القراءة
+ * المركزة على حد سواء، ويحافظ على النسبة نفسها بدقة عند التبديل بينهما.
  */
+const TOP_OFFSET_PX = 64;
+
 export function ReadingProgress() {
   const [progress, setProgress] = useState(0);
   const raf = useRef<number | null>(null);
@@ -22,14 +24,13 @@ export function ReadingProgress() {
       if (!content) return 0;
       const rect = content.getBoundingClientRect();
       const windowHeight = window.innerHeight;
-      const totalContentHeight = rect.height;
-
-      /* المسافة المقطوعة داخل المقال — من لمس أعلى المتن قمة النافذة */
-      const scrolled = windowHeight - rect.top;
+      const totalScrollable = rect.height - windowHeight + TOP_OFFSET_PX;
+      const scrolled = TOP_OFFSET_PX - rect.top;
 
       if (scrolled <= 0) return 0;
-      if (scrolled >= totalContentHeight) return 100;
-      return Math.min(100, Math.max(0, Math.round((scrolled / totalContentHeight) * 100)));
+      if (totalScrollable <= 0) return 100;
+      if (scrolled >= totalScrollable) return 100;
+      return Math.min(100, Math.max(0, Math.round((scrolled / totalScrollable) * 100)));
     };
 
     const update = () => {
@@ -42,9 +43,13 @@ export function ReadingProgress() {
     };
 
     const content = document.getElementById("article-body");
-    /* تغير ارتفاع المتن (صور/خطوط) يعيد المعايرة لحظيًا */
+    /* تغير ارتفاع المتن (صور/خطوط) أو تفعيل/إلغاء وضع القراءة المركزة يعيد المعايرة لحظيًا */
     const ro = new ResizeObserver(onScroll);
     if (content) ro.observe(content);
+    const mo = new MutationObserver(onScroll);
+    mo.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-immersion"] });
+
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     window.addEventListener("load", onScroll);
@@ -57,6 +62,7 @@ export function ReadingProgress() {
       window.removeEventListener("resize", onScroll);
       window.removeEventListener("load", onScroll);
       ro.disconnect();
+      mo.disconnect();
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       if (raf.current !== null) cancelAnimationFrame(raf.current);
