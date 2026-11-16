@@ -13,7 +13,8 @@ export function ProposalForm() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const valid = title.trim().length >= 5 && content.trim().length >= 50;
+  const trimmedLen = content.trim().length;
+  const valid = title.trim().length >= 5 && trimmedLen >= 50;
 
   const submit = async () => {
     setBusy(true);
@@ -74,19 +75,28 @@ export function ProposalForm() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
-            placeholder="عنوان المقترح — موضوع فكري، سؤال عميق، أو اقتراح تطوير"
-            className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm outline-hidden focus:border-(--accent)"
+            placeholder="عنوان المقترح (٥ أحرف على الأقل)"
+            className="min-h-[46px] w-full rounded-xl border bg-transparent px-4 py-3 text-sm leading-normal outline-hidden focus:border-(--accent)"
             style={{ borderColor: "var(--border)", color: "var(--ink)", background: "var(--surface)" }}
           />
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={5}
-            maxLength={4000}
-            placeholder="طوّر فكرتك هنا (50 حرفًا على الأقل).. ما الذي يستحق أن تُناقشه منصة «كلام له لازمة»؟"
-            className="w-full resize-none rounded-xl border bg-transparent px-4 py-3 text-sm leading-8 outline-hidden focus:border-(--accent)"
-            style={{ borderColor: "var(--border)", color: "var(--ink)", background: "var(--surface)" }}
-          />
+          <div>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={5}
+              maxLength={4000}
+              placeholder="طوّر فكرتك هنا (٥٠ حرفًا على الأقل).. ما الذي يستحق أن تُناقشه منصة «كلام له لازمة»؟"
+              className="w-full resize-none rounded-xl border bg-transparent px-4 py-3 text-sm leading-8 outline-hidden focus:border-(--accent)"
+              style={{ borderColor: "var(--border)", color: "var(--ink)", background: "var(--surface)" }}
+            />
+            <p
+              className="mt-1.5 text-[11px] font-medium"
+              style={{ color: trimmedLen >= 50 ? "#3c7a4e" : "var(--ink-muted)" }}
+            >
+              {new Intl.NumberFormat("ar-EG").format(trimmedLen)} / ٥٠ حرفًا على الأقل
+              {trimmedLen >= 50 ? " ✓" : ""}
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"

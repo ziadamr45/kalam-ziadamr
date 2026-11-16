@@ -28,6 +28,7 @@ export function AvatarFramePickerCard({
     (AVATAR_FRAMES.find((f) => f.id === initialFrame)?.id ?? "none") as AvatarFrameId,
   );
   const [saving, setSaving] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
   const pick = async (frameId: AvatarFrameId) => {
@@ -68,15 +69,52 @@ export function AvatarFramePickerCard({
         <h2 className="font-ui text-lg font-bold" style={{ color: "var(--ink)" }}>
           إطارات الصورة الشخصية
         </h2>
-        {saving && (
-          <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
-            جارٍ الحفظ..
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {saving && (
+            <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
+              جارٍ الحفظ..
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowGuide((v) => !v)}
+            aria-expanded={showGuide}
+            className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors hover:bg-(--accent-soft)"
+            style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <path d="M12 17h.01" />
+            </svg>
+            كيف تُفتح الإطارات؟
+          </button>
+        </div>
       </div>
       <p className="mt-1 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
         تُفتح الإطارات تلقائيًا مع تقدمك في الرتب ورصيد أثرك دون أي خصم من نقاطك.
       </p>
+
+      {showGuide && (
+        <div
+          className="mt-3 rounded-2xl border p-4 text-xs leading-6"
+          style={{ borderColor: "var(--border)", background: "var(--bg-soft)", color: "var(--ink)" }}
+        >
+          <p className="font-bold" style={{ color: "var(--accent-strong)" }}>
+            متى يُفتح كل إطار؟
+          </p>
+          <ul className="mt-2 space-y-1.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+            <li>• <strong style={{ color: "var(--ink)" }}>بلا إطار:</strong> متاح للجميع منذ التسجيل.</li>
+            <li>• <strong style={{ color: "var(--ink)" }}>مداد هادئ:</strong> يُفتح تلقائيًا عند بلوغ ٥٠ نقطة أثر (رتبة «محاور واعد»).</li>
+            <li>• <strong style={{ color: "var(--ink)" }}>غصن الزمرد:</strong> يُفتح تلقائيًا عند بلوغ ١٥٠ نقطة أثر (رتبة «عقل رصين»).</li>
+            <li>• <strong style={{ color: "var(--ink)" }}>تاج أهل الكلمة:</strong> يُفتح تلقائيًا عند بلوغ ٣٥٠ نقطة أثر (رتبة «أهل الكلمة»).</li>
+            <li>• <strong style={{ color: "var(--ink)" }}>الختم الملكي:</strong> يُفتح لحاملي التوثيق الرسمي أو العضوية المميزة VIP أو عند بلوغ ٥٠٠+ نقطة أثر.</li>
+          </ul>
+          <p className="mt-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+            كل الإطارات مجانية وتقديرية — التبديل بينها لا يخصم أي نقطة من رصيد أثرك.
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {AVATAR_FRAMES.map((frame) => {
@@ -98,7 +136,7 @@ export function AvatarFramePickerCard({
               }}
             >
               <span
-                className="inline-flex rounded-full p-[3px]"
+                className="relative inline-flex rounded-full p-[3.5px]"
                 style={{
                   background: frame.ringBackground,
                   boxShadow: frame.ringGlow,
@@ -110,15 +148,24 @@ export function AvatarFramePickerCard({
                     src={avatarUrl}
                     alt={frame.name}
                     referrerPolicy="no-referrer"
-                    className="h-12 w-12 rounded-full object-cover"
+                    className="h-12 w-12 rounded-full object-cover ring-2 ring-(--surface)"
                     style={{ background: "var(--surface)" }}
                   />
                 ) : (
                   <span
-                    className="flex h-12 w-12 items-center justify-center rounded-full text-base font-bold"
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-base font-bold ring-2 ring-(--surface)"
                     style={{ background: "var(--surface)", color: "var(--accent-strong)" }}
                   >
                     {fallbackLetter}
+                  </span>
+                )}
+                {frame.badgeChar && (
+                  <span
+                    aria-hidden
+                    className="absolute -bottom-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full border text-[9px] font-bold text-white"
+                    style={{ background: frame.badgeBg ?? "var(--accent)", borderColor: "var(--surface)" }}
+                  >
+                    {frame.badgeChar}
                   </span>
                 )}
               </span>

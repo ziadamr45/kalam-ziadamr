@@ -21,47 +21,53 @@ export type AvatarFrameMeta = {
   requiresPrivilegeOrScore?: number;
   ringBackground: string;
   ringGlow?: string;
+  badgeChar?: string;
+  badgeBg?: string;
 };
 
 export const AVATAR_FRAMES: AvatarFrameMeta[] = [
   {
     id: "none",
     name: "بلا إطار",
-    unlockHint: "متاح للجميع",
+    unlockHint: "متاح للجميع منذ التسجيل",
     minScore: 0,
     ringBackground: "var(--accent-soft)",
   },
   {
     id: "ink-calm",
     name: "مداد هادئ",
-    unlockHint: "يُفتح عند ٥٠ نقطة (محاور واعد)",
+    unlockHint: "يُفتح عند ٥٠ نقطة (رتبة محاور واعد)",
     minScore: 50,
-    ringBackground: "linear-gradient(135deg, #c08a2d, #84531b)",
-    ringGlow: "0 0 0 2px rgba(161,106,31,0.16)",
+    ringBackground: "linear-gradient(135deg, #e8c87e 0%, #c08a2d 48%, #734614 100%)",
+    ringGlow: "0 0 0 2px rgba(192,138,45,0.22), 0 4px 14px -4px rgba(161,106,31,0.45)",
   },
   {
     id: "emerald-leaf",
     name: "غصن الزمرد",
-    unlockHint: "يُفتح عند ١٥٠ نقطة (عقل رصين)",
+    unlockHint: "يُفتح عند ١٥٠ نقطة (رتبة عقل رصين)",
     minScore: 150,
-    ringBackground: "linear-gradient(135deg, #3c7a4e, #7bb686)",
-    ringGlow: "0 0 0 2px rgba(60,122,78,0.18)",
+    ringBackground: "linear-gradient(135deg, #9ad9aa 0%, #3c7a4e 50%, #1e4d2b 100%)",
+    ringGlow: "0 0 0 2px rgba(60,122,78,0.24), 0 4px 16px -4px rgba(60,122,78,0.45)",
   },
   {
     id: "kalam-gold",
     name: "تاج أهل الكلمة",
-    unlockHint: "يُفتح عند ٣٥٠ نقطة (أهل الكلمة)",
+    unlockHint: "يُفتح عند ٣٥٠ نقطة (رتبة أهل الكلمة)",
     minScore: 350,
-    ringBackground: "linear-gradient(135deg, #f5ebd3, #d9a441, #84531b)",
-    ringGlow: "0 2px 10px -2px rgba(217,164,65,0.45)",
+    ringBackground: "linear-gradient(135deg, #fff3c4 0%, #e6b84c 35%, #b87d1e 70%, #f5ebd3 100%)",
+    ringGlow: "0 0 0 2px rgba(217,164,65,0.32), 0 6px 20px -4px rgba(217,164,65,0.58)",
+    badgeChar: "✦",
+    badgeBg: "#B87D1E",
   },
   {
     id: "royal-seal",
     name: "الختم الملكي",
-    unlockHint: "لحاملي التوثيق أو التمييز أو ٥٠٠+ نقطة",
+    unlockHint: "لحاملي التوثيق الرسمي أو VIP أو ٥٠٠+ نقطة",
     requiresPrivilegeOrScore: 500,
-    ringBackground: "linear-gradient(135deg, #7c3aed, #d9a441)",
-    ringGlow: "0 2px 10px -2px rgba(124,58,237,0.38)",
+    ringBackground: "linear-gradient(135deg, #c4b5fd 0%, #7c3aed 40%, #d9a441 85%, #fef08a 100%)",
+    ringGlow: "0 0 0 2px rgba(124,58,237,0.3), 0 6px 22px -4px rgba(124,58,237,0.52)",
+    badgeChar: "♛",
+    badgeBg: "#6D28D9",
   },
 ];
 
