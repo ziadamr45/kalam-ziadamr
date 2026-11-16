@@ -21,19 +21,14 @@ type PublicComment = {
   authorFrame?: string | null;
   authorRank: string | null;
   isInspiring: boolean;
-  /* التوثيق الرسمي المستقل — ختم بلون التصنيف (إثبات هوية فقط) */
   authorVerified?: boolean;
   authorSealColor?: string | null;
   authorSealLabel?: string | null;
-  /* العضوية المميزة المستقلة — كبسولة بلونها الخاص */
   authorIsVip?: boolean;
   authorBadgeTitle?: string | null;
   authorBadgeColor?: string | null;
-  /* إطار التعليق الفخم — لون شارة الكاتب عند امتلاكه الصلاحية */
   authorAccent?: string | null;
-  /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
   authorCard?: { extendedBio: string | null; links: VerifiedSocialLinks } | null;
-  /* تثبيت ذاتي من كاتبه */
   selfPinned?: boolean;
   likes: number;
   dislikes: number;
@@ -57,7 +52,6 @@ function MiniSpinner({ size = 12 }: { size?: number }) {
   );
 }
 
-/** ختم التوثيق الرسمي — بلون تصنيف الحساب (ذهبي للمؤسس، كحلي للنخبة، زيتي للكتاب، فيروزي للعائلة) */
 function VerifiedSeal({ color, title }: { color: string; title: string }) {
   return (
     <span title={`${title} — حساب موثّق رسميًا`} aria-label={`حساب موثق: ${title}`}>
@@ -69,7 +63,6 @@ function VerifiedSeal({ color, title }: { color: string; title: string }) {
   );
 }
 
-/* روابط البطاقة الغنية بأيقونات نصية رصينة — المفاتيح المعتمدة فقط */
 const CARD_LINK_ORDER = [
   "website",
   "facebook",
@@ -519,7 +512,7 @@ export function CommentsSection({
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <span
-                    className="inline-flex shrink-0 rounded-full p-[2px]"
+                    className="inline-flex shrink-0 rounded-full p-[2.5px]"
                     style={{
                       background: frame.ringBackground,
                       boxShadow: frame.ringGlow,
@@ -533,12 +526,12 @@ export function CommentsSection({
                         width={36}
                         height={36}
                         referrerPolicy="no-referrer"
-                        className="h-9 w-9 rounded-full object-cover"
+                        className="h-9 w-9 rounded-full object-cover ring-[1.5px] ring-(--surface)"
                         style={{ background: "var(--surface)" }}
                       />
                     ) : (
                       <span
-                        className="flex h-9 w-9 items-center justify-center rounded-full font-bold"
+                        className="flex h-9 w-9 items-center justify-center rounded-full font-bold ring-[1.5px] ring-(--surface)"
                         style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
                       >
                         {c.authorName.charAt(0)}
@@ -656,7 +649,7 @@ export function CommentsSection({
                 </div>
               )}
 
-              <p className="font-body leading-9" style={{ color: "var(--ink)" }}>
+              <p className="font-body select-text leading-9" style={{ color: "var(--ink)" }}>
                 {c.content}
               </p>
 
