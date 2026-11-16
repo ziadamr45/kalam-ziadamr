@@ -279,6 +279,7 @@ export default async function ArticlePage({
                 authorName: displayName(c.user),
                 authorImage: displayAvatar(c.user),
                 authorFrame: c.user?.avatarFrame ?? null,
+                authorBio: c.user?.bio ?? null,
                 authorRank: c.user?.intellectualRank ?? null,
                 isInspiring: c.isInspiring,
                 authorVerified: c.user?.isVerified ?? false,
@@ -296,7 +297,7 @@ export default async function ArticlePage({
                     ? c.user.vipBadgeColor
                     : null,
                 authorCard:
-                  c.user?.isVerified && c.user
+                  (c.user?.isVerified || c.user?.isVip) && c.user
                     ? {
                         extendedBio: c.user.extendedBio ?? null,
                         links: parseSocialLinks(c.user.verifiedSocialLinks),

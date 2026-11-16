@@ -557,6 +557,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               verifiedSocialLinks: parseSocialLinks(user.verifiedSocialLinks),
             }}
             isVerified={user.isVerified}
+            sealColor={verificationSealColor(user.verificationType)}
+            sealLabel={verificationSealLabel(user.verificationType, user.verificationLabel)}
           />
         </section>
 

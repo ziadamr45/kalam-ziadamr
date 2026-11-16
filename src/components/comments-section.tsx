@@ -9,7 +9,12 @@ import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { formatArabicDate } from "@/lib/utils";
 import { RankBadge } from "@/components/rank-badge";
 import { FramedAvatar } from "@/components/avatar-frame";
-import { SOCIAL_LINK_LABELS, type VerifiedSocialLinks } from "@/lib/verification-meta";
+import { SocialPlatformIcon } from "@/components/social-platform-icon";
+import {
+  SOCIAL_LINK_KEYS,
+  SOCIAL_LINK_LABELS,
+  type VerifiedSocialLinks,
+} from "@/lib/verification-meta";
 
 type PublicComment = {
   id: string;
@@ -21,6 +26,7 @@ type PublicComment = {
   authorName: string;
   authorImage: string | null;
   authorFrame?: string | null;
+  authorBio?: string | null;
   authorRank: string | null;
   isInspiring: boolean;
   authorVerified?: boolean;
@@ -64,18 +70,6 @@ function VerifiedSeal({ color, title }: { color: string; title: string }) {
     </span>
   );
 }
-
-const CARD_LINK_ORDER = [
-  "website",
-  "facebook",
-  "instagram",
-  "telegram",
-  "whatsapp",
-  "youtube",
-  "tiktok",
-  "x",
-  "linkedin",
-] as const;
 
 const REPORT_REASONS = ["إساءة أو لغة غير لائقة", "إعلان أو سبام", "مخالفة القيم", "سبب آخر"];
 const CUSTOM_REASON = "سبب آخر";
@@ -525,6 +519,8 @@ export function CommentsSection({
     const repliesOpen = Boolean(expandedReplies[c.id]);
     const showVip = Boolean(c.authorIsVip && c.authorBadgeTitle);
     const showRank = Boolean(c.authorRank && c.authorRank !== "قارئ متأمل");
+    const isFullCard = Boolean((c.authorVerified || c.authorIsVip) && c.authorCard);
+    const cardOpen = cardFor === c.id;
 
     return (
       <li
@@ -570,22 +566,30 @@ export function CommentsSection({
             />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                {c.authorVerified && c.authorCard ? (
-                  <button
-                    type="button"
-                    onClick={() => setCardFor(cardFor === c.id ? null : c.id)}
-                    className="cursor-pointer truncate text-sm font-bold underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-(--accent-strong)"
-                    style={{ color: "var(--ink)" }}
-                    title="اضغط لعرض البطاقة الفكرية الموسعة"
-                    aria-expanded={cardFor === c.id}
+                <button
+                  type="button"
+                  onClick={() => setCardFor(cardOpen ? null : c.id)}
+                  className="group inline-flex min-w-0 cursor-pointer items-center gap-1 text-right text-sm font-bold underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:text-(--accent-strong) active:opacity-75"
+                  style={{ color: cardOpen ? "var(--accent-strong)" : "var(--ink)" }}
+                  title={isFullCard ? "اضغط لعرض البطاقة الفكرية الموسعة" : "اضغط لعرض بطاقة القارئ"}
+                  aria-expanded={cardOpen}
+                >
+                  <span className="truncate">{c.authorName}</span>
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`shrink-0 transition-transform duration-200 ${cardOpen ? "rotate-180 opacity-100" : "opacity-55 group-hover:opacity-100"}`}
+                    aria-hidden
                   >
-                    {c.authorName}
-                  </button>
-                ) : (
-                  <p className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
-                    {c.authorName}
-                  </p>
-                )}
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
                 {c.authorVerified && (
                   <VerifiedSeal
                     color={c.authorSealColor || "#2563EB"}
@@ -712,31 +716,54 @@ export function CommentsSection({
           )}
         </div>
 
-        {cardFor === c.id && c.authorCard && (
+        {cardOpen && isFullCard && c.authorCard && (
           <div
-            className="mb-3 rounded-2xl border p-4"
+            className="mb-3 rounded-2xl border p-4 text-right animate-fade-in"
             style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
           >
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold" style={{ color: c.authorSealColor || "#2563EB" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
-                <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
-              </svg>
-              بطاقة {c.authorSealLabel || "حساب موثّق"}
-            </p>
-            {c.authorCard.extendedBio && (
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p
+                className="flex items-center gap-1.5 text-[11px] font-bold"
+                style={{ color: c.authorVerified ? (c.authorSealColor || "#2563EB") : (c.authorBadgeColor || "#7C3AED") }}
+              >
+                {c.authorVerified ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+                    <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M12 2l2.6 6.2L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.4-.8L12 2z" />
+                  </svg>
+                )}
+                بطاقة {c.authorVerified ? (c.authorSealLabel || "حساب موثّق") : (c.authorBadgeTitle || "عضوية مميزة")}
+              </p>
+              <button
+                type="button"
+                onClick={() => setCardFor(null)}
+                className="rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors hover:bg-(--accent-soft)"
+                style={{ color: "var(--ink-muted)" }}
+                aria-label="إغلاق البطاقة"
+              >
+                إغلاق
+              </button>
+            </div>
+            {c.authorCard.extendedBio ? (
               <p className="whitespace-pre-line text-[13px] leading-7" style={{ color: "var(--ink)" }}>
                 {c.authorCard.extendedBio}
               </p>
-            )}
-            {!c.authorCard.extendedBio && (
+            ) : c.authorBio ? (
+              <p className="whitespace-pre-line text-[13px] leading-7" style={{ color: "var(--ink)" }}>
+                {c.authorBio}
+              </p>
+            ) : (
               <p className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
                 لم يكتب صاحب هذه البطاقة نبذته الفكرية الموسعة بعد.
               </p>
             )}
-            {CARD_LINK_ORDER.some((k) => c.authorCard?.links?.[k]) && (
+            {SOCIAL_LINK_KEYS.some((k) => c.authorCard?.links?.[k]) && (
               <div className="mt-3 flex flex-wrap gap-2">
-                {CARD_LINK_ORDER.map((k) => {
+                {SOCIAL_LINK_KEYS.map((k) => {
                   const href = c.authorCard?.links?.[k];
                   if (!href) return null;
                   return (
@@ -745,15 +772,58 @@ export function CommentsSection({
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer nofollow"
-                      className="rounded-full border px-3 py-1 text-[11px] font-bold transition-all hover:-translate-y-0.5"
+                      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition-all hover:-translate-y-0.5"
                       style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
                     >
-                      {SOCIAL_LINK_LABELS[k]}
+                      <SocialPlatformIcon platform={k} size={12} />
+                      <span>{SOCIAL_LINK_LABELS[k]}</span>
                     </a>
                   );
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {cardOpen && !isFullCard && (
+          <div
+            className="mb-3 rounded-2xl border p-3.5 text-right animate-fade-in"
+            style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <FramedAvatar
+                  src={c.authorImage}
+                  alt={c.authorName}
+                  fallbackLetter={c.authorName.charAt(0)}
+                  frameId={c.authorFrame}
+                  size="md"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
+                    {c.authorName}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <RankBadge rank={c.authorRank || "قارئ متأمل"} />
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCardFor(null)}
+                className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors hover:bg-(--accent-soft)"
+                style={{ color: "var(--ink-muted)" }}
+                aria-label="إغلاق البطاقة"
+              >
+                إغلاق
+              </button>
+            </div>
+            <p
+              className="mt-2.5 text-xs leading-6"
+              style={{ color: c.authorBio ? "var(--ink)" : "var(--ink-muted)" }}
+            >
+              {c.authorBio ? c.authorBio.slice(0, 200) : "لم يكتب نبذته الفكرية بعد."}
+            </p>
           </div>
         )}
 

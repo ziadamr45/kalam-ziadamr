@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayName, validateCustomName, validateBio } from "@/lib/identity";
 import { FramedAvatar } from "@/components/avatar-frame";
+import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import {
   SOCIAL_LINK_KEYS,
   SOCIAL_LINK_LABELS,
@@ -24,12 +25,16 @@ export function ProfileEditor({
   avatarFrame,
   initial,
   isVerified = false,
+  sealColor = "#2563EB",
+  sealLabel = "حساب موثّق",
 }: {
   googleName: string | null;
   googleImage: string | null;
   avatarFrame?: string | null;
   initial: Initial;
   isVerified?: boolean;
+  sealColor?: string;
+  sealLabel?: string;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -43,6 +48,7 @@ export function ProfileEditor({
   const [dragging, setDragging] = useState(false);
   const [extendedBio, setExtendedBio] = useState(initial.extendedBio ?? "");
   const [links, setLinks] = useState<VerifiedSocialLinks>(initial.verifiedSocialLinks ?? {});
+  const [showPreview, setShowPreview] = useState(false);
 
   const currentAvatar = imageUrl || googleImage;
   const nameError = name.trim() ? validateCustomName(name) : null;
@@ -123,6 +129,9 @@ export function ProfileEditor({
       setBusy(false);
     }
   };
+
+  const previewName = displayName({ customName: name.trim() || null, name: googleName });
+  const filledLinks = SOCIAL_LINK_KEYS.filter((k) => Boolean(links[k]?.trim()));
 
   return (
     <div
@@ -243,7 +252,7 @@ export function ProfileEditor({
           />
         </div>
 
-        <div className="min-w-0 flex-1 space-y-4">
+        <div className="min-w-0 flex-1 space-y-4 text-right">
           <div>
             <label htmlFor="custom-name" className="mb-1.5 block text-xs font-bold" style={{ color: "var(--ink)" }}>
               الاسم المعروض للقرّاء
@@ -290,28 +299,104 @@ export function ProfileEditor({
               }}
             />
             <p className="mt-1.5 flex justify-between text-[11px]" style={{ color: bioError ? "#DC2626" : "var(--ink-muted)" }}>
-              <span>{bioError ?? "تظهر في بطاقة ملفك الشخصي"}</span>
+              <span>{bioError ?? "تظهر في بطاقة ملفك الشخصي وفي النقاشات"}</span>
               <span>{bio.length}/200</span>
             </p>
           </div>
 
           {isVerified && (
             <div
-              className="rounded-2xl border p-4"
+              className="rounded-2xl border p-4 text-right"
               style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
             >
-              <p className="mb-1 flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
-                  <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
-                </svg>
-                بطاقتك الفكرية الموسعة
-              </p>
-              <p className="mb-3 text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center justify-start gap-1.5 text-right text-xs font-bold" style={{ color: "var(--accent-strong)" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden className="shrink-0">
+                    <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+                    <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                  </svg>
+                  <span>بطاقتك الفكرية الموسعة</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowPreview((v) => !v)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors hover:bg-(--accent-soft)"
+                  style={{
+                    borderColor: showPreview ? "var(--accent)" : "var(--border)",
+                    color: "var(--accent-strong)",
+                    background: showPreview ? "var(--accent-soft)" : "var(--surface)",
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <span>{showPreview ? "إخفاء المعاينة" : "معاينة بطاقتك كما يراها القرّاء"}</span>
+                </button>
+              </div>
+              <p className="mb-3 text-right text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
                 امتياز توثيقك الرسمي: من يضغط على اسمك في النقاشات يرى نبذتك الموسعة وروابطك الشخصية.
               </p>
 
-              <label htmlFor="extended-bio" className="mb-1.5 block text-xs font-bold" style={{ color: "var(--ink)" }}>
+              {showPreview && (
+                <div
+                  className="mb-4 rounded-2xl border p-4 text-right shadow-soft animate-fade-in"
+                  style={{ borderColor: "var(--accent)", background: "var(--surface)" }}
+                >
+                  <div className="mb-2.5 flex items-center gap-2.5">
+                    <FramedAvatar
+                      src={currentAvatar}
+                      alt={previewName}
+                      fallbackLetter={previewName.charAt(0)}
+                      frameId={avatarFrame}
+                      size="sm"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
+                          {previewName}
+                        </span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill={sealColor} aria-hidden className="shrink-0">
+                          <path d="M12 1.5l2.5 2.1 3.2-.4 1.2 3 3 1.2-.4 3.2L23.5 12l-2 2.4.4 3.2-3 1.2-1.2 3-3.2-.4L12 23.5l-2.5-2.1-3.2.4-1.2-3-3-1.2.4-3.2L.5 12l2-2.4-.4-3.2 3-1.2 1.2-3 3.2.4L12 1.5z" />
+                          <path d="M10.6 15.7l-3-3 1.3-1.3 1.7 1.7 4.5-4.5 1.3 1.3-5.8 5.8z" fill="#fff" />
+                        </svg>
+                      </div>
+                      <p className="text-[11px] font-bold" style={{ color: sealColor }}>
+                        بطاقة {sealLabel}
+                      </p>
+                    </div>
+                  </div>
+                  {extendedBio.trim() ? (
+                    <p className="whitespace-pre-line text-[13px] leading-7" style={{ color: "var(--ink)" }}>
+                      {extendedBio.trim()}
+                    </p>
+                  ) : bio.trim() ? (
+                    <p className="whitespace-pre-line text-[13px] leading-7" style={{ color: "var(--ink)" }}>
+                      {bio.trim()}
+                    </p>
+                  ) : (
+                    <p className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                      لم تكتب نبذتك الفكرية الموسعة بعد.
+                    </p>
+                  )}
+                  {filledLinks.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {filledLinks.map((k) => (
+                        <span
+                          key={k}
+                          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold"
+                          style={{ borderColor: "var(--border)", color: "var(--accent-strong)" }}
+                        >
+                          <SocialPlatformIcon platform={k} size={12} />
+                          <span>{SOCIAL_LINK_LABELS[k]}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <label htmlFor="extended-bio" className="mb-1.5 block text-right text-xs font-bold" style={{ color: "var(--ink)" }}>
                 نبذة فكرية موسعة <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(حتى 1200 حرف)</span>
               </label>
               <textarea
@@ -331,14 +416,19 @@ export function ProfileEditor({
                 {extendedBio.length}/1200
               </p>
 
-              <p className="mb-2 mt-4 block text-xs font-bold" style={{ color: "var(--ink)" }}>
+              <p className="mb-2 mt-4 block text-right text-xs font-bold" style={{ color: "var(--ink)" }}>
                 روابطك الاجتماعية العامة
               </p>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {SOCIAL_LINK_KEYS.map((k) => (
                   <div key={k}>
-                    <label htmlFor={`link-${k}`} className="mb-1 block text-[11px] font-bold" style={{ color: "var(--ink-muted)" }}>
-                      {SOCIAL_LINK_LABELS[k]}
+                    <label
+                      htmlFor={`link-${k}`}
+                      className="mb-1 flex items-center gap-1.5 text-[11px] font-bold"
+                      style={{ color: "var(--ink-muted)" }}
+                    >
+                      <SocialPlatformIcon platform={k} size={13} />
+                      <span>{SOCIAL_LINK_LABELS[k]}</span>
                     </label>
                     <input
                       id={`link-${k}`}
@@ -357,8 +447,8 @@ export function ProfileEditor({
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                يُقبل رابط https كامل لكل حقل — الروابط الفارغة تُهمل.
+              <p className="mt-2.5 text-right text-[11px] leading-5" style={{ color: "var(--ink-muted)" }}>
+                تظهر بطاقتك الفكرية كاملةً (النبذة الموسعة والروابط المضافة) تلقائيًا عند الضغط على اسمك في النقاشات — وتُهمل الحقول الفارغة.
               </p>
             </div>
           )}

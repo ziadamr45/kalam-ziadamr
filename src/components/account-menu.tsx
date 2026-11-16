@@ -30,6 +30,8 @@ export function AccountMenu() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [cached, setCached] = useState<CachedAvatar | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +85,10 @@ export function AccountMenu() {
   }, [status, session?.user, pathname]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setConfirmSignOut(false);
+      return;
+    }
     const onClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
     };
@@ -227,19 +232,52 @@ export function AccountMenu() {
               الأمان والجلسات
             </Link>
             <div className="my-1 h-px" style={{ background: "var(--border)" }} aria-hidden />
-            <button
-              onClick={async () => {
-                try {
-                  window.localStorage.removeItem("kalam_was_logged_in");
-                  window.localStorage.removeItem(AVATAR_CACHE_KEY);
-                } catch {}
-                await signOut({ redirectTo: "/" });
-              }}
-              className="block w-full rounded-xl px-3 py-2 text-right transition-colors hover:bg-(--accent-soft)"
-              style={{ color: "#b4443c" }}
-            >
-              تسجيل الخروج
-            </button>
+            {confirmSignOut ? (
+              <div
+                className="rounded-xl border p-2.5 text-right"
+                style={{ borderColor: "var(--border)", background: "var(--bg-soft)" }}
+              >
+                <p className="mb-2 text-xs font-bold" style={{ color: "var(--ink)" }}>
+                  هل تريد تسجيل الخروج؟
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={signingOut}
+                    onClick={async () => {
+                      setSigningOut(true);
+                      try {
+                        window.localStorage.removeItem("kalam_was_logged_in");
+                        window.localStorage.removeItem(AVATAR_CACHE_KEY);
+                      } catch {}
+                      await signOut({ redirectTo: "/" });
+                    }}
+                    className="flex-1 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white transition-opacity disabled:opacity-60"
+                    style={{ background: "#b4443c" }}
+                  >
+                    {signingOut ? "جارٍ الخروج…" : "تأكيد الخروج"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={signingOut}
+                    onClick={() => setConfirmSignOut(false)}
+                    className="rounded-lg border px-2.5 py-1.5 text-xs font-semibold"
+                    style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmSignOut(true)}
+                className="block w-full rounded-xl px-3 py-2 text-right transition-colors hover:bg-(--accent-soft)"
+                style={{ color: "#b4443c" }}
+              >
+                تسجيل الخروج
+              </button>
+            )}
           </nav>
         </div>
       )}

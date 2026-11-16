@@ -284,6 +284,7 @@ export async function getApprovedComments(articleId: string) {
             customName: true,
             customImage: true,
             avatarFrame: true,
+            bio: true,
             impactScore: true,
             intellectualRank: true,
             isVerified: true,

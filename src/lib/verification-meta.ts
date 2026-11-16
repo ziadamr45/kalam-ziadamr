@@ -27,12 +27,12 @@ export const VERIFICATION_TYPE_META: Record<
   OWNER: {
     color: "#D97706",
     label: "المؤسس",
-    hint: "توثيق صاحب المنصة السيادي — ختم ذهبي حصري بالبذر التلقائي",
+    hint: "توثيق صاحب المنصة — ختم ذهبي حصري",
   },
   NOTABLE: {
     color: "#1E3A8A",
     label: "أهل الكلمة",
-    hint: "نخبة الحوار المموّهقين — ختم كحلي/أزرق",
+    hint: "نخبة الحوار المميَّزون — ختم كحلي/أزرق",
   },
   OFFICIAL_AUTHOR: {
     color: "#6B8E23",
@@ -67,44 +67,44 @@ export function verificationSealLabel(
   return verificationMeta(type)?.label ?? "حساب موثّق";
 }
 
-/**
- * روابط البطاقة الفكرية الموثقة — الحقول الاجتماعية العامة الأساسية
- * (استبدالًا للحقول التقنية: تُعرض الحقول الممتلئة فقط للقراء)
- */
-export type VerifiedSocialLinks = {
-  website?: string;
-  facebook?: string;
-  instagram?: string;
-  telegram?: string;
-  whatsapp?: string;
-  youtube?: string;
-  tiktok?: string;
-  x?: string;
-  linkedin?: string;
-};
-
 export const SOCIAL_LINK_KEYS = [
   "website",
   "facebook",
   "instagram",
+  "threads",
   "telegram",
   "whatsapp",
   "youtube",
   "tiktok",
+  "snapchat",
   "x",
   "linkedin",
+  "github",
+  "devto",
 ] as const;
 
-export const SOCIAL_LINK_LABELS: Record<(typeof SOCIAL_LINK_KEYS)[number], string> = {
+export type SocialLinkKey = (typeof SOCIAL_LINK_KEYS)[number];
+
+/**
+ * روابط البطاقة الفكرية الموثقة — الحقول الاجتماعية العامة
+ * (تُعرض الحقول الممتلئة فقط للقراء)
+ */
+export type VerifiedSocialLinks = Partial<Record<SocialLinkKey, string>>;
+
+export const SOCIAL_LINK_LABELS: Record<SocialLinkKey, string> = {
   website: "الموقع الشخصي أو المدونة",
   facebook: "فيسبوك",
   instagram: "إنستجرام",
+  threads: "ثريدز",
   telegram: "تليجرام",
   whatsapp: "واتساب",
   youtube: "قناة يوتيوب",
   tiktok: "تيك توك",
+  snapchat: "سناب شات",
   x: "منصة إكس",
   linkedin: "لينكد إن",
+  github: "جيت هب",
+  devto: "DEV",
 };
 
 /** مطابقة صارمة: https فقط — تُقبل روابط wa.me وt.me وكل الروابط الاجتماعية الآمنة */
