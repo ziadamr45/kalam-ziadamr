@@ -198,12 +198,28 @@ export default async function ArticlePage({
             >
               {article.title}
             </h1>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs sm:mt-5" style={{ color: "var(--ink-muted)" }}>
-              <span>فريق كلام له لازمة</span>
-              <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
-              <span>{formatArabicDate(article.publishedAt)}</span>
-              <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
-              <span>مدة القراءة المتوقعة: {formatReadingTime(article.readingTimeSec)}</span>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:mt-5" style={{ color: "var(--ink-muted)" }}>
+              <span className="inline-flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+                فريق كلام له لازمة
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect width="18" height="18" x="3" y="4" rx="2" />
+                  <path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
+                {formatArabicDate(article.publishedAt)}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                مدة القراءة المتوقعة: {formatReadingTime(article.readingTimeSec)}
+              </span>
             </div>
             <div className="mx-auto mt-5 h-[3px] w-16 rounded-full sm:mt-6" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
           </header>

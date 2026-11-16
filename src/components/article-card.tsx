@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { easternDigits, formatArabicDate } from "@/lib/utils";
+import { formatArabicDate } from "@/lib/utils";
 import { formatReadingTime } from "@/lib/readingTime";
 
 export type ArticleCardData = {
@@ -48,12 +48,25 @@ export function ArticleCard({ article, index = 0 }: { article: ArticleCardData; 
         {article.summary}
       </p>
       <div
-        className="mt-4 flex items-center gap-3 text-xs"
+        className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs"
         style={{ color: "var(--ink-muted)" }}
       >
-        {article.publishedAt && <span>{formatArabicDate(article.publishedAt)}</span>}
-        {article.publishedAt && <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />}
-        <span>{formatReadingTime(article.readingTimeSec)}</span>
+        {article.publishedAt && (
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect width="18" height="18" x="3" y="4" rx="2" />
+              <path d="M16 2v4M8 2v4M3 10h18" />
+            </svg>
+            {formatArabicDate(article.publishedAt)}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          {formatReadingTime(article.readingTimeSec)}
+        </span>
       </div>
     </Link>
   );

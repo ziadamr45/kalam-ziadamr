@@ -294,12 +294,25 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               <p className="mt-1.5 truncate text-sm" dir="ltr" style={{ color: "var(--ink-muted)" }}>
                 {user.email}
               </p>
-              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs sm:justify-start" style={{ color: "var(--ink-muted)" }}>
-                <span>{roleLabelAr(user.role)}</span>
-                <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
-                <span>قارئ معنا منذ {formatArabicDate(user.createdAt)}</span>
-                <span aria-hidden className="h-3 w-px" style={{ background: "var(--border)" }} />
-                <span>
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:justify-start" style={{ color: "var(--ink-muted)" }}>
+                <span className="inline-flex items-center gap-1.5">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  {roleLabelAr(user.role)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <rect width="18" height="18" x="3" y="4" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" />
+                  </svg>
+                  قارئ معنا منذ {formatArabicDate(user.createdAt)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+                  </svg>
                   رصيد أثرك{" "}
                   <strong style={{ color: "var(--accent-strong)" }}>
                     {new Intl.NumberFormat("ar-EG").format(user.impactScore)}

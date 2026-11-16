@@ -8,6 +8,12 @@ import { getVisitorFingerprint } from "@/lib/fingerprint";
 
 type ChatMessage = { role: "user" | "model"; text: string };
 
+const STARTER_CHIPS = [
+  "لخّص لي الفكرة الأساسية في نقاط",
+  "ما أهم دليل أو مثال في المقال؟",
+  "كيف أطبّق هذه الفكرة عمليًا؟",
+];
+
 /**
  * عارض ماركداون غني لردود المحاور:
  * عناوين (##)، جداول (| ... |)، اقتباسات (> )، قوائم نقطية ومرقمة،
@@ -326,6 +332,8 @@ export function DiscussCompanion({
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
+  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
+  const [confirmRetryIdx, setConfirmRetryIdx] = useState<number | null>(null);
   const { data: session, status } = useSession();
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -335,10 +343,16 @@ export function DiscussCompanion({
   const messagesRef = useRef<ChatMessage[]>([]);
   const syncSeqRef = useRef(0);
   const shouldScrollRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const editingRef = useRef<number | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
 
   const readLocalMessages = useCallback((): { messages: ChatMessage[]; remaining: number | null } => {
     try {
@@ -517,10 +531,17 @@ export function DiscussCompanion({
     [],
   );
 
+  const cancelEdit = useCallback(() => {
+    setEditing(null);
+    setInput("");
+  }, []);
+
   const closeDrawer = useCallback(() => {
     setOpen(false);
     openRef.current = false;
     setError("");
+    setConfirmDeleteIdx(null);
+    setConfirmRetryIdx(null);
     requestAnimationFrame(() => triggerRef.current?.focus());
   }, []);
 
@@ -557,7 +578,13 @@ export function DiscussCompanion({
     const prevOverflow = document.documentElement.style.overflow;
     document.documentElement.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeDrawer();
+      if (e.key === "Escape") {
+        if (editingRef.current !== null) {
+          cancelEdit();
+        } else {
+          closeDrawer();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     const t = setTimeout(() => inputRef.current?.focus(), 350);
@@ -566,7 +593,7 @@ export function DiscussCompanion({
       window.removeEventListener("keydown", onKey);
       clearTimeout(t);
     };
-  }, [open, closeDrawer]);
+  }, [open, closeDrawer, cancelEdit]);
 
   const plainOf = (t: string) =>
     t
@@ -590,40 +617,65 @@ export function DiscussCompanion({
     const m = messages[idx];
     if (!m || sending) return;
     setActiveIdx(null);
+    setConfirmDeleteIdx(null);
+    setConfirmRetryIdx(null);
     setEditing(idx);
     setInput(m.text);
     setError("");
     setTimeout(() => inputRef.current?.focus(), 60);
   };
 
-  const cancelEdit = () => {
-    setEditing(null);
-    setInput("");
+  const confirmDelete = (idx: number) => {
+    if (sending) return;
+    syncSeqRef.current += 1;
+    const next = messages.slice(0, idx);
+    setMessages(next);
+    messagesRef.current = next;
+    setActiveIdx(null);
+    setConfirmDeleteIdx(null);
+    setConfirmRetryIdx(null);
+    if (editing !== null && editing >= idx) {
+      setEditing(null);
+      setInput("");
+    }
+    persistSession(next, remaining);
+    if (status === "authenticated") {
+      void fetch("/api/ai/discuss", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articleId, messages: next, replace: true }),
+      }).catch(() => {});
+    }
   };
 
-  const send = async () => {
-    const text = input.trim();
-    if (!text || sending || exhausted) return;
-
+  const runDiscussTurn = async (
+    text: string,
+    baseMessages: ChatMessage[],
+    editIndex: number | null,
+    restoreInputOnFail: boolean,
+  ) => {
     /* إلغاء أي استجابة fetchQuota معلقة حتى لا تكتب فوق الرسالة الجديدة */
     syncSeqRef.current += 1;
 
     setError("");
-    setInput("");
-    const editIndex = editing;
-    setEditing(null);
     setActiveIdx(null);
-    const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
+    setConfirmDeleteIdx(null);
+    setConfirmRetryIdx(null);
+
     const nextMessages: ChatMessage[] = [...baseMessages, { role: "user", text }];
     shouldScrollRef.current = true;
     setMessages(nextMessages);
     messagesRef.current = nextMessages;
     setSending(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const res = await fetch("/api/ai/discuss", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           articleId,
           message: text,
@@ -654,7 +706,7 @@ export function DiscussCompanion({
         }
         setMessages(baseMessages);
         messagesRef.current = baseMessages;
-        setInput(text);
+        if (restoreInputOnFail) setInput(text);
         if (editIndex !== null) setEditing(editIndex);
         return;
       }
@@ -686,15 +738,47 @@ export function DiscussCompanion({
           if (idata?.awarded) setImpactNote(`+${idata.points} رصيد أثر لحوارك المثمر`);
         } catch {}
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setMessages(baseMessages);
+        messagesRef.current = baseMessages;
+        persistSession(baseMessages, remaining);
+        if (restoreInputOnFail) setInput(text);
+        if (editIndex !== null) setEditing(editIndex);
+        setError("");
+        return;
+      }
       setError("انقطع الاتصال — أعد المحاولة");
       setMessages(baseMessages);
       messagesRef.current = baseMessages;
-      setInput(text);
+      if (restoreInputOnFail) setInput(text);
       if (editIndex !== null) setEditing(editIndex);
     } finally {
+      abortRef.current = null;
       setSending(false);
     }
+  };
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || sending || (exhausted && !unlimited)) return;
+    const editIndex = editing;
+    setInput("");
+    setEditing(null);
+    const baseMessages = editIndex !== null ? messages.slice(0, editIndex) : messages;
+    await runDiscussTurn(text, baseMessages, editIndex, true);
+  };
+
+  const confirmRetry = async (modelIdx: number) => {
+    if (sending || (exhausted && !unlimited)) return;
+    const userMsg = messages[modelIdx - 1];
+    if (!userMsg || userMsg.role !== "user") return;
+    const baseMessages = messages.slice(0, modelIdx - 1);
+    await runDiscussTurn(userMsg.text, baseMessages, null, false);
+  };
+
+  const stopGenerating = () => {
+    abortRef.current?.abort();
   };
 
   const onInputKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -704,7 +788,7 @@ export function DiscussCompanion({
       window.matchMedia("(hover: hover) and (pointer: fine)").matches;
     if (!isDesktopKeyboard) return;
     e.preventDefault();
-    send();
+    void send();
   };
 
   const arabicNum = (n: number) => new Intl.NumberFormat("ar-EG").format(n);
@@ -909,13 +993,34 @@ export function DiscussCompanion({
               </div>
 
               {messages.length === 0 && (
-                <div
-                  className="mt-2 rounded-2xl border border-dashed p-5 text-center text-sm leading-8"
-                  style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
-                >
-                  اسأل عن أي فكرة في المقال — سأحاورك بفكر الكاتب نفسه.
-                  <br />
-                  النقاش محصور بهذا المقال وحده.
+                <div className="mt-2 space-y-3">
+                  <div
+                    className="rounded-2xl border border-dashed p-5 text-center text-sm leading-8"
+                    style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+                  >
+                    اسأل عن أي فكرة في المقال — سأحاورك بفكر الكاتب نفسه.
+                    <br />
+                    النقاش محصور بهذا المقال وحده.
+                  </div>
+                  {!sending && !(exhausted && !unlimited) && (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {STARTER_CHIPS.map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => void runDiscussTurn(chip, messages, null, false)}
+                          className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-[1.02] hover:bg-(--accent-soft)"
+                          style={{
+                            borderColor: "var(--border)",
+                            background: "var(--bg-soft)",
+                            color: "var(--ink)",
+                          }}
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -923,7 +1028,11 @@ export function DiscussCompanion({
                 <div key={i} data-msg-idx={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className="min-w-0 max-w-[92%]">
                     <div
-                      onClick={() => setActiveIdx(activeIdx === i ? null : i)}
+                      onClick={() => {
+                        setConfirmDeleteIdx(null);
+                        setConfirmRetryIdx(null);
+                        setActiveIdx(activeIdx === i ? null : i);
+                      }}
                       className={`w-fit max-w-full cursor-pointer overflow-hidden rounded-2xl px-4 py-3 text-sm leading-7 break-words [overflow-wrap:anywhere] ${
                         m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
                       }`}
@@ -938,50 +1047,141 @@ export function DiscussCompanion({
                     </div>
                     {activeIdx === i && !sending && (
                       <div
-                        className={`mt-1 flex items-center gap-3 text-[11px] font-bold ${
+                        className={`mt-1.5 flex flex-wrap items-center gap-3 text-[11px] font-bold ${
                           m.role === "user" ? "justify-end" : ""
                         }`}
                       >
-                        {m.role === "model" ? (
+                        <button
+                          type="button"
+                          onClick={() => void copyMessage(i)}
+                          className="flex items-center gap-1 transition-colors hover:opacity-80"
+                          style={{ color: copiedIdx === i ? "var(--accent-strong)" : "var(--ink-muted)" }}
+                        >
+                          {copiedIdx === i ? (
+                            <>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                              {m.role === "model" ? "نُسخ الرد" : "نُسخت"}
+                            </>
+                          ) : (
+                            <>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <rect x="9" y="9" width="13" height="13" rx="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                              {m.role === "model" ? "نسخ الرد" : "نسخ"}
+                            </>
+                          )}
+                        </button>
+
+                        {m.role === "model" && i > 0 && messages[i - 1]?.role === "user" && !(exhausted && !unlimited) && (
                           <button
                             type="button"
-                            onClick={() => copyMessage(i)}
+                            onClick={() => setConfirmRetryIdx(confirmRetryIdx === i ? null : i)}
                             className="flex items-center gap-1 transition-colors hover:opacity-80"
-                            style={{ color: copiedIdx === i ? "var(--accent-strong)" : "var(--ink-muted)" }}
-                          >
-                            {copiedIdx === i ? (
-                              <>
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M20 6 9 17l-5-5" />
-                                </svg>
-                                نُسخ الرد
-                              </>
-                            ) : (
-                              <>
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <rect x="9" y="9" width="13" height="13" rx="2" />
-                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                </svg>
-                                نسخ الرد
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => startEdit(i)}
-                            className="flex items-center gap-1 transition-colors hover:opacity-80"
-                            style={{ color: "var(--ink-muted)" }}
-                            title="عدّل رسالتك — يُقصّ الحوار بعد هذه الرسالة وتُحسب من رصيدك كرسالة جديدة"
+                            style={{ color: confirmRetryIdx === i ? "#D97706" : "var(--ink-muted)" }}
+                            title="إعادة توليد هذا الرد — تُحسب من رصيدك كرسالة جديدة"
                           >
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                              <path d="M3 3v5h5" />
                             </svg>
-                            تعديل
+                            إعادة المحاولة
                           </button>
+                        )}
+
+                        {m.role === "user" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEdit(i)}
+                              className="flex items-center gap-1 transition-colors hover:opacity-80"
+                              style={{ color: "var(--ink-muted)" }}
+                              title="عدّل رسالتك — يُقصّ الحوار بعد هذه الرسالة وتُحسب من رصيدك كرسالة جديدة"
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                              </svg>
+                              تعديل
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteIdx(confirmDeleteIdx === i ? null : i)}
+                              className="flex items-center gap-1 transition-colors hover:opacity-80"
+                              style={{ color: confirmDeleteIdx === i ? "#DC2626" : "var(--ink-muted)" }}
+                              title="حذف هذه الرسالة وما بعدها من الحوار"
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M3 6h18" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                              حذف
+                            </button>
+                          </>
                         )}
                       </div>
                     )}
+
+                    {confirmRetryIdx === i && !sending && (
+                      <div
+                        className="mt-2 rounded-xl border px-3 py-2 text-[11px] font-semibold"
+                        style={{
+                          borderColor: "rgba(245,158,11,0.4)",
+                          background: "rgba(245,158,11,0.08)",
+                          color: "#D97706",
+                        }}
+                      >
+                        <p>إعادة المحاولة تحذف هذا الرد وما بعده وتُحسب من رصيدك كرسالة جديدة</p>
+                        <div className="mt-1.5 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => void confirmRetry(i)}
+                            className="font-bold underline underline-offset-2"
+                          >
+                            متابعة
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRetryIdx(null)}
+                            className="opacity-80 hover:opacity-100"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {confirmDeleteIdx === i && !sending && (
+                      <div
+                        className="mt-2 rounded-xl border px-3 py-2 text-[11px] font-semibold"
+                        style={{
+                          borderColor: "rgba(220,38,38,0.35)",
+                          background: "rgba(220,38,38,0.07)",
+                          color: "#DC2626",
+                        }}
+                      >
+                        <p>سيتم حذف هذه الرسالة وما بعدها من الحوار — الرصيد المخصوم لا يُسترد</p>
+                        <div className="mt-1.5 flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteIdx(null)}
+                            style={{ color: "var(--ink-muted)" }}
+                          >
+                            إلغاء
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => confirmDelete(i)}
+                            className="font-bold underline underline-offset-2"
+                          >
+                            تأكيد الحذف
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {editing === i && (
                       <p className="mt-1 text-[10px] font-semibold leading-4" style={{ color: "#D97706" }}>
                         وضع التعديل — أرسل النص الجديد وسيُحذف ما بعد هذه الرسالة
@@ -1057,10 +1257,10 @@ export function DiscussCompanion({
                   onKeyDown={onInputKey}
                   enterKeyHint="enter"
                   rows={1}
-                  disabled={exhausted || sending}
+                  disabled={(exhausted && !unlimited) || sending}
                   maxLength={1200}
                   placeholder={
-                    exhausted
+                    exhausted && !unlimited
                       ? "انتهت حصة النقاش لهذا المقال"
                       : editing !== null
                         ? "عدّل رسالتك ثم أرسل.."
@@ -1069,25 +1269,38 @@ export function DiscussCompanion({
                   className="max-h-28 min-h-[44px] flex-1 resize-none rounded-xl border bg-transparent p-3 text-sm leading-7 outline-hidden transition-colors focus:border-(--accent) disabled:opacity-50"
                   style={{ borderColor: "var(--border)", color: "var(--ink)" }}
                 />
-                <button
-                  type="button"
-                  data-tour="discuss-send"
-                  onClick={send}
-                  disabled={exhausted || sending || !input.trim()}
-                  aria-label="إرسال الرسالة"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-soft transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
-                  style={{ background: "var(--accent)", color: "#fff" }}
-                >
-                  {sending ? (
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden className="animate-spin">
-                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                {sending ? (
+                  <button
+                    type="button"
+                    onClick={stopGenerating}
+                    aria-label="إيقاف التوليد"
+                    title="إيقاف توليد الرد"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-soft transition-all hover:scale-105"
+                    style={{
+                      background: "var(--bg-soft)",
+                      color: "var(--ink)",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
                     </svg>
-                  ) : (
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    data-tour="discuss-send"
+                    onClick={() => void send()}
+                    disabled={(exhausted && !unlimited) || !input.trim()}
+                    aria-label="إرسال الرسالة"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-soft transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+                    style={{ background: "var(--accent)", color: "#fff" }}
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="-scale-x-100">
                       <path d="m22 2-7 20-4-9-9-4Z" />
                     </svg>
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
               <p className="select-none py-1.5 text-center text-xs text-zinc-500 dark:text-zinc-400">
                 {cfgDisclaimer}

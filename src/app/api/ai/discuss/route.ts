@@ -199,6 +199,34 @@ async function dbSyncMessagesOnly(
   }
 }
 
+async function dbReplaceMessagesOnly(
+  userId: string,
+  articleId: string,
+  clientMessages: StoredTurn[],
+): Promise<{ count: number; messages: StoredTurn[] } | null> {
+  try {
+    const clean = clientMessages.slice(-40);
+    const existing = await prisma.aiDiscussionUsage.findUnique({
+      where: { userId_articleId: { userId, articleId } },
+      select: { messageCount: true },
+    });
+    if (!existing) {
+      return { count: 0, messages: [] };
+    }
+    const saved = await prisma.aiDiscussionUsage.update({
+      where: { userId_articleId: { userId, articleId } },
+      data: { messages: clean },
+      select: { messageCount: true, messages: true },
+    });
+    return {
+      count: saved.messageCount,
+      messages: sanitizeStoredMessages(saved.messages),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function memUsage(articleId: string, readerKey: string): number {
   const q = quotaBuckets.get(quotaKey(articleId, readerKey));
   if (!q || q.day !== todayKey()) return 0;
@@ -602,6 +630,7 @@ export async function PUT(request: Request) {
     const body = (await request.json().catch(() => ({}))) as {
       articleId?: string;
       messages?: unknown;
+      replace?: boolean;
     };
     const articleId = body.articleId?.trim() ?? "";
     if (!articleId) {
@@ -610,7 +639,9 @@ export async function PUT(request: Request) {
 
     const clientMessages = sanitizeStoredMessages(body.messages);
     const limit = await limitFor(`u:${userId}`);
-    const synced = await dbSyncMessagesOnly(userId, articleId, clientMessages);
+    const synced = body.replace
+      ? await dbReplaceMessagesOnly(userId, articleId, clientMessages)
+      : await dbSyncMessagesOnly(userId, articleId, clientMessages);
     const used = synced?.count ?? 0;
 
     return NextResponse.json({
@@ -760,14 +791,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "المقال غير متاح للنقاش" }, { status: 404 });
     }
 
+    const hasExplicitHistory = Array.isArray(body.history);
     const clientHistory: StoredTurn[] = sanitizeStoredMessages(body.history).filter(
       (h, idx, arr) =>
         !(idx === arr.length - 1 && h.role === "user" && h.text === message.trim()),
     );
-    const mergedHistory: StoredTurn[] =
-      clientHistory.length > 0
-        ? clientHistory
-        : (existingDb?.messages ?? []);
+    const mergedHistory: StoredTurn[] = hasExplicitHistory
+      ? clientHistory
+      : (existingDb?.messages ?? []);
 
     const history: ChatTurn[] = mergedHistory.map((h) => ({
       role: h.role,

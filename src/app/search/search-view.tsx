@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 /**
  * صفحة البحث الفكري — وجهة مستقلة لاختصار PWA «البحث الفكري»:
  * نفس محرك البحث اللحظي (/api/search) ونفس اللغة البصرية للـ Palette
- * لكن بصفحة كاملة تصلح للفتح المباشر من الشاشة الرئيسية.
+ * مع عرض سجل البحث الأخير للمسجلين في وضع الخمول.
  */
 
 type Hit = {
@@ -19,6 +19,8 @@ type Hit = {
   views: number;
   snippet: string | null;
 };
+
+type HistoryItem = { query: string; at: string };
 
 /** يلفّ كل ظهور لكلمات البحث داخل النص بوسم تمييز ذهبي */
 function Highlight({ text, terms }: { text: string; terms: string[] }) {
@@ -55,19 +57,51 @@ export default function SearchView() {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* تذكّر الاستعلام عند فتح نتيجة — سجل البحث للقارئ المسجل حصرًا،
-     والخادم يرفع 401 للزائر فيتجاهله النداء بصمت */
-  const remember = (term: string) => {
-    if (term.trim().length < 2) return;
+  /* جلب سجل البحث للمسجلين فقط — الزائر غير المسجل يصله 401 فيبقى السجل فارغًا */
+  useEffect(() => {
+    fetch("/api/search/history")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setHistory((d.history ?? []).slice(0, 10));
+      })
+      .catch(() => {});
+  }, []);
+
+  /* تذكّر الاستعلام عند فتح نتيجة — سجل البحث للقارئ المسجل حصرًا */
+  const remember = useCallback((term: string) => {
+    const clean = term.trim();
+    if (clean.length < 2) return;
     fetch("/api/search/history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: term.trim() }),
+      body: JSON.stringify({ query: clean }),
       keepalive: true,
+    })
+      .then((r) => {
+        if (!r.ok) return;
+        setHistory((prev) =>
+          [{ query: clean, at: new Date().toISOString() }, ...prev.filter((h) => h.query !== clean)].slice(0, 10),
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  const dropOne = useCallback((query: string) => {
+    setHistory((prev) => prev.filter((h) => h.query !== query));
+    fetch("/api/search/history", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
     }).catch(() => {});
-  };
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    fetch("/api/search/history", { method: "DELETE" }).catch(() => {});
+  }, []);
 
   /* تركيز فوري على الحقل عند الوصول */
   useEffect(() => {
@@ -151,9 +185,63 @@ export default function SearchView() {
       {/* النتائج */}
       <div className="mt-6">
         {q.trim().length < 2 ? (
-          <p className="pt-10 text-center text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
-            اكتب حرفين على الأقل ليبدأ البحث..
-          </p>
+          history.length > 0 ? (
+            <div
+              className="rounded-2xl border p-3 shadow-xs"
+              style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+            >
+              <div className="flex items-center justify-between px-3 pb-2 pt-1">
+                <span className="text-xs font-bold" style={{ color: "var(--ink-muted)" }}>
+                  بحثك الأخير
+                </span>
+                <button
+                  type="button"
+                  onClick={clearHistory}
+                  className="rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors hover:bg-(--accent-soft)"
+                  style={{ color: "var(--accent-strong)" }}
+                >
+                  مسح الكل
+                </button>
+              </div>
+              <div className="space-y-1">
+                {history.map((h) => (
+                  <div key={h.query} className="flex items-center rounded-xl transition-colors hover:bg-(--accent-soft)">
+                    <button
+                      type="button"
+                      onClick={() => setQ(h.query)}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-right"
+                      title={h.query}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: "var(--ink-muted)" }} aria-hidden>
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                      </svg>
+                      <span className="truncate text-sm" style={{ color: "var(--ink)" }}>
+                        {h.query}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dropOne(h.query)}
+                      aria-label={`إزالة ${h.query} من السجل`}
+                      title="إزالة من السجل"
+                      className="ml-1 shrink-0 rounded-full p-1.5 transition-colors hover:bg-(--accent-soft)"
+                      style={{ color: "var(--ink-muted)" }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="pt-10 text-center text-sm leading-8" style={{ color: "var(--ink-muted)" }}>
+              اكتب حرفين على الأقل ليبدأ البحث..
+            </p>
+          )
         ) : busy && hits.length === 0 ? (
           <p className="pt-10 animate-pulse text-center text-sm" style={{ color: "var(--ink-muted)" }}>
             جارٍ البحث..
