@@ -276,6 +276,7 @@ export default async function ArticlePage({
                 authorId: c.user?.id ?? null,
                 authorName: displayName(c.user),
                 authorImage: displayAvatar(c.user),
+                authorFrame: c.user?.avatarFrame ?? null,
                 authorRank: c.user?.intellectualRank ?? null,
                 isInspiring: c.isInspiring,
                 authorVerified: c.user?.isVerified ?? false,

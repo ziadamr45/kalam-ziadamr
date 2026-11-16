@@ -8,6 +8,7 @@ import { getVisitorFingerprint } from "@/lib/fingerprint";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { formatArabicDate } from "@/lib/utils";
 import { RankBadge } from "@/components/rank-badge";
+import { getAvatarFrameMeta } from "@/lib/avatar-frames";
 import { SOCIAL_LINK_LABELS, type VerifiedSocialLinks } from "@/lib/verification-meta";
 
 type PublicComment = {
@@ -17,6 +18,7 @@ type PublicComment = {
   authorId: string | null;
   authorName: string;
   authorImage: string | null;
+  authorFrame?: string | null;
   authorRank: string | null;
   isInspiring: boolean;
   /* التوثيق الرسمي المستقل — ختم بلون التصنيف (إثبات هوية فقط) */
@@ -92,8 +94,6 @@ export function CommentsSection({
   articleId: string;
   articleSlug?: string;
   initialComments: PublicComment[];
-  /* الصفحة ISR ثابتة — الحالة الفعلية للجلسة تُقرأ من useSession أدناه؛
-     الخاصية متروكة اختيارية للتوافق وتعمل كمفتاح قسر عند تمرير false */
   isLoggedIn?: boolean;
 }) {
   const { data: session } = useSession();
@@ -111,12 +111,9 @@ export function CommentsSection({
   const [reportSent, setReportSent] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [impactNote, setImpactNote] = useState<string>("");
-  /* البطاقة الفكرية الموسعة — تُفتح بالضغط على اسم الكاتب الموثق */
   const [cardFor, setCardFor] = useState<string | null>(null);
-  /* فخ الروبوتات — حقل مخفي عن البشر تمامًا، البوتات الملئة لكل الحقول ستملؤه */
   const [honey, setHoney] = useState("");
 
-  /* التصويت — الأعداد الحية وأصواتي تُجلب من الخادم بعد الرسم الأولي (الصفحة ISR ثابتة) */
   const [myVotes, setMyVotes] = useState<Record<string, "LIKE" | "DISLIKE">>({});
   const [voteCounts, setVoteCounts] = useState<Record<string, { likes: number; dislikes: number }>>(
     () => Object.fromEntries(initialComments.map((c) => [c.id, { likes: c.likes, dislikes: c.dislikes }])),
@@ -127,7 +124,6 @@ export function CommentsSection({
   const loggedIn = (isLoggedIn ?? true) && Boolean(session?.user);
   const myId = session?.user?.id ?? null;
 
-  /* صلاحيات المشاهد — التثبيت الذاتي يُقرأ من الخادم بعد الجلسة (لا ثقة بالعميل) */
   const [canSelfPin, setCanSelfPin] = useState(false);
   const [pinBusy, setPinBusy] = useState<string | null>(null);
   useEffect(() => {
@@ -141,7 +137,6 @@ export function CommentsSection({
       .catch(() => {});
   }, [loggedIn]);
 
-  /* التثبيت الذاتي — تحديث فوري في مكانه بلا إعادة تحميل الصفحة مع إعادة فرز قائمة الحوار */
   const togglePin = async (commentId: string, pin: boolean) => {
     if (pinBusy) return;
     setPinBusy(commentId);
@@ -180,7 +175,6 @@ export function CommentsSection({
     }
   };
 
-  /* جلب الأعداد الحية للتفاعلات وأصواتي (يعمل للزائر والمسجل لكسر جمود كاش ISR) */
   useEffect(() => {
     fetch(`/api/comments/votes?articleId=${encodeURIComponent(articleId)}`, { cache: "no-store" })
       .then((r) => r.json())
@@ -199,7 +193,6 @@ export function CommentsSection({
       .catch(() => {});
   }, [articleId, loggedIn]);
 
-  /* الفلترة اللحظية قبل الإرسال */
   const onContentChange = (value: string) => {
     setContent(value);
     setStatus("idle");
@@ -247,7 +240,6 @@ export function CommentsSection({
   const sendReport = async (commentId: string) => {
     if (reportBusy) return;
     setReportError(null);
-    /* «سبب آخر» إلزامي الوصف — نفحص قبل الإرسال */
     if (reportReason === CUSTOM_REASON && customReason.trim().length < 5) {
       setReportError("صف المخالفة بدقة في الحقل المخصص — الوصف إلزامي.");
       return;
@@ -280,7 +272,6 @@ export function CommentsSection({
     }
   };
 
-  /* تنفيذ النية المحفوظة — عاد المستخدم من الدخول ليشارك في الحوار */
   useEffect(
     () =>
       onAuthIntent((intent) => {
@@ -293,7 +284,6 @@ export function CommentsSection({
     [],
   );
 
-  /* التصويت على تعليق — تحديث لحظي فوري (0ms) بلا تعطيل ولا انتظار، ومزامنة صامتة بالخلفية */
   const vote = async (commentId: string, value: "LIKE" | "DISLIKE") => {
     if (!loggedIn) {
       requestAuth({ kind: "vote-comment" });
@@ -393,7 +383,6 @@ export function CommentsSection({
         الحوار ({comments.length > 0 ? new Intl.NumberFormat("ar-EG").format(comments.length) : "لا تعليقات بعد"})
       </h2>
 
-      {/* التنبيه الهادئ — زر الدخول يظهر فقط للزائر غير المسجل */}
       {voteNotice && (
         <div
           className="mb-5 flex flex-col items-start justify-between gap-3 rounded-2xl border p-4 text-sm sm:flex-row sm:items-center"
@@ -413,14 +402,12 @@ export function CommentsSection({
         </div>
       )}
 
-      {/* نموذج التعليق */}
       {loggedIn ? (
         <form
           onSubmit={submit}
           className="rounded-2xl border p-5 shadow-soft"
           style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         >
-          {/* فخ السبام — خارج الشاشة بكل المقاييس: لا يراه الإنسان ولا يلمسه */}
           <input
             type="text"
             name="website"
@@ -493,23 +480,21 @@ export function CommentsSection({
         </div>
       )}
 
-      {/* قائمة التعليقات */}
       <ul className="space-y-4">
         {comments.map((c) => {
           const mine = Boolean(myId && c.authorId && c.authorId === myId);
           const counts = voteCounts[c.id] ?? { likes: c.likes, dislikes: c.dislikes };
           const myVote = myVotes[c.id] ?? null;
+          const frame = getAvatarFrameMeta(c.authorFrame);
           return (
             <li
               key={c.id}
               className="rounded-2xl border p-5 shadow-soft transition-colors"
               style={
                 c.authorAccent
-                  ? /* إطار التعليق الفخم — بلون شارة الكاتب الموثق */
-                    { background: "var(--surface)", borderColor: c.authorAccent, borderWidth: 2 }
+                  ? { background: "var(--surface)", borderColor: c.authorAccent, borderWidth: 2 }
                   : mine
-                    ? /* تعليقك أنت — خلفية كهرمانية هادئة وإطار مميز */
-                      { background: "#FFFBEB", borderColor: "#FCD34D" }
+                    ? { background: "#FFFBEB", borderColor: "#FCD34D" }
                     : c.isInspiring
                       ? { background: "var(--accent-soft)", borderColor: "var(--accent)" }
                       : { background: "var(--surface)", borderColor: "var(--border)" }
@@ -533,25 +518,33 @@ export function CommentsSection({
               )}
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  {c.authorImage ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={c.authorImage}
-                      alt={c.authorName}
-                      width={36}
-                      height={36}
-                      referrerPolicy="no-referrer"
-                      className="h-9 w-9 rounded-full border-2 object-cover"
-                      style={{ borderColor: "var(--accent-soft)" }}
-                    />
-                  ) : (
-                    <span
-                      className="flex h-9 w-9 items-center justify-center rounded-full font-bold"
-                      style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
-                    >
-                      {c.authorName.charAt(0)}
-                    </span>
-                  )}
+                  <span
+                    className="inline-flex shrink-0 rounded-full p-[2px]"
+                    style={{
+                      background: frame.ringBackground,
+                      boxShadow: frame.ringGlow,
+                    }}
+                  >
+                    {c.authorImage ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={c.authorImage}
+                        alt={c.authorName}
+                        width={36}
+                        height={36}
+                        referrerPolicy="no-referrer"
+                        className="h-9 w-9 rounded-full object-cover"
+                        style={{ background: "var(--surface)" }}
+                      />
+                    ) : (
+                      <span
+                        className="flex h-9 w-9 items-center justify-center rounded-full font-bold"
+                        style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                      >
+                        {c.authorName.charAt(0)}
+                      </span>
+                    )}
+                  </span>
                   <div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {c.authorVerified && c.authorCard ? (
@@ -570,14 +563,12 @@ export function CommentsSection({
                           {c.authorName}
                         </p>
                       )}
-                      {/* ختم التوثيق الرسمي المستقل — بلون تصنيف الحساب (ذهبي/كحلي/زيتي/فيروزي) */}
                       {c.authorVerified && (
                         <VerifiedSeal
                           color={c.authorSealColor || "#2563EB"}
                           title={c.authorSealLabel || "حساب موثّق"}
                         />
                       )}
-                      {/* كبسولة العضوية المميزة المستقلة — بلون شارتها الخاص */}
                       {c.authorIsVip && c.authorBadgeTitle && (
                         <span
                           className="rounded-full px-2 py-0.5 text-[10px] font-bold"
@@ -589,7 +580,6 @@ export function CommentsSection({
                           {c.authorBadgeTitle}
                         </span>
                       )}
-                      {/* شارة «أنت» — بجانب اسمك واضحة بلون كهرماني مميز */}
                       {mine && (
                         <span className="text-amber-500 font-medium text-xs">(أنت)</span>
                       )}
@@ -621,7 +611,6 @@ export function CommentsSection({
                 )}
               </div>
 
-              {/* البطاقة الفكرية الموسعة — نبذة وروابط صاحب الحساب الموثق */}
               {cardFor === c.id && c.authorCard && (
                 <div
                   className="mb-3 rounded-2xl border p-4"
@@ -671,7 +660,6 @@ export function CommentsSection({
                 {c.content}
               </p>
 
-              {/* شريط التفاعل — استجابة لحظية (0ms) بلا تعطيل ولا انتظار */}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={() => void vote(c.id, "LIKE")}
@@ -703,7 +691,6 @@ export function CommentsSection({
                   <svg width="14" height="14" viewBox="0 0 24 24" fill={myVote === "DISLIKE" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(180deg)" }}><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
                   <span>{counts.dislikes > 0 ? new Intl.NumberFormat("ar-EG").format(counts.dislikes) : "لم يعجبني"}</span>
                 </button>
-                {/* التثبيت الذاتي — زر يظهر على تعليقك فقط عند امتلاكك الصلاحية */}
                 {mine && canSelfPin && (
                   <button
                     onClick={() => togglePin(c.id, !c.selfPinned)}
@@ -756,7 +743,6 @@ export function CommentsSection({
                       </button>
                     ))}
                   </div>
-                  {/* «سبب آخر» — حقل نصي إلزامي يظهر تلقائيًا */}
                   {reportReason === CUSTOM_REASON && (
                     <textarea
                       value={customReason}
@@ -776,7 +762,6 @@ export function CommentsSection({
                       {reportError}
                     </p>
                   )}
-                  {/* فخ ثانٍ لنموذج الإبلاغ — نفس المبدأ خارج الشاشة */}
                   <input
                     type="text"
                     name="website2"

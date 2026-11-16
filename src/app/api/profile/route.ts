@@ -6,6 +6,7 @@ import { analyzeComment } from "@/lib/moderation";
 import { logEvent, writePublicTrail, getClientIp } from "@/lib/audit";
 import { recordServerError } from "@/lib/error-alert";
 import { parsePrivileges } from "@/lib/vip";
+import { AVATAR_FRAMES, isFrameUnlocked } from "@/lib/avatar-frames";
 import { SOCIAL_LINK_KEYS, type VerifiedSocialLinks } from "@/lib/verification-meta";
 
 /**
@@ -13,7 +14,7 @@ import { SOCIAL_LINK_KEYS, type VerifiedSocialLinks } from "@/lib/verification-m
  * مسار تحديث الملف الشخصي — استقلالية الهوية
  * ============================================================
  * PUT: تعديل الاسم المعروض (بفحص فوري للأسماء المسيئة أو الفارغة)
- * والصورة الشخصية (رابط Cloudinary من /api/upload) والنبذة الفكرية.
+ * والصورة الشخصية (رابط Cloudinary من /api/upload) والنبذة الفكرية وإطار الصورة.
  * إرسال أي حقل قيمته null يُرجعه لحالة Google الأصلية بنقرة واحدة.
  * بيانات Google الأصلية (email/googleId/name/image) لا تُمس إطلاقًا.
  */
@@ -29,6 +30,7 @@ export async function PUT(request: Request) {
     const body = (await request.json()) as {
       customName?: string | null;
       customImage?: string | null;
+      avatarFrame?: string | null;
       bio?: string | null;
       extendedBio?: string | null;
       verifiedSocialLinks?: VerifiedSocialLinks | null;
@@ -38,6 +40,7 @@ export async function PUT(request: Request) {
     const data: {
       customName?: string | null;
       customImage?: string | null;
+      avatarFrame?: string | null;
       bio?: string | null;
       extendedBio?: string | null;
       verifiedSocialLinks?: VerifiedSocialLinks | null;
@@ -73,10 +76,6 @@ export async function PUT(request: Request) {
         if (!/^https:\/\//.test(img) || img.length > 500) {
           return NextResponse.json({ error: "رابط صورة غير صالح" }, { status: 400 });
         }
-        /* قفل النطاقات: رابط صورة القارئ يُقبل من Cloudinary (رفع المنصة) أو
-           Google (صورة الحساب) حصرًا — أي نطاق خارجي مرفوض؛ إذ يمكن لرابط
-           خارجي حر أن يكون IP Logger يسرق عناوين زوار المنصة عند عرض
-           التعليقات والملفات */
         let imgHost = "";
         try {
           imgHost = new URL(img).hostname.toLowerCase();
@@ -90,7 +89,6 @@ export async function PUT(request: Request) {
             { status: 400 },
           );
         }
-        /* رابط Cloudinary يجب أن يعود لمجلدات سحابة المنصة نفسها لا لسحابة غريبة */
         if (imgHost === "res.cloudinary.com") {
           const cloud = process.env.CLOUDINARY_CLOUD_NAME;
           if (cloud && !img.includes(`/${cloud}/`)) {
@@ -98,6 +96,26 @@ export async function PUT(request: Request) {
           }
         }
         data.customImage = img;
+      }
+    }
+
+    /* ==================== إطار الصورة الشخصية ==================== */
+    if (body.avatarFrame !== undefined) {
+      if (body.avatarFrame === null || body.avatarFrame === "" || body.avatarFrame === "none") {
+        data.avatarFrame = null;
+      } else {
+        const valid = AVATAR_FRAMES.some((f) => f.id === body.avatarFrame);
+        if (!valid) {
+          return NextResponse.json({ error: "إطار غير معروف" }, { status: 400 });
+        }
+        const currentUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { impactScore: true, isVerified: true, isVip: true },
+        });
+        if (!currentUser || !isFrameUnlocked(body.avatarFrame, currentUser)) {
+          return NextResponse.json({ error: "هذا الإطار لم يُفتح بعد لرتبتك الحالية" }, { status: 403 });
+        }
+        data.avatarFrame = body.avatarFrame;
       }
     }
 
@@ -124,7 +142,6 @@ export async function PUT(request: Request) {
         if (text.length > 1200) {
           return NextResponse.json({ error: "النبذة الموسعة حتى 1200 حرف" }, { status: 400 });
         }
-        /* الفلترة الأخلاقية نفسها — البطاقة العامة لا تحتمل لغة مسيئة */
         const verdict = analyzeComment(text);
         if (verdict.status === "REJECT") {
           return NextResponse.json({ error: "النبذة تخالف أدب المنصة — راجع صياغتها" }, { status: 400 });
@@ -133,9 +150,8 @@ export async function PUT(request: Request) {
       }
     }
 
-    /* ==================== الروابط الشخصية (المفاتيح المعتمدة فقط) ==================== */
+    /* ==================== تفضيلات الإشعارات ==================== */
     if (body.notificationPrefs !== undefined) {
-      /* مركز تفضيلات الإشعارات — كائن مغلق المفاتيح (بريد الأمان خارج التحكم عمدًا) */
       const raw = body.notificationPrefs;
       if (raw === null) {
         data.notificationPrefs = null;
@@ -147,6 +163,7 @@ export async function PUT(request: Request) {
       }
     }
 
+    /* ==================== الروابط الشخصية (المفاتيح المعتمدة فقط) ==================== */
     if (body.verifiedSocialLinks !== undefined) {
       if (body.verifiedSocialLinks === null) {
         data.verifiedSocialLinks = null;
@@ -175,14 +192,22 @@ export async function PUT(request: Request) {
     const updated = await prisma.user.update({
       where: { id: userId },
       data: data as never,
-      select: { customName: true, customImage: true, bio: true, extendedBio: true, verifiedSocialLinks: true, notificationPrefs: true },
+      select: {
+        customName: true,
+        customImage: true,
+        avatarFrame: true,
+        bio: true,
+        extendedBio: true,
+        verifiedSocialLinks: true,
+        notificationPrefs: true,
+      },
     });
 
     writePublicTrail({
       actorId: userId,
       actorEmail: session.user.email ?? userId,
       actionType: "PROFILE_UPDATED",
-      description: "تحديث الهوية المعروضة للقارئ من الموقع العام (الاسم/الصورة/النبذة)",
+      description: "تحديث الهوية المعروضة للقارئ من الموقع العام (الاسم/الصورة/النبذة/الإطار)",
       metadata: { ip: getClientIp(request) },
     });
     logEvent({
@@ -194,6 +219,7 @@ export async function PUT(request: Request) {
       meta: {
         nameChanged: "customName" in data,
         imageChanged: "customImage" in data,
+        frameChanged: "avatarFrame" in data,
         bioChanged: "bio" in data,
         displayName: displayName(updated),
       },
@@ -221,10 +247,10 @@ export async function GET() {
       image: true,
       customName: true,
       customImage: true,
+      avatarFrame: true,
       bio: true,
       impactScore: true,
       intellectualRank: true,
-      /* منظومة التوثيق الرسمي المستقل + العضوية المميزة — يقرؤها قسم النقاشات وكل المكونات */
       isVerified: true,
       verificationType: true,
       verificationLabel: true,

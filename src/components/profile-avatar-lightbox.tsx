@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getAvatarFrameMeta } from "@/lib/avatar-frames";
 
 export function ProfileAvatarLightbox({
   src,
   alt,
+  frameId,
 }: {
   src: string;
   alt: string;
+  frameId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const frame = getAvatarFrameMeta(frameId);
 
   useEffect(() => {
     if (!open) return;
@@ -32,15 +36,19 @@ export function ProfileAvatarLightbox({
         onClick={() => setOpen(true)}
         aria-label="عرض الصورة الشخصية كاملة"
         title="اضغط لعرض الصورة كاملة"
-        className="group relative cursor-zoom-in rounded-full transition-transform hover:scale-[1.03] focus:outline-hidden focus-visible:ring-2"
+        className="group relative inline-flex cursor-zoom-in rounded-full p-[3px] transition-transform hover:scale-[1.03] focus:outline-hidden focus-visible:ring-2"
+        style={{
+          background: frame.ringBackground,
+          boxShadow: frame.ringGlow,
+        }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt={alt}
           referrerPolicy="no-referrer"
-          className="h-22 w-22 rounded-full border-4 object-cover"
-          style={{ borderColor: "var(--accent-soft)" }}
+          className="h-22 w-22 rounded-full object-cover"
+          style={{ background: "var(--surface)" }}
         />
       </button>
 

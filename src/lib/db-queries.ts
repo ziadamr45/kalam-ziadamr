@@ -8,10 +8,6 @@ import { prisma } from "@/lib/prisma";
 
 export type ArticleWithSection = Article & { section: Section | null };
 
-/**
- * شرط "متاح للنشر الآن" — النشر الكسول بلا Cron:
- * المنشور فعلًا + المجدول الذي حان موعده (يظهر تلقائيًا لحظة استحقاقه).
- */
 const publishedWhere: Prisma.ArticleWhereInput = {
   OR: [
     { status: "PUBLISHED", publishedAt: { lte: new Date() } },
@@ -19,15 +15,6 @@ const publishedWhere: Prisma.ArticleWhereInput = {
   ],
 };
 
-/**
- * درع الاستعلامات ضد الهزات اللحظية — ثلاث محاولات متباعدة قبل الاستسلام.
- * في بيئة serverless يسقط أغلب أعطال الاتصال العابرة (بداية باردة،
- * زحمة تجمع الاتصالات) خلال مئات المللي ثانية، فتُعيد المحاولة العطلَ
- * إلى وضعه قبل أن يصل إلى صفحةٍ تُخزَّن في كاش ISR.
- * عند استنفاد المحاولات يُرفع الخطأ عمدًا: فشل التوليد يجعل Next.js
- * يُبقي آخر نسخة سليمة من الصفحة (stale-while-error) بدل تخزين
- * انكسارٍ لحظي على هيئة «مقالات مختفية» أو 404 زائفة لدقائق.
- */
 async function withDbRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -71,12 +58,6 @@ export async function getArticlesBySection(
   );
 }
 
-/**
- * فك ترميز الـ slug الوارد من المتصفح قبل أي استعلام.
- * الروابط العربية تصل من App Router مشفرة (URL Encoded) على هيئة
- * %D9%84%D9%85%D8%A7-... بينما المخزَّن في قاعدة البيانات عربي خالص،
- * فلا يكتمل البحث دون فك التشفير — وهو جذر صفحات 404 الزائفة.
- */
 export function safeDecodeSlug(raw: string): string {
   if (!raw) return raw;
   try {
@@ -86,19 +67,11 @@ export function safeDecodeSlug(raw: string): string {
   }
 }
 
-/**
- * مقال واحد بالـ slug — بمطابقة مزدوجة تحصينية:
- * (المشفر كما وصل + المفكوك كما خُزّن) فتُغطى كل حالات المتصفحات والروابط.
- * المنشور صراحةً بحالة PUBLISHED يُعرض بلا قيود زمنية إضافية،
- * والمجدول يُعرض لحظة استحقاق موعده فقط.
- */
 export async function getArticleBySlug(
   slug: string,
 ): Promise<ArticleWithSection | null> {
   if (!slug) return null;
   const decoded = safeDecodeSlug(slug);
-  /* العودة بـ null مسموحة فقط نتيجةَ استعلامٍ ناجح (slug غير موجود أصلًا)،
-     أما عطل قاعدة البيانات فيُرفع — وإلا خُزِّست 404 زائفة لمقال حي */
   return withDbRetry(() =>
     prisma.article.findFirst({
       where: {
@@ -117,7 +90,6 @@ export async function getArticleBySlug(
   );
 }
 
-/** جميع الـ slugs المنشورة (لـ generateStaticParams) */
 export async function getPublishedSlugs(): Promise<{ slug: string }[]> {
   try {
     return await withDbRetry(() =>
@@ -127,18 +99,10 @@ export async function getPublishedSlugs(): Promise<{ slug: string }[]> {
       }),
     );
   } catch {
-    /* قائمة ما يُسبق توليده وقت البناء فقط — فشلها لا يُخزِّن محتوى
-       فاضيًا إطلاقًا: dynamicParams يولّد المقالات عند الطلب، فالصمت
-       هنا أمان لا سامّية */
     return [];
   }
 }
 
-/**
- * الأقسام النشطة من قاعدة البيانات — مصدر القائمة الجانبية الحي.
- * ترتيب حسب sortOrder ثم createdAt، مع عدّاد المقالات المنشورة لكل قسم
- * (شرط النشر الكسول نفسه حتى لا يُحسب المجدول المستقبلي).
- */
 export async function getActiveSections() {
   try {
     const sections = await withDbRetry(() =>
@@ -158,12 +122,9 @@ export async function getActiveSections() {
     );
     if (sections.length > 0) return sections;
   } catch {}
-  /* عمدًا null لا خطأ: الأقسام زينة تجويلية ولها بديل ثابت أصيل
-     في SECTIONS — تدهور رشيق لا يُخزِّن صفحةً فاضية من المقالات */
   return null;
 }
 
-/** مقالات ذات صلة من نفس القسم */
 export async function getRelatedArticles(
   articleId: string,
   sectionId: string | null,
@@ -183,9 +144,6 @@ export async function getRelatedArticles(
   );
 }
 
-/** التعليقات المعتمدة لمقال — بالهوية المعروضة والرتبة، مع خوارزمية أولوية
-    «النقاشات الموثقة»: المُلهم مثبتًا أعلى، ثم تثبيت الكاتب الذاتي،
-    ثم تعليقات الحسابات الموثقة لتظهر في مقدمة الحوار، ثم الأحدث */
 export async function getApprovedComments(articleId: string) {
   return withDbRetry(() =>
     prisma.comment.findMany({
@@ -205,19 +163,17 @@ export async function getApprovedComments(articleId: string) {
             image: true,
             customName: true,
             customImage: true,
+            avatarFrame: true,
             impactScore: true,
             intellectualRank: true,
-            /* التوثيق الرسمي المستقل — ختم ملون حسب التصنيف */
             isVerified: true,
             verificationType: true,
             verificationLabel: true,
             verifiedAt: true,
-            /* العضوية المميزة المستقلة — كبسولة ملونة وصلاحيات */
             isVip: true,
             vipBadgeTitle: true,
             vipBadgeColor: true,
             vipPrivileges: true,
-            /* البطاقة الفكرية الموسعة — نبذة وروابط لحاملي التوثيق */
             extendedBio: true,
             verifiedSocialLinks: true,
           },
@@ -227,7 +183,6 @@ export async function getApprovedComments(articleId: string) {
   );
 }
 
-/** إحصاءات إعجاب/عدم إعجاب تعليقات مقال — خريطة commentId → { likes, dislikes } */
 export async function getCommentVoteStats(articleId: string) {
   const comments = await withDbRetry(() =>
     prisma.comment.findMany({
@@ -253,7 +208,6 @@ export async function getCommentVoteStats(articleId: string) {
   return stats;
 }
 
-/** عدادات التفاعل الحالية */
 export async function getInteractionCounts(articleId: string) {
   const grouped = await withDbRetry(() =>
     prisma.interaction.groupBy({
@@ -267,7 +221,6 @@ export async function getInteractionCounts(articleId: string) {
   return { likes, dislikes };
 }
 
-/** تصويت الزائر الحالي إن وُجد */
 export async function getMyVote(
   articleId: string,
   opts: { userId?: string | null; visitorFp?: string | null },
@@ -286,7 +239,6 @@ export async function getMyVote(
   }
 }
 
-/** slugs الأقسام لخريطة الموقع */
 export async function getSectionSlugs(): Promise<string[]> {
   try {
     const sections = await withDbRetry(() =>

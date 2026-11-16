@@ -526,8 +526,6 @@ export function DiscussCompanion({
     [articleId, persistSession, pushLocalToServer, readLocalMessages, status],
   );
 
-  /* الجلب المسبق في الخلفية فور جاهزية جلسة القارئ، وعند عودة المستخدم للتبويب:
-     حتى يظهر الرصيد المتبقي أو حالة نفاد الحصة وسجل الرسائل لحظيًا (0ms) بدون تأخير */
   useEffect(() => {
     if (status !== "authenticated") return;
     const local = restoreSession();
@@ -595,9 +593,6 @@ export function DiscussCompanion({
       .catch(() => {});
   }, []);
 
-  /* التمرير التلقائي بعد تحديث DOM بالكامل:
-     - أثناء التفكير أو للردود القصيرة: ينزل لآخر المحادثة.
-     - للردود الطويلة: يقف عند بداية الرد الجديد حتى يقرأه القارئ من أوله. */
   useEffect(() => {
     if (!open || !listRef.current || !shouldScrollRef.current) return;
     shouldScrollRef.current = false;
@@ -700,7 +695,6 @@ export function DiscussCompanion({
     editIndex: number | null,
     restoreInputOnFail: boolean,
   ) => {
-    /* إلغاء أي استجابة fetchQuota معلقة حتى لا تكتب فوق الرسالة الجديدة */
     syncSeqRef.current += 1;
 
     setError("");
@@ -1081,7 +1075,7 @@ export function DiscussCompanion({
                 const showActions = !sending && (activeIdx === i || isDefaultVisible);
                 return (
                 <div key={i} data-msg-idx={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className="min-w-0 max-w-[92%]">
+                  <div className={`min-w-0 max-w-[92%] flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
                     <div
                       onClick={() => {
                         setConfirmDeleteIdx(null);

@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { ProfileEditor } from "@/components/profile-editor";
+import { AvatarFramePickerCard } from "@/components/avatar-frame-picker";
 import { ProfileAvatarLightbox } from "@/components/profile-avatar-lightbox";
 import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { DevicesPanel } from "@/components/devices-panel";
@@ -16,6 +17,7 @@ import { FirstVisitHint } from "@/components/first-visit-hint";
 import { ProposalForm } from "@/components/proposal-form";
 import { RankBadge } from "@/components/rank-badge";
 import { parsePrivileges, PRIVILEGE_LABELS, roleLabelAr } from "@/lib/vip";
+import { getAvatarFrameMeta } from "@/lib/avatar-frames";
 import { verificationSealColor, verificationSealLabel, parseSocialLinks } from "@/lib/verification-meta";
 import PushPromptCapsule from "@/components/push-prompt-capsule";
 import { displayName } from "@/lib/identity";
@@ -67,6 +69,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
         image: true,
         customName: true,
         customImage: true,
+        avatarFrame: true,
         bio: true,
         impactScore: true,
         intellectualRank: true,
@@ -147,6 +150,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const progress = next
     ? Math.min(100, Math.round(((user.impactScore - prevMin) / (next.min - prevMin)) * 100))
     : 100;
+  const activeFrame = getAvatarFrameMeta(user.avatarFrame);
 
   return (
     <>
@@ -216,13 +220,22 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                   <ProfileAvatarLightbox
                     src={user.customImage || (user.image as string)}
                     alt={displayName(user)}
+                    frameId={user.avatarFrame}
                   />
                 ) : (
                   <span
-                    className="flex h-22 w-22 items-center justify-center rounded-full border-4 text-3xl font-bold"
-                    style={{ borderColor: "var(--accent-soft)", background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                    className="inline-flex rounded-full p-[3px]"
+                    style={{
+                      background: activeFrame.ringBackground,
+                      boxShadow: activeFrame.ringGlow,
+                    }}
                   >
-                    {displayName(user).charAt(0)}
+                    <span
+                      className="flex h-22 w-22 items-center justify-center rounded-full text-3xl font-bold"
+                      style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
+                    >
+                      {displayName(user).charAt(0)}
+                    </span>
                   </span>
                 )}
               </div>
@@ -506,6 +519,17 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
               verifiedSocialLinks: parseSocialLinks(user.verifiedSocialLinks),
             }}
             isVerified={user.isVerified}
+          />
+        </section>
+
+        <section className="mx-auto mt-5 max-w-3xl px-4 sm:px-6">
+          <AvatarFramePickerCard
+            avatarUrl={user.customImage || user.image || null}
+            fallbackLetter={displayName(user).charAt(0)}
+            initialFrame={user.avatarFrame}
+            impactScore={user.impactScore}
+            isVerified={user.isVerified}
+            isVip={user.isVip}
           />
         </section>
 

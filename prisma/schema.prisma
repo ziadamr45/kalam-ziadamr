@@ -88,7 +88,7 @@ model Article {
   @@index([sectionId])
 }
 
-// ============================ المجتمع ============================
+// ============================ المجتمع ============================\
 
 enum CommentStatus {
   PENDING
@@ -112,8 +112,7 @@ model User {
   googleId      String?   @unique
   name          String?
   email         String?   @unique
-  emailVerified DateTime?
-  image         String?
+  emailVerified DateTime?\n  image         String?
   banned        Boolean   @default(false)
   banReason     String?
   createdAt     DateTime  @default(now())
@@ -122,6 +121,7 @@ model User {
   /* ============ محرك الهوية المستقلة (Custom Profile Engine) ============ */
   customName    String? // الاسم المعروض الذي يختاره القارئ — الأصل يبقى بيانات Google للتوثيق
   customImage   String? // رابط الصورة الشخصية المرفوعة عبر Cloudinary — تُعرض بدل صورة Google عند وجودها
+  avatarFrame   String? // إطار الصورة الشخصية المختار — يُفتح بالإنجازات والرتب دون خصم رصيد
   bio           String? @db.Text // نبذة فكرية مقتضبة يعبر بها القارئ عن نفسه
 
   /* ============ محرك رصيد الأثر الفكري (Reader Impact Engine) ============ */
@@ -384,8 +384,7 @@ model AdminSession {
   admin      AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
   tokenHash  String    @unique
   ip         String?
-  userAgent  String?
-  deviceHash String?
+  userAgent  String?\n  deviceHash String?
   trusted    Boolean   @default(false)
   expiresAt  DateTime
   createdAt  DateTime  @default(now())
@@ -860,7 +859,7 @@ model UserDevice {
   deviceHash   String   // تجزئة فريدة مشتقة من (userId + User-Agent)
   browser      String?  // مثل: Chrome, Safari
   os           String?  // مثل: Android 14, Windows 11, iOS
-  deviceType   String?  // mobile | tablet | desktop
+  deviceType   String?  // mobile | desktop | tablet
   lastIp       String?
   location     String?  // المدينة والدولة (من ترويسات Vercel الطرفية)
   lastActiveAt DateTime @default(now())
