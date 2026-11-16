@@ -1,6 +1,5 @@
 import type {
   Article,
-  Comment,
   Prisma,
   Section,
 } from "@prisma/client";
@@ -31,7 +30,6 @@ async function withDbRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   throw lastErr;
 }
 
-/** أحدث المقالات المنشورة */
 export async function getLatestArticles(limit = 9): Promise<ArticleWithSection[]> {
   return withDbRetry(() =>
     prisma.article.findMany({
@@ -43,7 +41,6 @@ export async function getLatestArticles(limit = 9): Promise<ArticleWithSection[]
   );
 }
 
-/** مقالات قسم معين */
 export async function getArticlesBySection(
   sectionSlug: string,
   limit = 30,
@@ -125,12 +122,13 @@ export async function getActiveSections() {
   return null;
 }
 
+/** مقالات ذات صلة: من نفس القسم أولًا، ثم تكمل من بقية المنصة حتى يظهر القسم دائمًا */
 export async function getRelatedArticles(
   articleId: string,
   sectionId: string | null,
   limit = 3,
 ): Promise<ArticleWithSection[]> {
-  return withDbRetry(() =>
+  const sameSection = await withDbRetry(() =>
     prisma.article.findMany({
       where: {
         ...publishedWhere,
@@ -142,6 +140,91 @@ export async function getRelatedArticles(
       include: { section: true },
     }),
   );
+
+  if (sameSection.length >= limit || !sectionId) {
+    return sameSection;
+  }
+
+  const excludeIds = [articleId, ...sameSection.map((a) => a.id)];
+  const fallback = await withDbRetry(() =>
+    prisma.article.findMany({
+      where: {
+        ...publishedWhere,
+        id: { notIn: excludeIds },
+      },
+      orderBy: { publishedAt: "desc" },
+      take: limit - sameSection.length,
+      include: { section: true },
+    }),
+  );
+
+  return [...sameSection, ...fallback];
+}
+
+/** مختارات مخصصة لحساب القارئ: بحسب أقسام محفوظاته وتفاعلاته وتقدمه، أو الأكثر قراءة */
+export async function getPersonalizedArticles(
+  userId: string,
+  limit = 3,
+): Promise<ArticleWithSection[]> {
+  try {
+    const [saved, interactions, progresses] = await Promise.all([
+      prisma.savedArticle.findMany({
+        where: { userId },
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        select: { article: { select: { sectionId: true } } },
+      }),
+      prisma.interaction.findMany({
+        where: { userId, value: 1 },
+        take: 10,
+        orderBy: { updatedAt: "desc" },
+        select: { article: { select: { sectionId: true } } },
+      }),
+      prisma.readingProgress.findMany({
+        where: { userId },
+        take: 10,
+        orderBy: { updatedAt: "desc" },
+        select: { articleId: true, progress: true, article: { select: { sectionId: true } } },
+      }),
+    ]);
+
+    const completedIds = progresses.filter((p) => p.progress >= 90).map((p) => p.articleId);
+    const preferredSectionIds = Array.from(
+      new Set(
+        [
+          ...saved.map((s) => s.article.sectionId),
+          ...interactions.map((i) => i.article.sectionId),
+          ...progresses.map((p) => p.article.sectionId),
+        ].filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    if (preferredSectionIds.length > 0) {
+      const matched = await prisma.article.findMany({
+        where: {
+          ...publishedWhere,
+          sectionId: { in: preferredSectionIds },
+          ...(completedIds.length > 0 ? { id: { notIn: completedIds } } : {}),
+        },
+        orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
+        take: limit,
+        include: { section: true },
+      });
+      if (matched.length > 0) return matched;
+    }
+
+    return await prisma.article.findMany({
+      where: {
+        ...publishedWhere,
+        ...(completedIds.length > 0 ? { id: { notIn: completedIds } } : {}),
+      },
+      orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
+      take: limit,
+      include: { section: true },
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function getApprovedComments(articleId: string) {
