@@ -793,6 +793,8 @@ export function DiscussCompanion({
 
   const arabicNum = (n: number) => new Intl.NumberFormat("ar-EG").format(n);
   const ready = mounted && open;
+  const lastUserIdx = messages.map((m) => m.role).lastIndexOf("user");
+  const lastModelIdx = messages.map((m) => m.role).lastIndexOf("model");
 
   return (
     <>
@@ -1024,7 +1026,9 @@ export function DiscussCompanion({
                 </div>
               )}
 
-              {messages.map((m, i) => (
+              {messages.map((m, i) => {
+                const showActions = !sending && (activeIdx === i || i === lastUserIdx || i === lastModelIdx);
+                return (
                 <div key={i} data-msg-idx={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className="min-w-0 max-w-[92%]">
                     <div
@@ -1033,7 +1037,7 @@ export function DiscussCompanion({
                         setConfirmRetryIdx(null);
                         setActiveIdx(activeIdx === i ? null : i);
                       }}
-                      className={`w-fit max-w-full cursor-pointer overflow-hidden rounded-2xl px-4 py-3 text-sm leading-7 break-words [overflow-wrap:anywhere] ${
+                      className={`w-fit max-w-full cursor-pointer select-text overflow-hidden rounded-2xl px-4 py-3 text-sm leading-7 break-words [overflow-wrap:anywhere] ${
                         m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
                       }`}
                       style={
@@ -1045,7 +1049,7 @@ export function DiscussCompanion({
                     >
                       {m.role === "model" ? <MiniMarkdown text={m.text} /> : m.text}
                     </div>
-                    {activeIdx === i && !sending && (
+                    {showActions && (
                       <div
                         className={`mt-1.5 flex flex-wrap items-center gap-3 text-[11px] font-bold ${
                           m.role === "user" ? "justify-end" : ""
@@ -1189,7 +1193,8 @@ export function DiscussCompanion({
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               {sending && (
                 <div className="flex justify-start">

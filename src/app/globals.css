@@ -195,6 +195,17 @@ iframe {
   }
 }
 
+/* منع تحديد النص العرضي على عناصر الواجهة والتنقل، مع إبقاء المقالات والتعليقات والمحادثات متاحة للتحديد */
+button,
+[role="button"],
+[role="tab"],
+nav,
+.site-header,
+.site-footer {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 ::selection {
   background: var(--selection);
   color: var(--accent-strong);
