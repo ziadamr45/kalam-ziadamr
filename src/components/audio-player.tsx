@@ -59,6 +59,8 @@ export function AudioPlayer({
   const clearedResumeRef = useRef(false);
   const silenceHighlightUntilRef = useRef(0);
   const seekingBarRef = useRef(false);
+  const pendingSeekRef = useRef<number | null>(null);
+  const allowScrollOnSeekRef = useRef(false);
 
   useEffect(() => {
     window.dispatchEvent(
@@ -179,7 +181,9 @@ export function AudioPlayer({
         const blockEl = el.closest("[id^='blk-']");
         blockEl?.classList.add("audio-active");
 
-        if (follow) {
+        const shouldScroll = follow && (!audioRef.current?.paused || allowScrollOnSeekRef.current);
+        allowScrollOnSeekRef.current = false;
+        if (shouldScroll) {
           const rect = el.getBoundingClientRect();
           const topBand = window.innerHeight * 0.22;
           const bottomBand = window.innerHeight * 0.78;
@@ -187,9 +191,12 @@ export function AudioPlayer({
             el.scrollIntoView({ behavior: "smooth", block: "center" });
           }
         }
-      } else if (idx < 0) {
-        document.querySelectorAll(".audio-word-active").forEach((n) => n.classList.remove("audio-word-active"));
-        document.querySelectorAll("#article-body .audio-active").forEach((n) => n.classList.remove("audio-active"));
+      } else {
+        allowScrollOnSeekRef.current = false;
+        if (idx < 0) {
+          document.querySelectorAll(".audio-word-active").forEach((n) => n.classList.remove("audio-word-active"));
+          document.querySelectorAll("#article-body .audio-active").forEach((n) => n.classList.remove("audio-active"));
+        }
       }
     },
     [follow, highlightMap, wordElements],
@@ -258,10 +265,16 @@ export function AudioPlayer({
         const el = document.getElementById(activeId);
         if (el) {
           el.classList.add("audio-active");
-          if (follow) {
+          const shouldScroll = follow && (!audioRef.current?.paused || allowScrollOnSeekRef.current);
+          allowScrollOnSeekRef.current = false;
+          if (shouldScroll) {
             el.scrollIntoView({ behavior: "smooth", block: "center" });
           }
+        } else {
+          allowScrollOnSeekRef.current = false;
         }
+      } else {
+        allowScrollOnSeekRef.current = false;
       }
     },
     [current, effWords, follow, playing, timings],
@@ -395,10 +408,11 @@ export function AudioPlayer({
   }, [rate]);
 
   const onTimeUpdate = useCallback(() => {
+    if (seekingBarRef.current) return;
     const audio = audioRef.current;
     if (!audio) return;
     const t = audio.currentTime;
-    if (!seekingBarRef.current) setCurrent(t);
+    setCurrent(t);
     updatePositionState(t);
     const now = Date.now();
     if (now - lastSaveRef.current > 2000) {
@@ -415,23 +429,43 @@ export function AudioPlayer({
     }
   }, [activeWordIndex, effWords, savePos, setActiveBlock, setActiveWord, updatePositionState]);
 
-  const seekAtClientX = useCallback(
-    async (clientX: number, rect: DOMRect, rtl: boolean) => {
-      const audio = audioRef.current;
+  const previewSeekAtClientX = useCallback(
+    (clientX: number, rect: DOMRect, rtl: boolean) => {
       const effDur = duration || durationSec || 0;
-      if (!audio || !effDur || rect.width <= 0) return;
+      if (!effDur || rect.width <= 0) return;
       const rawRatio = (clientX - rect.left) / rect.width;
       const clamped = Math.max(0, Math.min(1, rtl ? 1 - rawRatio : rawRatio));
       const target = Math.max(0, Math.min(effDur - 0.15, clamped * effDur));
+      pendingSeekRef.current = target;
       setCurrent(target);
+    },
+    [duration, durationSec],
+  );
+
+  const commitSeek = useCallback(
+    async (scrollAfterSeek: boolean) => {
+      seekingBarRef.current = false;
+      const target = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+      const audio = audioRef.current;
+      if (target == null || !audio) return;
       if (!audio.src) {
         audio.src = await resolveSrc();
+      }
+      if (!scrollAfterSeek) {
+        /* المشغل الأساسي: لا يقفز المقال للأسفل ولا يلون الكلمات أثناء اللمس/السحب */
+        allowScrollOnSeekRef.current = false;
+        silenceHighlightUntilRef.current = Date.now() + 250;
+      } else {
+        /* المشغل العائم المصغر: يمكنه الانتقال لموضع الصوت الجديد عند الإفلات دون تلوين مسار السحب */
+        allowScrollOnSeekRef.current = true;
       }
       try {
         audio.currentTime = target;
       } catch {}
+      setCurrent(target);
     },
-    [duration, durationSec, resolveSrc],
+    [resolveSrc],
   );
 
   useEffect(() => {
@@ -620,25 +654,26 @@ export function AudioPlayer({
           </button>
         )}
 
-        {/* شريط التقدم RTL — يدعم السحب والنقر بالإصبع والماوس بمساحة لمس مريحة */}
+        {/* شريط التقدم RTL — يدعم السحب والنقر بالإصبع والماوس دون تشتيت المقال أثناء السحب */}
         <div className="order-2 min-w-[calc(100%-4rem)] flex-1 sm:order-none sm:min-w-0">
           <div
             onPointerDown={(e) => {
               seekingBarRef.current = true;
               e.currentTarget.setPointerCapture(e.pointerId);
-              void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), true);
+              previewSeekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), true);
             }}
             onPointerMove={(e) => {
               if (!seekingBarRef.current) return;
-              void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), true);
+              previewSeekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), true);
             }}
             onPointerUp={() => {
-              seekingBarRef.current = false;
+              void commitSeek(false);
             }}
             onPointerCancel={() => {
               seekingBarRef.current = false;
+              pendingSeekRef.current = null;
             }}
-            className="group relative flex h-6 cursor-pointer touch-none items-center"
+            className="group relative flex h-6 cursor-pointer touch-none select-none items-center"
             role="slider"
             aria-label="شريط تقدم الصوت"
             aria-valuenow={Math.round(current)}
@@ -716,23 +751,24 @@ export function AudioPlayer({
                     onPointerDown={(e) => {
                       seekingBarRef.current = true;
                       e.currentTarget.setPointerCapture(e.pointerId);
-                      void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), false);
+                      previewSeekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), false);
                     }}
                     onPointerMove={(e) => {
                       if (!seekingBarRef.current) return;
-                      void seekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), false);
+                      previewSeekAtClientX(e.clientX, e.currentTarget.getBoundingClientRect(), false);
                     }}
                     onPointerUp={() => {
-                      seekingBarRef.current = false;
+                      void commitSeek(true);
                     }}
                     onPointerCancel={() => {
                       seekingBarRef.current = false;
+                      pendingSeekRef.current = null;
                     }}
                     role="slider"
                     aria-label="شريط تقدم الصوت المصغر"
                     aria-valuenow={Math.round(current)}
                     aria-valuemax={Math.round(duration)}
-                    className="flex h-4 w-20 cursor-pointer touch-none items-center sm:w-24"
+                    className="flex h-4 w-20 cursor-pointer touch-none select-none items-center sm:w-24"
                   >
                     <span className="relative block h-1.5 w-full overflow-hidden rounded-full bg-white/25 dark:bg-zinc-900/20">
                       <span

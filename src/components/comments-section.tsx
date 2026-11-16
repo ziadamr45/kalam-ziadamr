@@ -107,6 +107,10 @@ export function CommentsSection({
   const [cardFor, setCardFor] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editBusy, setEditBusy] = useState<string | null>(null);
   const [honey, setHoney] = useState("");
 
   const [myVotes, setMyVotes] = useState<Record<string, "LIKE" | "DISLIKE">>({});
@@ -190,6 +194,44 @@ export function CommentsSection({
       window.setTimeout(() => setVoteNotice(null), 5000);
     } finally {
       setDeleteBusy(null);
+    }
+  };
+
+  const saveEditComment = async (commentId: string) => {
+    if (editBusy || !editContent.trim()) return;
+    const verdict = analyzeComment(editContent);
+    if (verdict.status === "REJECT") {
+      setEditError(verdict.reasons[0] ?? "التعليق يخالف أدب الحوار");
+      return;
+    }
+    setEditBusy(commentId);
+    setEditError(null);
+    try {
+      const res = await fetch("/api/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: commentId, content: editContent.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEditError(data?.error ?? "تعذر حفظ التعديل — جرّب مرة أخرى.");
+        return;
+      }
+      if (data?.comment?.status === "PENDING") {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+        setVoteNotice("تم حفظ تعديلك وسيمرّ على المراجعة قبل الظهور مجددًا.");
+        window.setTimeout(() => setVoteNotice(null), 5000);
+      } else {
+        setComments((prev) =>
+          prev.map((c) => (c.id === commentId ? { ...c, content: editContent.trim() } : c)),
+        );
+      }
+      setEditId(null);
+      setEditContent("");
+    } catch {
+      setEditError("تعذر حفظ التعديل — تحقق من اتصالك.");
+    } finally {
+      setEditBusy(null);
     }
   };
 
@@ -506,6 +548,7 @@ export function CommentsSection({
           const mine = Boolean(myId && c.authorId && c.authorId === myId);
           const counts = voteCounts[c.id] ?? { likes: c.likes, dislikes: c.dislikes };
           const myVote = myVotes[c.id] ?? null;
+          const isEditing = editId === c.id;
           return (
             <li
               key={c.id}
@@ -619,18 +662,45 @@ export function CommentsSection({
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setDeleteConfirm(c.id)}
-                      className="rounded-full p-2 text-xs transition-colors hover:bg-(--accent-soft)"
-                      style={{ color: "var(--ink-muted)" }}
-                      title="حذف تعليقي"
-                      aria-label="حذف تعليقي"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isEditing) {
+                            setEditId(null);
+                            setEditError(null);
+                          } else {
+                            setEditId(c.id);
+                            setEditContent(c.content);
+                            setEditError(null);
+                            setDeleteConfirm(null);
+                          }
+                        }}
+                        className="rounded-full p-2 text-xs transition-colors hover:bg-(--accent-soft)"
+                        style={{ color: isEditing ? "var(--accent-strong)" : "var(--ink-muted)" }}
+                        title="تعديل تعليقي"
+                        aria-label="تعديل تعليقي"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteConfirm(c.id);
+                          setEditId(null);
+                        }}
+                        className="rounded-full p-2 text-xs transition-colors hover:bg-(--accent-soft)"
+                        style={{ color: "var(--ink-muted)" }}
+                        title="حذف تعليقي"
+                        aria-label="حذف تعليقي"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        </svg>
+                      </button>
+                    </div>
                   )
                 ) : reportSent === c.id ? (
                   <span className="text-xs" style={{ color: "var(--accent-strong)" }}>
@@ -697,9 +767,59 @@ export function CommentsSection({
                 </div>
               )}
 
-              <p className="font-body select-text leading-9" style={{ color: "var(--ink)" }}>
-                {c.content}
-              </p>
+              {isEditing ? (
+                <div className="mt-2">
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => {
+                      setEditContent(e.target.value);
+                      setEditError(null);
+                    }}
+                    rows={3}
+                    maxLength={1200}
+                    className="w-full resize-none rounded-xl border bg-transparent p-3 text-sm leading-8 outline-hidden transition-colors focus:border-(--accent)"
+                    style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+                  />
+                  {editError && (
+                    <p className="mt-1.5 text-xs font-semibold" style={{ color: "#DC2626" }}>
+                      {editError}
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] tabular-nums" style={{ color: "var(--ink-muted)" }}>
+                      {new Intl.NumberFormat("ar-EG").format(editContent.length)} / ١٬٢٠٠
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={editBusy === c.id}
+                        onClick={() => {
+                          setEditId(null);
+                          setEditError(null);
+                        }}
+                        className="rounded-full border px-3.5 py-1.5 text-xs font-semibold"
+                        style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}
+                      >
+                        إلغاء
+                      </button>
+                      <button
+                        type="button"
+                        disabled={editBusy === c.id || !editContent.trim()}
+                        onClick={() => void saveEditComment(c.id)}
+                        className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity disabled:opacity-50"
+                        style={{ background: "var(--accent)" }}
+                      >
+                        {editBusy === c.id && <MiniSpinner size={12} />}
+                        {editBusy === c.id ? "جارٍ الحفظ…" : "حفظ التعديل"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="font-body select-text leading-9" style={{ color: "var(--ink)" }}>
+                  {c.content}
+                </p>
+              )}
 
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <button

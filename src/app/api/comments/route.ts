@@ -258,6 +258,93 @@ export async function POST(request: Request) {
   }
 }
 
+const editSchema = z.object({
+  id: z.string().min(1).max(64),
+  content: z.string().min(1).max(1200),
+});
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "تسجيل الدخول مطلوب" }, { status: 401 });
+    }
+    const parsed = editSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "بيانات التعديل غير صالحة" }, { status: 400 });
+    }
+    const { id, content } = parsed.data;
+    const trimmed = content.trim();
+    if (!trimmed) {
+      return NextResponse.json({ error: "نص التعليق لا يمكن أن يكون فارغًا" }, { status: 400 });
+    }
+
+    const [user, comment] = await Promise.all([
+      prisma.user.findUnique({ where: { id: session.user.id }, select: { banned: true } }),
+      prisma.comment.findUnique({
+        where: { id },
+        select: { id: true, userId: true, status: true, article: { select: { slug: true } } },
+      }),
+    ]);
+    if (!user || user.banned) {
+      return NextResponse.json({ error: "تم إيقاف المشاركة لهذا الحساب" }, { status: 403 });
+    }
+    if (!comment) {
+      return NextResponse.json({ error: "التعليق غير موجود" }, { status: 404 });
+    }
+    if (comment.userId !== session.user.id) {
+      return NextResponse.json({ error: "لا تملك صلاحية تعديل هذا التعليق" }, { status: 403 });
+    }
+
+    const verdict = analyzeComment(trimmed);
+    if (verdict.status === "REJECT") {
+      return NextResponse.json({ error: verdict.reasons[0], rejected: true }, { status: 422 });
+    }
+    const ai = await aiModerate(trimmed);
+    if (ai.checked && !ai.approved) {
+      return NextResponse.json(
+        { error: `${ai.reason} — راجع بنود صفحة «أخلاقيات الحوار والتعليق»`, rejected: true },
+        { status: 422 },
+      );
+    }
+
+    const autoApprove = await readAutoApprove();
+    const keepApproved =
+      comment.status === "APPROVED" &&
+      (autoApprove || (!verdict.flagged && verdict.riskScore < 0.4));
+
+    const updated = await prisma.comment.update({
+      where: { id: comment.id },
+      data: {
+        content: trimmed,
+        status: keepApproved ? "APPROVED" : "PENDING",
+        flagged: verdict.flagged,
+        flagReasons: verdict.reasons,
+        riskScore: verdict.riskScore,
+      },
+      select: { id: true, content: true, status: true },
+    });
+
+    if (comment.article?.slug) {
+      try {
+        revalidatePath(`/article/${comment.article.slug}`);
+      } catch {}
+    }
+
+    return NextResponse.json({ ok: true, comment: updated });
+  } catch (err) {
+    await recordServerError({
+      err,
+      app: "PUBLIC",
+      path: "/api/comments",
+      method: "PATCH",
+      requestId: request.headers.get("x-kalam-rid"),
+      url: `${process.env.NEXT_PUBLIC_ADMIN_URL ?? ""}/system?tab=errors`,
+    });
+    return NextResponse.json({ error: "تعذر تعديل التعليق" }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const session = await auth();
