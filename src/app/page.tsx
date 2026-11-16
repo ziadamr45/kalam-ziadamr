@@ -12,8 +12,6 @@ import PushPromptCapsule from "@/components/push-prompt-capsule";
 
 export const revalidate = 300;
 
-/* الكانونيكال الرسمي للرئيسية — بغيره يعتمد جوجل عنوان الطلب وقد
-   يشتت الإشارة بين نسخ النطاق (بالشرطات المائلة وبغيرها) */
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
@@ -82,7 +80,6 @@ export default async function HomePage() {
           ]}
         />
 
-        {/* البطل — الهوية والشعار المندمج */}
         <section className="relative overflow-hidden pt-22 pb-10 text-center sm:pt-28 sm:pb-14">
           <div
             aria-hidden
@@ -108,7 +105,6 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* أحدث المقالات — المرساة id مطلوبة لاختصار PWA «أحدث المقالات» */}
         <section id="latest-articles" className="mx-auto max-w-5xl scroll-mt-24 px-4 pb-16 sm:px-6">
           <div className="mb-8 flex items-baseline justify-between">
             <h2 className="font-ui text-2xl font-bold" style={{ color: "var(--ink)" }}>
@@ -148,7 +144,6 @@ export default async function HomePage() {
           )}
         </section>
 
-        {/* الأقسام */}
         <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6">
           <h2 className="font-ui mb-8 text-2xl font-bold" style={{ color: "var(--ink)" }}>
             الأقسام
@@ -194,8 +189,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* فلسفة التحرير */}
-        <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
+        <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 sm:pb-20">
           <div className="rounded-3xl border p-8 sm:p-10" style={{ background: "var(--bg-soft)", borderColor: "var(--border)" }}>
             <h2 className="font-ui mb-2 text-center text-2xl font-bold" style={{ color: "var(--ink)" }}>
               لماذا هنا؟

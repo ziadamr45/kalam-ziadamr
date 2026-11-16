@@ -11,7 +11,6 @@ export const metadata: Metadata = {
     "راسل إدارة منصة كلام له لازمة مباشرة — اقتراحات، ملاحظات، أو كلمة طيبة. رسالتك تصل لإدارة المنصة مباشرة.",
 };
 
-/* قنوات المراسلة السريعة المعتمدة — واتساب وتليجرام والبريد أزرار مباشرة */
 const QUICK_CHANNELS: Array<"whatsapp" | "telegram" | "email"> = ["whatsapp", "telegram", "email"];
 const SECONDARY_CHANNELS: Array<"facebook" | "x" | "instagram" | "youtube"> = [
   "facebook",
@@ -82,7 +81,7 @@ export default async function ContactPage() {
     <>
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-4 pb-20 pt-20 sm:px-6 sm:pb-24 sm:pt-24">
+        <section className="mx-auto max-w-3xl px-4 pb-16 pt-20 sm:px-6 sm:pb-20 sm:pt-24">
           <header className="page-chrome text-center">
             <h1 className="font-body text-3xl font-bold leading-[1.8] sm:text-4xl" style={{ color: "var(--ink)" }}>
               اتصل بنا
@@ -98,7 +97,6 @@ export default async function ContactPage() {
             <ContactForm />
           </div>
 
-          {/* المراسلة السريعة — أزرار مباشرة لأسرع قنوات الوصول */}
           <div className="page-chrome mt-10 rounded-3xl border p-6" style={{ background: "var(--bg-soft)", borderColor: "var(--border)" }}>
             <h2 className="font-ui mb-4 text-base font-bold" style={{ color: "var(--ink)" }}>
               أو تواصل مباشرة عبر

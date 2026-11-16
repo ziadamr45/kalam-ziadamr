@@ -9,7 +9,6 @@ import { SECTION_MAP, SECTIONS } from "@/lib/sections";
 
 export const revalidate = 300;
 
-/** فك تشفير آمن للـ slugs العربية — يفشل بهدوء لو كانت النسبة حرفية أصلًا */
 function safeDecodeSlug(raw: string): string {
   try {
     return decodeURIComponent(raw);
@@ -36,7 +35,6 @@ export async function generateMetadata({
   const def = SECTION_MAP[slug];
   const dbSections = await getActiveSections();
   const name = dbSections?.find((s) => s.slug === slug)?.name ?? def?.name ?? slug;
-  /* الكانونيكال الرسمي للقسم — عنوان واحد معتمد لكل قسم */
   return { title: name, alternates: { canonical: `/section/${slug}` } };
 }
 
@@ -71,7 +69,7 @@ export default async function SectionPage({
           </p>
         </section>
 
-        <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
+        <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 sm:pb-20">
           <FirstVisitHint
             id="section-guide"
             className="mb-6"

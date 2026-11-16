@@ -3,12 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-/**
- * صفحة البحث الفكري — وجهة مستقلة لاختصار PWA «البحث الفكري»:
- * نفس محرك البحث اللحظي (/api/search) ونفس اللغة البصرية للـ Palette
- * مع عرض سجل البحث الأخير للمسجلين في وضع الخمول.
- */
-
 type Hit = {
   slug: string;
   title: string;
@@ -22,7 +16,6 @@ type Hit = {
 
 type HistoryItem = { query: string; at: string };
 
-/** يلفّ كل ظهور لكلمات البحث داخل النص بوسم تمييز ذهبي */
 function Highlight({ text, terms }: { text: string; terms: string[] }) {
   if (!text) return null;
   const clean = terms.filter((t) => t.length >= 2).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
@@ -60,7 +53,6 @@ export default function SearchView() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* جلب سجل البحث للمسجلين فقط — الزائر غير المسجل يصله 401 فيبقى السجل فارغًا */
   useEffect(() => {
     fetch("/api/search/history")
       .then((r) => (r.ok ? r.json() : null))
@@ -70,7 +62,6 @@ export default function SearchView() {
       .catch(() => {});
   }, []);
 
-  /* تذكّر الاستعلام عند فتح نتيجة — سجل البحث للقارئ المسجل حصرًا */
   const remember = useCallback((term: string) => {
     const clean = term.trim();
     if (clean.length < 2) return;
@@ -103,19 +94,15 @@ export default function SearchView() {
     fetch("/api/search/history", { method: "DELETE" }).catch(() => {});
   }, []);
 
-  /* تركيز فوري على الحقل عند الوصول */
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  /* الجسر من البحث الفوري: معامل ?q= يعبّي الحقل ويشعل البحث تلقائيًا —
-     رابط «فتح في صفحة البحث الكاملة» في الـPalette يمرر الاستعلام إلى هنا */
   useEffect(() => {
     const initial = new URLSearchParams(window.location.search).get("q")?.trim();
     if (initial) setQ(initial);
   }, []);
 
-  /* بحث لحظي مراجَل — نفس إيقاع الـ Palette */
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) {
@@ -137,8 +124,7 @@ export default function SearchView() {
   const terms = q.trim().split(/\s+/);
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 pb-24 sm:px-6">
-      {/* ترويسة الصفحة */}
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 sm:px-6 sm:pb-20">
       <div className="pt-10 text-center">
         <h1 className="font-ui text-3xl font-bold" style={{ color: "var(--ink)" }}>
           البحث الفكري
@@ -148,7 +134,6 @@ export default function SearchView() {
         </p>
       </div>
 
-      {/* حقل الإدخال */}
       <div
         className="mt-8 flex items-center gap-3 rounded-2xl border px-5 py-4 shadow-xs"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
@@ -182,7 +167,6 @@ export default function SearchView() {
         )}
       </div>
 
-      {/* النتائج */}
       <div className="mt-6">
         {q.trim().length < 2 ? (
           history.length > 0 ? (
