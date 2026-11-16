@@ -652,7 +652,7 @@ export function ArticleReader({
       <div
         ref={contentRef}
         id="article-body"
-        className={`article-body mt-10 pb-32 ${tashkeel ? "is-tashkeel" : ""} ${
+        className={`article-body mt-10 pb-8 sm:pb-10 ${tashkeel ? "is-tashkeel" : ""} ${
           tashkeelGateLifted ? "tashkeel-gate-lifted" : ""
         }`}
         style={{ color: "var(--ink)" }}

@@ -143,7 +143,7 @@ export function ProfileEditor({
         هويتي المعروضة
       </h2>
       <p className="mb-6 text-xs leading-6" style={{ color: "var(--ink-muted)" }}>
-        تسجيل الدخول عبر Google بوابة توثيق وأمان فقط — أما اسمك وصورتك أمام القرّاء فأنت صاحب القرار فيها.
+        تسجيل الدخول عبر Google بوابة توثيق وأمان فقط. أما اسمك وصورتك أمام القرّاء فأنت صاحب القرار فيها.
       </p>
 
       <div className="flex flex-col gap-6 sm:flex-row">

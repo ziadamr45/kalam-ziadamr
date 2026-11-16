@@ -346,7 +346,9 @@ export default async function ArticlePage({
           </section>
         )}
       </main>
-      <SiteFooter />
+      <div className="no-print pb-16" style={{ background: "var(--bg-soft)" }}>
+        <SiteFooter />
+      </div>
     </>
   );
 }
