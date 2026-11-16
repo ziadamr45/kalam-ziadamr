@@ -112,7 +112,8 @@ model User {
   googleId      String?   @unique
   name          String?
   email         String?   @unique
-  emailVerified DateTime?\n  image         String?
+  emailVerified DateTime?
+  image         String?
   banned        Boolean   @default(false)
   banReason     String?
   createdAt     DateTime  @default(now())
@@ -256,8 +257,7 @@ model CommentReport {
   reason         String
   details        String?
   reporterFp     String?
-  reporterUserId String?
-  reporterEmail  String?
+  reporterUserId String?\n  reporterEmail  String?
   createdAt      DateTime @default(now())
 
   @@index([commentId])
@@ -384,7 +384,8 @@ model AdminSession {
   admin      AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
   tokenHash  String    @unique
   ip         String?
-  userAgent  String?\n  deviceHash String?
+  userAgent  String?
+  deviceHash String?
   trusted    Boolean   @default(false)
   expiresAt  DateTime
   createdAt  DateTime  @default(now())
