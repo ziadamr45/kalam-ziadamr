@@ -88,7 +88,7 @@ model Article {
   @@index([sectionId])
 }
 
-// ============================ المجتمع ============================\
+// ============================ المجتمع ============================
 
 enum CommentStatus {
   PENDING
@@ -213,7 +213,7 @@ model SavedArticle {
   createdAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [articleId], onDelete: Cascade)
 
   @@unique([userId, articleId])
   @@index([userId, createdAt(sort: Desc)])
@@ -257,7 +257,8 @@ model CommentReport {
   reason         String
   details        String?
   reporterFp     String?
-  reporterUserId String?\n  reporterEmail  String?
+  reporterUserId String?
+  reporterEmail  String?
   createdAt      DateTime @default(now())
 
   @@index([commentId])
