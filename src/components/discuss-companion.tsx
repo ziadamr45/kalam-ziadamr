@@ -334,6 +334,7 @@ export function DiscussCompanion({
   const [impactNote, setImpactNote] = useState("");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [hiddenDefaults, setHiddenDefaults] = useState<number[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [confirmRetryIdx, setConfirmRetryIdx] = useState<number | null>(null);
@@ -351,6 +352,7 @@ export function DiscussCompanion({
 
   useEffect(() => {
     messagesRef.current = messages;
+    setHiddenDefaults([]);
   }, [messages]);
 
   useEffect(() => {
@@ -593,20 +595,27 @@ export function DiscussCompanion({
       .catch(() => {});
   }, []);
 
-  /* التمرير التلقائي لأسفل يحدث فقط عند فتح النافذة أو عند إرسال رسالة/وصول رد جديد،
-     وليس عند تحديث المزامنة في الخلفية حتى لا يسحب القارئ للأسفل أثناء صعوده للأعلى */
+  /* التمرير التلقائي بعد تحديث DOM بالكامل:
+     - أثناء التفكير أو للردود القصيرة: ينزل لآخر المحادثة.
+     - للردود الطويلة: يقف عند بداية الرد الجديد حتى يقرأه القارئ من أوله. */
   useEffect(() => {
     if (!open || !listRef.current || !shouldScrollRef.current) return;
     shouldScrollRef.current = false;
     const last = messages[messages.length - 1];
-    if (!sending && last?.role === "model") {
-      const el = listRef.current.querySelector(`[data-msg-idx="${messages.length - 1}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
-    }
-    listRef.current.scrollTop = listRef.current.scrollHeight;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const listEl = listRef.current;
+        if (!listEl) return;
+        if (!sending && last?.role === "model") {
+          const el = listEl.querySelector(`[data-msg-idx="${messages.length - 1}"]`) as HTMLElement | null;
+          if (el && el.offsetHeight > listEl.clientHeight - 48) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            return;
+          }
+        }
+        listEl.scrollTo({ top: listEl.scrollHeight, behavior: "smooth" });
+      });
+    });
   }, [messages, sending, open]);
 
   useEffect(() => {
@@ -792,6 +801,7 @@ export function DiscussCompanion({
       if (editIndex !== null) setEditing(editIndex);
     } finally {
       abortRef.current = null;
+      shouldScrollRef.current = true;
       setSending(false);
     }
   };
@@ -890,34 +900,17 @@ export function DiscussCompanion({
           style={{ background: "var(--surface)" }}
         >
           <header
-            className="border-b p-4"
+            className="border-b px-4 py-3"
             style={{ borderColor: "var(--border)" }}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p className="font-ui text-sm font-bold" style={{ color: "var(--ink)" }}>
-                  محاورة المقال فكريًا
-                </p>
-                <span
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
-                  style={{
-                    background: "var(--accent-soft)",
-                    color: "var(--accent-strong)",
-                    borderColor: "var(--accent)",
-                  }}
-                  title="تحاور نموذج ذكاء اصطناعي تحليلي مبنيًا على متن هذا المقال"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
-                    <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
-                  </svg>
-                  {cfgBadge}
-                </span>
-              </div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-ui min-w-0 truncate text-sm font-bold" style={{ color: "var(--ink)" }}>
+                محاورة المقال فكريًا
+              </p>
               <div className="flex shrink-0 items-center gap-1.5">
                 {impactNote && (
                   <span
-                    className="hidden rounded-full px-3 py-1 text-[11px] font-bold sm:inline"
+                    className="hidden rounded-full px-2.5 py-1 text-[11px] font-bold sm:inline"
                     style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}
                     title="سُجّل في رصيد أثرك الفكري"
                   >
@@ -927,7 +920,7 @@ export function DiscussCompanion({
                 {unlimited || (remaining !== null && remaining > 1_000_000) ? (
                   <span
                     data-tour="discuss-quota"
-                    className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
+                    className="flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-bold"
                     style={{
                       background: "rgba(245, 158, 11, 0.1)",
                       color: "#D97706",
@@ -945,7 +938,7 @@ export function DiscussCompanion({
                   remaining !== null && (
                     <span
                       data-tour="discuss-quota"
-                      className="rounded-full px-3 py-1 text-[11px] font-bold tabular-nums"
+                      className="whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums"
                       style={{
                         background: "var(--bg-soft)",
                         color: remaining <= 1 ? "#DC2626" : "var(--ink-muted)",
@@ -993,9 +986,26 @@ export function DiscussCompanion({
                 </button>
               </div>
             </div>
-            <p className="mt-1.5 text-xs leading-5" style={{ color: "var(--ink-muted)" }}>
-              {articleTitle}
-            </p>
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              <p className="min-w-0 flex-1 truncate text-xs font-medium leading-5" style={{ color: "var(--ink-muted)" }} title={articleTitle}>
+                {articleTitle}
+              </p>
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
+                style={{
+                  background: "var(--accent-soft)",
+                  color: "var(--accent-strong)",
+                  borderColor: "var(--accent)",
+                }}
+                title="تحاور نموذج ذكاء اصطناعي تحليلي مبنيًا على متن هذا المقال"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+                  <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+                </svg>
+                {cfgBadge}
+              </span>
+            </div>
           </header>
 
           <div ref={listRef} className="flex-1 overflow-y-auto p-3.5 sm:p-4" aria-live="polite">
@@ -1066,7 +1076,9 @@ export function DiscussCompanion({
               )}
 
               {messages.map((m, i) => {
-                const showActions = !sending && (activeIdx === i || i === lastUserIdx || i === lastModelIdx);
+                const isLatest = i === lastUserIdx || i === lastModelIdx;
+                const isDefaultVisible = isLatest && !hiddenDefaults.includes(i);
+                const showActions = !sending && (activeIdx === i || isDefaultVisible);
                 return (
                 <div key={i} data-msg-idx={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className="min-w-0 max-w-[92%]">
@@ -1074,7 +1086,14 @@ export function DiscussCompanion({
                       onClick={() => {
                         setConfirmDeleteIdx(null);
                         setConfirmRetryIdx(null);
-                        setActiveIdx(activeIdx === i ? null : i);
+                        if (isLatest) {
+                          setHiddenDefaults((prev) =>
+                            prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i],
+                          );
+                          setActiveIdx(null);
+                        } else {
+                          setActiveIdx(activeIdx === i ? null : i);
+                        }
                       }}
                       className={`w-fit max-w-full cursor-pointer select-text overflow-hidden rounded-2xl px-4 py-3 text-sm leading-7 break-words [overflow-wrap:anywhere] ${
                         m.role === "user" ? "whitespace-pre-wrap rounded-tl-sm" : "rounded-tr-sm"
@@ -1084,7 +1103,7 @@ export function DiscussCompanion({
                           ? { background: "var(--accent)", color: "#fff" }
                           : { background: "var(--bg-soft)", color: "var(--ink)", border: "1px solid var(--border)" }
                       }
-                      title="اضغط لإظهار الإجراءات"
+                      title="اضغط لإظهار أو إخفاء الإجراءات"
                     >
                       {m.role === "model" ? <MiniMarkdown text={m.text} /> : m.text}
                     </div>

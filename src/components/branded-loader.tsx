@@ -1,7 +1,8 @@
 export function BrandedLoader({ label = "جارٍ التحميل…" }: { label?: string }) {
   return (
     <div
-      className="flex min-h-[100dvh] w-full items-center justify-center px-4 py-8"
+      className="fixed inset-0 z-50 flex w-full items-center justify-center overflow-hidden px-4 py-6"
+      style={{ background: "var(--bg)" }}
       aria-busy="true"
       aria-label={label}
     >
