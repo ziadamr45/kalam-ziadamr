@@ -7,7 +7,7 @@ import { formatArabicDate } from "@/lib/utils";
 /* أسماء أفعال الأثر بالعربية — تُشارك بين القائمة المختصرة والنافذة الكاملة */
 export const IMPACT_ACTION_LABEL: Record<string, string> = {
   READ_COMPLETE: "قراءة متأنية أتممتها",
-  AI_DISCUSS: "نقاش فكري عميق مع المساعد",
+  AI_DISCUSS: "نقاش عميق مع المحاور الفكري",
   COMMENT_APPROVED: "تعليق هادف اجتاز الفلترة",
   COMMENT_LIKED: "إعجاب قارئ مسجل بتعليقك",
   COMMENT_INSPIRING: "تمييز التحرير لتعليقك كـ«ملهم»",

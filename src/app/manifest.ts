@@ -53,7 +53,7 @@ const SCREENSHOTS: MetadataRoute.Manifest["screenshots"] = [
     sizes: "1080x2400",
     type: "image/png",
     form_factor: "narrow",
-    label: "حوار فكري رصين مع المقال عبر المحاور الذكي",
+    label: "حوار فكري رصين مع المقال عبر المحاور الفكري",
   },
   {
     src: "/screenshots/mobile-dark.png?v=2",
@@ -88,7 +88,7 @@ const SCREENSHOTS: MetadataRoute.Manifest["screenshots"] = [
     sizes: "1920x1080",
     type: "image/png",
     form_factor: "wide",
-    label: "محاورة المقال فكريًا مع المحاور الذكي على شاشة الحاسوب",
+    label: "محاورة المقال فكريًا مع المحاور الفكري على شاشة الحاسوب",
   },
   {
     src: "/screenshots/desktop-article.png?v=2",

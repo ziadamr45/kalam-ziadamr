@@ -681,14 +681,14 @@ export async function POST(request: Request) {
     const flags = await getSiteConfigFresh().catch(() => null);
     if (flags && !flags.AI_DISCUSS_ENABLED) {
       return NextResponse.json(
-        { error: "المحاورة الذكية متوقفة مؤقتًا بإدارة المنصة" },
+        { error: "المحاور الفكري متوقف مؤقتًا بقرار من إدارة المنصة" },
         { status: 503 },
       );
     }
 
     if (!geminiConfigured()) {
       return NextResponse.json(
-        { error: "مساعد النقاش غير متاح حاليًا — عُد بعد قليل" },
+        { error: "المحاور الفكري غير متاح حاليًا — عُد بعد قليل" },
         { status: 503 },
       );
     }
