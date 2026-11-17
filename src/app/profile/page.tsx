@@ -121,10 +121,18 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           take: 20,
           select: {
             id: true,
+            parentId: true,
             content: true,
             status: true,
             createdAt: true,
             article: { select: { slug: true, title: true } },
+            parent: {
+              select: {
+                id: true,
+                content: true,
+                user: { select: { name: true, customName: true } },
+              },
+            },
           },
         })
       : Promise.resolve([]),
@@ -673,6 +681,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             <ul className="space-y-3">
               {comments.map((c) => {
                 const badge = STATUS_LABEL[c.status] ?? STATUS_LABEL.PENDING;
+                const isReply = Boolean(c.parentId);
+                const parentAuthor = c.parent?.user ? displayName(c.parent.user) : "قارئ";
                 return (
                   <li
                     key={c.id}
@@ -701,6 +711,25 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                         {badge.text}
                       </span>
                     </div>
+                    {isReply && (
+                      <div
+                        className="mt-2.5 rounded-xl border-r-2 px-3 py-2 text-right"
+                        style={{ background: "var(--bg-soft)", borderColor: "var(--accent)" }}
+                      >
+                        <p className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: "var(--accent-strong)" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <polyline points="9 14 4 9 9 4" />
+                            <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                          </svg>
+                          <span>رد على {parentAuthor}</span>
+                        </p>
+                        {c.parent?.content && (
+                          <p className="mt-0.5 line-clamp-1 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                            «{c.parent.content}»
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <p className="mt-3 text-sm leading-7" style={{ color: "var(--ink)" }}>
                       {c.content}
                     </p>
@@ -715,7 +744,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
           {approvedCount > 0 && (
             <p className="mt-6 text-center text-[11px]" style={{ color: "var(--ink-muted)" }}>
-              نُشر {new Intl.NumberFormat("ar-EG").format(approvedCount)} من تعليقاتك هنا.
+              نُشر {new Intl.NumberFormat("ar-EG").format(approvedCount)} من مشاركاتك هنا.
             </p>
           )}
         </section>

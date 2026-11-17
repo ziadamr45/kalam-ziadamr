@@ -540,11 +540,15 @@ export function CommentsSection({
         }
       >
         {!isReply && c.selfPinned && (
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-bold" style={{ color: c.authorAccent ?? "var(--accent-strong)" }}>
+          <p
+            className="mb-3 flex items-center gap-1.5 text-xs font-bold"
+            style={{ color: c.authorAccent ?? "var(--accent-strong)" }}
+            title="مثبَّت من كاتبه — من مزايا الحسابات المميزة"
+          >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <path d="M16 3l5 5-1.4 1.4-1-1-4.2 4.2.6 4.6-1.4 1.4-3.5-3.5L6 19.4 4.6 18l4.3-4.1-3.5-3.5L6.8 9l4.6.6L15.6 5.4l-1-1L16 3z" />
             </svg>
-            مثبَّت من كاتبه — صلاحية الحسابات المميزة
+            مثبَّت من كاتبه
           </p>
         )}
         {!isReply && c.isInspiring && (

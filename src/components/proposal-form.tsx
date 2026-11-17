@@ -76,7 +76,7 @@ export function ProposalForm() {
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
             placeholder="عنوان المقترح (٥ أحرف على الأقل)"
-            className="min-h-[46px] w-full rounded-xl border bg-transparent px-4 py-3 text-sm leading-normal outline-hidden focus:border-(--accent)"
+            className="min-h-[52px] w-full rounded-xl border bg-transparent px-4 py-3.5 text-sm leading-[1.9] placeholder:leading-[1.9] outline-hidden focus:border-(--accent)"
             style={{ borderColor: "var(--border)", color: "var(--ink)", background: "var(--surface)" }}
           />
           <div>
