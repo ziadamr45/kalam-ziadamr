@@ -70,13 +70,16 @@ export function ProposalForm() {
 
       {open && (
         <div className="mt-5 space-y-4">
-          <input
-            type="text"
+          <textarea
+            rows={1}
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setTitle(e.target.value.replace(/[\r\n]+/g, " "))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.preventDefault();
+            }}
             maxLength={120}
             placeholder="عنوان المقترح (٥ أحرف على الأقل)"
-            className="min-h-[52px] w-full rounded-xl border bg-transparent px-4 py-3.5 text-sm leading-[1.9] placeholder:leading-[1.9] outline-hidden focus:border-(--accent)"
+            className="w-full resize-none overflow-hidden rounded-xl border bg-transparent px-4 py-3 text-sm leading-8 outline-hidden focus:border-(--accent)"
             style={{ borderColor: "var(--border)", color: "var(--ink)", background: "var(--surface)" }}
           />
           <div>
