@@ -403,6 +403,7 @@ export function ArticleReader({
       )}
 
       <div
+        id="reading-toolbar"
         className="page-chrome no-print fixed bottom-0 left-0 right-0 z-40 border-t px-2 py-2 backdrop-blur-md sm:px-3"
         style={{
           background: "color-mix(in srgb, var(--bg) 90%, transparent)",

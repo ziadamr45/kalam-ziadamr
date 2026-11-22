@@ -61,6 +61,8 @@ export function AudioPlayer({
   const [inlineInView, setInlineInView] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const inlinePlayerRef = useRef<HTMLDivElement | null>(null);
+  const [mobileToolbarHeight, setMobileToolbarHeight] = useState(68);
+  const miniPlayerRef = useRef<HTMLDivElement | null>(null);
   const [resumedFrom, setResumedFrom] = useState(0);
   const clearedResumeRef = useRef(false);
   const silenceHighlightUntilRef = useRef(0);
@@ -102,14 +104,27 @@ export function AudioPlayer({
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  /* على الهاتف تُثبَّت الكبسولة كشريط كامل العرض فوق شريط الأدوات، فنحجز
-     مساحة أسفل الصفحة كي لا يختفي أي سطر خلفها عند نهاية المقال */
+  /* Dock against the toolbar's real height, including safe-area/font changes.
+     Reserve the mini player's own measured height so the last line stays reachable. */
   useEffect(() => {
     if (!(miniVisible && isMobile)) return;
+    const toolbar = document.getElementById("reading-toolbar");
+    const mini = miniPlayerRef.current;
     const body = document.body;
     const prev = body.style.paddingBottom;
-    body.style.paddingBottom = prev ? `calc(${prev} + 3.75rem)` : "3.75rem";
+    const measure = () => {
+      if (toolbar) setMobileToolbarHeight(toolbar.getBoundingClientRect().height);
+      const height = mini?.getBoundingClientRect().height ?? 60;
+      body.style.paddingBottom = prev ? `calc(${prev} + ${height}px)` : `${height}px`;
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (toolbar) observer.observe(toolbar, { box: "border-box" });
+    if (mini) observer.observe(mini, { box: "border-box" });
+    window.addEventListener("resize", measure);
     return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
       body.style.paddingBottom = prev;
     };
   }, [miniVisible, isMobile]);
@@ -180,14 +195,6 @@ export function AudioPlayer({
       .querySelectorAll("#article-body .audio-active")
       .forEach((n) => n.classList.remove("audio-active"));
     activeWordRef.current = -1;
-
-    const audio = audioRef.current;
-    if (audio && !audio.paused && !audio.ended) {
-      const raf = requestAnimationFrame(() => {
-        setActiveWordRef.current(activeWordIndexRef.current(audio.currentTime));
-      });
-      return () => cancelAnimationFrame(raf);
-    }
   }, [syncKey]);
 
   const wordElements = useCallback((): Map<number, Element> => {
@@ -276,6 +283,49 @@ export function AudioPlayer({
   useEffect(() => {
     activeWordIndexRef.current = activeWordIndex;
   }, [activeWordIndex]);
+
+  /* Read the media clock every visible frame, without rendering React at 60Hz.
+     timeupdate still owns progress, persistence and the background fallback. */
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!playing || !effWords || !audio) return;
+    let frame: number | null = null;
+    let disposed = false;
+    const stop = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = null;
+    };
+    const renderActiveWordFrame = () => {
+      frame = null;
+      if (disposed || audio.paused || audio.ended || document.hidden) return;
+      if (!seekingBarRef.current && Date.now() >= silenceHighlightUntilRef.current) {
+        setActiveWordRef.current(activeWordIndexRef.current(audio.currentTime));
+      }
+      frame = requestAnimationFrame(renderActiveWordFrame);
+    };
+    const start = () => {
+      if (!disposed && frame === null && !audio.paused && !audio.ended && !document.hidden) {
+        frame = requestAnimationFrame(renderActiveWordFrame);
+      }
+    };
+    const onVisibility = () => {
+      stop();
+      if (!document.hidden) start();
+    };
+    audio.addEventListener("pause", stop);
+    audio.addEventListener("ended", stop);
+    audio.addEventListener("error", stop);
+    document.addEventListener("visibilitychange", onVisibility);
+    start();
+    return () => {
+      disposed = true;
+      stop();
+      audio.removeEventListener("pause", stop);
+      audio.removeEventListener("ended", stop);
+      audio.removeEventListener("error", stop);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [playing, effWords, syncKey]);
 
   const timings = useMemo(() => {
     const totalWords = blocks.reduce((a, b) => a + b.words, 0) || 1;
@@ -766,16 +816,17 @@ export function AudioPlayer({
           <div dir="ltr" className="no-print pointer-events-none fixed inset-x-0 bottom-0 z-40">
             {/* الهاتف: شريط كامل العرض رفيع فوق شريط أدوات القراءة مباشرة —
                 الشاشات الكبيرة: كبسولة عائمة مدمجة كما كانت */}
-            <div className="flex justify-start pb-[calc(4.25rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
+            <div style={{ paddingBottom: isMobile ? `${mobileToolbarHeight}px` : undefined }} className="flex justify-start sm:pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
                 className={`pointer-events-auto flex w-full items-center gap-1 border-t border-amber-500/30 px-2 py-1.5 shadow-2xl backdrop-blur-md transition-all duration-300 sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] ${
-                  playing ? "opacity-100" : "opacity-100 sm:opacity-35 sm:[@media(hover:hover)]:hover:opacity-100"
+                  playing ? "opacity-100" : "opacity-35 [@media(hover:hover)]:hover:opacity-100"
                 }`}
                 style={{
                   /* ألوان الموقع نفسها: كريمي فاتح في الوضع الساطع، غامق في الوضع الداكن — والتفاصيل ذهبية */
                   background: "color-mix(in srgb, var(--bg) 90%, transparent)",
                   color: "var(--ink)",
                 }}
+                ref={miniPlayerRef}
                 role="group"
                 aria-label="التحكم العائم في الصوت"
               >
@@ -798,7 +849,7 @@ export function AudioPlayer({
                   className="no-touch-grow flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft)"
                   style={{ color: "var(--ink-muted)" }}
                 >
-                  <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden><g transform="scale(-1,1) translate(-24,0)"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></g><text x="12" y="15.3" textAnchor="middle" fontSize="7.4" fontWeight="800" fill="currentColor">١٥</text></svg>
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /><text x="12" y="15.3" textAnchor="middle" fontSize="7.4" fontWeight="800" fill="currentColor">١٥</text></svg>
                 </button>
                 <button
                   onClick={() => skip(15)}
@@ -807,7 +858,7 @@ export function AudioPlayer({
                   className="no-touch-grow flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft)"
                   style={{ color: "var(--ink-muted)" }}
                 >
-                  <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /><text x="12" y="15.3" textAnchor="middle" fontSize="7.4" fontWeight="800" fill="currentColor">١٥</text></svg>
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden><g transform="scale(-1,1) translate(-24,0)"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></g><text x="12" y="15.3" textAnchor="middle" fontSize="7.4" fontWeight="800" fill="currentColor">١٥</text></svg>
                 </button>
 
                 <div className="flex min-w-0 flex-1 select-none flex-col items-start gap-1 sm:flex-none">
