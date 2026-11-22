@@ -417,7 +417,7 @@ export function ArticleReader({
                 }}
                 aria-expanded={saveMenuOpen}
                 aria-haspopup="menu"
-                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
+                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-sm transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
                 style={{ color: anySaved ? "var(--accent-strong)" : "var(--ink-muted)" }}
                 title="خيارات الحفظ: في حسابك متزامنًا، أو على هذا الجهاز دون إنترنت"
               >
@@ -534,7 +534,7 @@ export function ArticleReader({
             ref={toolsPanelRef}
             role={toolsOpen ? "region" : undefined}
             aria-label={toolsOpen ? "أدوات القراءة" : undefined}
-            className={`${toolsOpen ? "flex" : "hidden"} absolute inset-x-3 bottom-full mb-3 max-h-[calc(100dvh-7rem)] flex-col gap-2 overflow-y-auto rounded-2xl border p-4 shadow-lift sm:contents`}
+            className={`${toolsOpen ? "flex" : "hidden"} absolute inset-x-3 bottom-full mb-3 max-h-[calc(100dvh-7rem)] flex-col gap-2 overflow-y-auto rounded-2xl border p-4 shadow-lift max-sm:[&_button]:min-h-11 max-sm:[&_button]:text-sm max-sm:[&_.tashkeel-toggle-label]:text-sm sm:contents`}
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
           >
             <div className="mb-1 flex items-center justify-between sm:hidden">
@@ -593,7 +593,7 @@ export function ArticleReader({
               <span className="hidden sm:inline">طباعة / حفظ PDF</span>
             </button>
 
-            <div className="flex min-h-11 items-center sm:order-6" data-tour="quote-btn" onClick={() => setToolsOpen(false)}>
+            <div className="flex min-h-11 items-center max-sm:[&>button]:w-full sm:order-6" data-tour="quote-btn" onClick={() => setToolsOpen(false)}>
               <QuoteGenerator
                 articleId={article.id}
                 articleTitle={article.title}
@@ -786,4 +786,4 @@ export function ArticleReader({
       <div id="article-end-marker" className="h-1" aria-hidden />
     </div>
   );
-            }
+}
