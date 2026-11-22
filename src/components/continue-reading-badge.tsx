@@ -25,13 +25,14 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
   const [resume, setResume] = useState<SavedProgress | null>(null);
   const [progress, setProgress] = useState(0);
   const [dismissed, setDismissed] = useState(false);
-  /* تزامن مع الكبسولة الصوتية العائمة — ترتفع الشارة فوقها تلقائيًا عند تشغيل الصوت */
+  /* موضع مؤشر التقدم فقط، رسالة الاستكمال تبقى داخل المقال. */
   const [audioActive, setAudioActive] = useState(false);
 
   const latest = useRef({ pct: 0, scrollY: 0 });
   const maxMilestone = useRef({ pct: 0, scrollY: 0 });
   const lastSaved = useRef(0);
   const resumed = useRef(false);
+  const entryScrollY = useRef<number | null>(null);
 
   useEffect(() => {
     const onAudio = (e: Event) => {
@@ -79,6 +80,8 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       ticking = false;
       const y = Math.max(0, window.scrollY);
       const pct = calculateProgress();
+      if (entryScrollY.current === null) entryScrollY.current = y;
+      if (Math.abs(y - entryScrollY.current) > 80) setDismissed(true);
       latest.current = { pct, scrollY: y };
       setProgress(pct);
 
@@ -134,6 +137,7 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       }).catch(() => {});
     };
 
+    entryScrollY.current = window.scrollY;
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("pagehide", onLeave);
     document.addEventListener("visibilitychange", onLeave);
@@ -167,10 +171,8 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
 
       {resume && !dismissed && (
         <div
-          className={`no-print fixed right-3 z-30 flex items-center gap-2 rounded-full border border-amber-500/30 px-3 py-1.5 shadow-lg backdrop-blur-md transition-all duration-300 animate-fade-up sm:right-4 ${
-            audioActive ? "bottom-36 sm:bottom-16" : "bottom-16"
-          }`}
-          style={{ background: "color-mix(in srgb, var(--surface) 95%, transparent)" }}
+          className="no-print mx-auto mt-5 flex max-w-md flex-wrap items-center justify-center gap-2 rounded-2xl border border-amber-500/30 px-3 py-2"
+          style={{ background: "var(--surface)" }}
           role="group"
           aria-label={`استئناف القراءة من ${resume.pct} بالمئة`}
         >
@@ -182,13 +184,13 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
           </span>
           <button
             onClick={continueReading}
-            className="rounded-full bg-amber-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+            className="min-h-11 rounded-full bg-amber-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-amber-700"
           >
             متابعة القراءة
           </button>
           <button
             onClick={() => setDismissed(true)}
-            className="px-1 text-xs transition-colors"
+            className="min-h-11 min-w-11 rounded-full text-xs transition-colors hover:bg-(--accent-soft)"
             style={{ color: "var(--ink-muted)" }}
             aria-label="إغلاق"
             title="إغلاق — يبقى موضع القراءة محفوظًا"
