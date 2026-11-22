@@ -58,6 +58,9 @@ export function AudioPlayer({
   const [rate, setRate] = useState(1);
   const [follow, setFollow] = useState(true);
   const [sessionActive, setSessionActive] = useState(false);
+  const [inlineInView, setInlineInView] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const inlinePlayerRef = useRef<HTMLDivElement | null>(null);
   const [resumedFrom, setResumedFrom] = useState(0);
   const clearedResumeRef = useRef(false);
   const silenceHighlightUntilRef = useRef(0);
@@ -65,14 +68,51 @@ export function AudioPlayer({
   const pendingSeekRef = useRef<number | null>(null);
   const allowScrollOnSeekRef = useRef(false);
 
+  /* الكبسولة المصغرة لا تظهر إلا بعد خروج المشغل الأساسي من الشاشة —
+     فلا يوجد زران إيقاف وشريطا تقدم للصوت نفسه في وقت واحد */
+  const miniVisible = sessionActive && !inlineInView;
+
   useEffect(() => {
     window.dispatchEvent(
-      new CustomEvent("kalam:audio-capsule", { detail: { active: sessionActive } }),
+      new CustomEvent("kalam:audio-capsule", { detail: { active: miniVisible } }),
     );
     return () => {
       window.dispatchEvent(new CustomEvent("kalam:audio-capsule", { detail: { active: false } }));
     };
-  }, [sessionActive]);
+  }, [miniVisible]);
+
+  useEffect(() => {
+    const el = inlinePlayerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        setInlineInView(entries[0]?.isIntersecting ?? true);
+      },
+      { threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639.98px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  /* على الهاتف تُثبَّت الكبسولة كشريط كامل العرض فوق شريط الأدوات، فنحجز
+     مساحة أسفل الصفحة كي لا يختفي أي سطر خلفها عند نهاية المقال */
+  useEffect(() => {
+    if (!(miniVisible && isMobile)) return;
+    const body = document.body;
+    const prev = body.style.paddingBottom;
+    body.style.paddingBottom = prev ? `calc(${prev} + 3.75rem)` : "3.75rem";
+    return () => {
+      body.style.paddingBottom = prev;
+    };
+  }, [miniVisible, isMobile]);
 
   const wordElsRef = useRef<Map<number, Element> | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -571,6 +611,7 @@ export function AudioPlayer({
   return (
     <>
       <div
+        ref={inlinePlayerRef}
         className="rounded-2xl border p-4 shadow-soft"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         dir="rtl"
@@ -720,21 +761,28 @@ export function AudioPlayer({
       </div>
       </div>
 
-      {sessionActive &&
+      {miniVisible &&
         createPortal(
           <div dir="ltr" className="no-print pointer-events-none fixed inset-x-0 bottom-0 z-40">
-            <div className="flex justify-start pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
+            {/* الهاتف: شريط كامل العرض رفيع فوق شريط أدوات القراءة مباشرة —
+                الشاشات الكبيرة: كبسولة عائمة مدمجة كما كانت */}
+            <div className="flex justify-start pb-[calc(4.25rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
-                className={`pointer-events-auto flex items-center gap-2.5 rounded-full border border-amber-500/30 bg-zinc-900 py-2 pl-2 pr-3.5 text-white shadow-2xl transition-all duration-300 hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] dark:bg-white dark:text-zinc-900 sm:py-2.5 ${
-                  playing ? "opacity-100" : "opacity-35 [@media(hover:hover)]:hover:opacity-100"
+                className={`pointer-events-auto flex w-full items-center gap-1 border-t border-amber-500/30 px-2 py-1.5 shadow-2xl backdrop-blur-md transition-all duration-300 sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] ${
+                  playing ? "opacity-100" : "opacity-100 sm:opacity-35 sm:[@media(hover:hover)]:hover:opacity-100"
                 }`}
+                style={{
+                  /* ألوان الموقع نفسها: كريمي فاتح في الوضع الساطع، غامق في الوضع الداكن — والتفاصيل ذهبية */
+                  background: "color-mix(in srgb, var(--bg) 90%, transparent)",
+                  color: "var(--ink)",
+                }}
                 role="group"
                 aria-label="التحكم العائم في الصوت"
               >
                 <button
                   onClick={toggle}
                   aria-label={playing ? "إيقاف الصوت مؤقتًا" : "متابعة التشغيل"}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95 sm:h-12 sm:w-12"
                 >
                   {playing ? (
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
@@ -743,7 +791,26 @@ export function AudioPlayer({
                   )}
                 </button>
 
-                <div className="flex select-none flex-col items-start gap-1">
+                <button
+                  onClick={() => skip(-15)}
+                  aria-label="إرجاع ١٥ ثانية إلى الخلف"
+                  title="إرجاع ١٥ ثانية"
+                  className="no-touch-grow flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft)"
+                  style={{ color: "var(--ink-muted)" }}
+                >
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden><g transform="scale(-1,1) translate(-24,0)"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></g><text x="12" y="15.3" textAnchor="middle" fontSize="7.4" fontWeight="800" fill="currentColor">١٥</text></svg>
+                </button>
+                <button
+                  onClick={() => skip(15)}
+                  aria-label="تقديم ١٥ ثانية إلى الأمام"
+                  title="تقديم ١٥ ثانية"
+                  className="no-touch-grow flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft)"
+                  style={{ color: "var(--ink-muted)" }}
+                >
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /><text x="12" y="15.3" textAnchor="middle" fontSize="7.4" fontWeight="800" fill="currentColor">١٥</text></svg>
+                </button>
+
+                <div className="flex min-w-0 flex-1 select-none flex-col items-start gap-1 sm:flex-none">
                   <span className="font-ui flex items-center gap-1.5 text-xs font-bold tabular-nums leading-none">
                     <span
                       aria-hidden
@@ -772,12 +839,15 @@ export function AudioPlayer({
                     aria-label="شريط تقدم الصوت المصغر"
                     aria-valuenow={Math.round(current)}
                     aria-valuemax={Math.round(duration)}
-                    className="flex h-4 w-20 cursor-pointer touch-none select-none items-center sm:w-24"
+                    className="flex h-4 w-full cursor-pointer touch-none select-none items-center sm:w-24"
                   >
-                    <span className="relative block h-1.5 w-full overflow-hidden rounded-full bg-white/25 dark:bg-zinc-900/20">
+                    <span className="relative block h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
                       <span
-                        className="absolute inset-y-0 left-0 rounded-full bg-amber-400 transition-[width] duration-75"
-                        style={{ width: duration ? `${Math.min(100, (current / duration) * 100)}%` : "0%" }}
+                        className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
+                        style={{
+                          width: duration ? `${Math.min(100, (current / duration) * 100)}%` : "0%",
+                          background: "linear-gradient(90deg, var(--accent-strong), var(--accent))",
+                        }}
                       />
                     </span>
                   </div>
@@ -787,7 +857,8 @@ export function AudioPlayer({
                   onClick={cycleRate}
                   aria-label="سرعة التشغيل"
                   title="سرعة التشغيل"
-                  className="font-ui no-touch-grow flex h-8 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
+                  className="font-ui no-touch-grow flex h-8 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums transition-colors hover:bg-(--accent-soft)"
+                  style={{ color: "var(--accent-strong)" }}
                 >
                   ×{easternDigits(rate)}
                 </button>
@@ -799,7 +870,8 @@ export function AudioPlayer({
                   }}
                   aria-label="إغلاق المشغل العائم وإيقاف الصوت"
                   title="إغلاق"
-                  className="no-touch-grow flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white dark:text-zinc-900/60 dark:hover:bg-zinc-900/10 dark:hover:text-zinc-900"
+                  className="no-touch-grow flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--accent-soft)"
+                  style={{ color: "var(--ink-muted)" }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                 </button>
