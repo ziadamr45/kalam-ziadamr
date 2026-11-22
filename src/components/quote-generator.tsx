@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { mobileReadingToolClass, ReadingToolIcon } from "@/components/reading-tool-card";
 import { useSession } from "next-auth/react";
 import QRCode from "qrcode";
 import { useDialogs } from "@/components/ui/dialogs";
@@ -525,6 +526,7 @@ export function QuoteGenerator({
   articleCover = null,
   containerSelector,
   suggestedQuotes = [],
+  readingTool = false,
 }: {
   articleId: string;
   articleTitle: string;
@@ -532,6 +534,7 @@ export function QuoteGenerator({
   articleCover?: string | null;
   containerSelector: string;
   suggestedQuotes?: string[];
+  readingTool?: boolean;
 }) {
   const { data: session } = useSession();
   const { toast } = useDialogs();
@@ -845,12 +848,13 @@ export function QuoteGenerator({
           requestOpen();
         }}
         onClick={requestOpen}
-        className="rounded-full px-1.5 py-1.5 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+        className={`${readingTool ? mobileReadingToolClass : ""} rounded-full px-1.5 py-1.5 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm`}
         style={{ color: "var(--ink-muted)" }}
         title="حوّل أي جملة إلى بطاقة اقتباس جاهزة للمشاركة"
       >
+        {readingTool && <ReadingToolIcon kind="quote" />}
         <span className="hidden sm:inline">اقتباسها ✦</span>
-        <span className="sm:hidden">اقتباسها</span>
+        <span className="sm:hidden">{readingTool ? "بطاقة اقتباس" : "اقتباسها"}</span>
       </button>
 
       {/* الشريحة العائمة عند التحديد — زر البطاقة يبقى مرئيًا معطلًا مع

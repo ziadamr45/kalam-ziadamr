@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
+import { mobileReadingToolClass, ReadingToolIcon } from "@/components/reading-tool-card";
 import { ArticleBlocks } from "@/components/markdown-blocks";
 import { FirstVisitHint } from "@/components/first-visit-hint";
 import SearchJump from "@/components/search-jump";
@@ -535,10 +536,10 @@ export function ArticleReader({
             ref={toolsPanelRef}
             role={toolsOpen ? "region" : undefined}
             aria-label={toolsOpen ? "أدوات القراءة" : undefined}
-            className={`${toolsOpen ? "flex" : "hidden"} absolute inset-x-3 bottom-full mb-3 max-h-[calc(100dvh-7rem)] flex-col gap-2 overflow-y-auto rounded-2xl border p-4 shadow-lift max-sm:[&_button]:min-h-11 max-sm:[&_button]:text-sm max-sm:[&_.tashkeel-toggle-label]:text-sm sm:contents`}
+            className={`${toolsOpen ? "grid" : "hidden"} absolute inset-x-3 bottom-full mb-3 max-h-[calc(100dvh-7rem)] grid-cols-2 gap-2.5 overflow-y-auto rounded-3xl border p-4 shadow-lift max-sm:[&_.tashkeel-toggle-label]:text-sm sm:contents`}
             style={{ background: "var(--surface)", borderColor: "var(--border)" }}
           >
-            <div className="mb-1 flex items-center justify-between sm:hidden">
+            <div className="col-span-2 mb-1 flex items-center justify-between border-b border-(--border) pb-2 sm:hidden">
               <h2 className="text-sm font-bold">أدوات القراءة</h2>
               <button type="button" aria-label="إغلاق أدوات القراءة" className="min-h-11 min-w-11 rounded-full hover:bg-(--accent-soft)" onClick={() => { setToolsOpen(false); toolsButtonRef.current?.focus(); }}>✕</button>
             </div>
@@ -549,14 +550,17 @@ export function ArticleReader({
                 role="switch"
                 aria-checked={tashkeel}
                 data-tour="tashkeel-btn"
-                className="flex shrink-0 cursor-pointer items-center sm:order-1 gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
+                className={`${mobileReadingToolClass} flex shrink-0 cursor-pointer items-center sm:order-1 gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2 ${tashkeel ? "max-sm:border-(--accent)! max-sm:bg-(--accent-soft)!" : ""}`}
                 title="تبديل النص المشكول بالحركات الكاملة"
               >
+                <ReadingToolIcon kind="tashkeel" />
+                <span className="flex items-center gap-2">
                 <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
                   تشكيل
                 </span>
                 <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
                   <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
+                </span>
                 </span>
               </button>
               <span className="hidden h-4 w-px shrink-0 sm:block sm:order-2" style={{ background: "var(--border)" }} aria-hidden />
@@ -573,9 +577,10 @@ export function ArticleReader({
               }}
               aria-expanded={showSummary}
               data-tour="summary-btn"
-              className="sm:order-3 min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className={`${mobileReadingToolClass} sm:order-3 min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm`}
               style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
             >
+              <ReadingToolIcon kind="summary" />
               <span className="sm:hidden">المختصر المفيد</span>
               <span className="hidden sm:inline">المختصر المفيد</span>
             </button>
@@ -586,11 +591,12 @@ export function ArticleReader({
               type="button"
               onClick={() => { setToolsOpen(false); window.print(); }}
               data-tour="pdf-btn"
-              className="sm:order-5 min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className={`${mobileReadingToolClass} sm:order-5 min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm`}
               style={{ color: "var(--ink-muted)" }}
               title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
             >
-              <span className="sm:hidden">طباعة / حفظ PDF</span>
+              <ReadingToolIcon kind="pdf" />
+              <span className="sm:hidden">حفظ PDF</span>
               <span className="hidden sm:inline">طباعة / حفظ PDF</span>
             </button>
 
@@ -602,6 +608,7 @@ export function ArticleReader({
                 articleCover={article.coverImage}
                 containerSelector="#article-body"
                 suggestedQuotes={suggestedQuotes}
+                readingTool
               />
             </div>
 
