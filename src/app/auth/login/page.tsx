@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { SiteHeader } from "@/components/site-header";
 import LoginGate from "./login-gate";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "بوابة الوصول — كلام له لازمة",
@@ -36,6 +37,7 @@ export default async function AuthLoginPage({
         </div>
       )}
       <LoginGate />
+      <SiteFooter />
     </>
   );
 }
