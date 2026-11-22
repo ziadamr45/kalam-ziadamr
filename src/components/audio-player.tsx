@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { get, set } from "idb-keyval";
+import { audioStorageKeys } from "@/lib/audio-storage";
 import { easternDigits } from "@/lib/utils";
 
 type Cue = { t: number; id: string };
@@ -31,6 +32,7 @@ export function AudioPlayer({
   jumpMap,
   slug,
   syncKey,
+  audioRevision,
   title,
   sectionName,
   coverImage,
@@ -44,6 +46,7 @@ export function AudioPlayer({
   jumpMap?: number[] | null;
   slug: string;
   syncKey?: string;
+  audioRevision?: string;
   title?: string;
   sectionName?: string | null;
   coverImage?: string | null;
@@ -76,7 +79,8 @@ export function AudioPlayer({
   const cachedRef = useRef(false);
   const activeWordRef = useRef<number>(-1);
 
-  const posKey = `kalam-audio-pos:${slug}`;
+  const storageKeys = useMemo(() => audioStorageKeys(slug, src, audioRevision), [slug, src, audioRevision]);
+  const posKey = storageKeys.position;
   const lastSaveRef = useRef(0);
   const savePos = useCallback(
     (t: number, isPlaying: boolean) => {
@@ -97,7 +101,7 @@ export function AudioPlayer({
 
   const resolveSrc = useCallback(async (): Promise<string> => {
     try {
-      const blob = (await get(`kalam-audio:${slug}`)) as Blob | undefined;
+      const blob = (await get(storageKeys.audio)) as Blob | undefined;
       if (blob && blob.size > 0) {
         cachedRef.current = true;
         const url = URL.createObjectURL(blob);
@@ -106,7 +110,7 @@ export function AudioPlayer({
       }
     } catch {}
     return src;
-  }, [slug, src]);
+  }, [storageKeys.audio, src]);
 
   const cacheAudio = useCallback(async () => {
     if (cachedRef.current) return;
@@ -116,10 +120,10 @@ export function AudioPlayer({
       if (!res.ok) return;
       const blob = await res.blob();
       if (blob.size > 0 && blob.size < 40 * 1024 * 1024) {
-        await set(`kalam-audio:${slug}`, blob);
+        await set(storageKeys.audio, blob);
       }
     } catch {}
-  }, [slug, src]);
+  }, [storageKeys.audio, src]);
 
   useEffect(() => {
     wordElsRef.current = null;

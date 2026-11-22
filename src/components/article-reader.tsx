@@ -39,6 +39,7 @@ type ReaderArticle = {
   content: string;
   contentWithTashkeel: string;
   audioUrl: string | null;
+  audioRevision?: string;
   audioDurationSec: number | null;
   audioCues: unknown;
   audioWords: unknown;
@@ -764,6 +765,8 @@ export function ArticleReader({
       {audioEnabled && article.audioUrl && (
         <div className="page-chrome mt-8">
           <AudioPlayer
+            key={article.audioRevision ? `${article.audioRevision}:${article.audioUrl}` : undefined}
+            audioRevision={article.audioRevision}
             src={article.audioUrl}
             durationSec={article.audioDurationSec}
             cues={Array.isArray(article.audioCues) ? (article.audioCues as { t: number; id: string }[]) : null}

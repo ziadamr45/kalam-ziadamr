@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { articleAudioRevision } from "@/lib/audio-storage";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
@@ -233,6 +234,7 @@ export default async function ArticlePage({
               content: article.content,
               contentWithTashkeel: article.contentWithTashkeel,
               audioUrl: article.audioUrl,
+              audioRevision: articleAudioRevision(article.id, article.audioGeneratedAt),
               audioDurationSec: article.audioDurationSec,
               audioCues: article.audioCues,
               audioWords: article.audioWords,
