@@ -1,58 +1,40 @@
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ArticleCard } from "@/components/article-card";
 import { FirstVisitHint } from "@/components/first-visit-hint";
-import { getArticlesBySection, getActiveSections } from "@/lib/db-queries";
-import { SECTION_MAP, SECTIONS } from "@/lib/sections";
+import { getArticlesBySection, getRoutingSections } from "@/lib/db-queries";
+import { requireSection } from "@/lib/section-route";
+import { SECTIONS, RETIRED_SECTION_SLUGS } from "@/lib/sections";
 
 export const revalidate = 300;
 
-function safeDecodeSlug(raw: string): string {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
-
 export async function generateStaticParams() {
-  try {
-    const sections = await getActiveSections();
-    if (sections) return sections.map((s) => ({ slug: s.slug }));
-  } catch {}
-  return SECTIONS.map((s) => ({ slug: s.slug }));
+  const sections = await getRoutingSections();
+  // Pre-render known legacy paths too, including retired ones as real 404s.
+  // This also avoids a cold ISR fallback redirect in Next 15.
+  const slugs = new Set([
+    ...[...sections, ...SECTIONS].map((section) => section.slug),
+    ...RETIRED_SECTION_SLUGS,
+  ]);
+  return [...slugs].map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
+export async function generateMetadata({ params }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug: rawSlug } = await params;
-  const slug = safeDecodeSlug(rawSlug);
-  const def = SECTION_MAP[slug];
-  const dbSections = await getActiveSections();
-  const name = dbSections?.find((s) => s.slug === slug)?.name ?? def?.name ?? slug;
-  return { title: name, alternates: { canonical: `/section/${slug}` } };
+  const section = await requireSection((await params).slug);
+  return { title: section.name, alternates: {
+    canonical: `/section/${encodeURIComponent(section.slug)}`,
+  } };
 }
 
-export default async function SectionPage({
-  params,
-}: {
+export default async function SectionPage({ params }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug: rawSlug } = await params;
-  const slug = safeDecodeSlug(rawSlug);
-  const def = SECTION_MAP[slug];
-  const dbSections = await getActiveSections();
-  const section = dbSections?.find((s) => s.slug === slug);
-  const name = section?.name ?? def?.name;
-  const description = section?.description ?? def?.description ?? "";
-
-  if (!name) notFound();
-
+  const section = await requireSection((await params).slug);
+  const { name, slug } = section;
+  const description = section.description ?? "";
   const articles = await getArticlesBySection(slug, 30);
 
   return (
@@ -107,4 +89,4 @@ export default async function SectionPage({
       <SiteFooter />
     </>
   );
-}
+          }

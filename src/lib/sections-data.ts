@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { RETIRED_SECTION_SLUGS } from "@/lib/sections";
 
 /**
  * ============================================================
@@ -11,8 +12,7 @@ import { prisma } from "@/lib/prisma";
  * طبقة كاش موسومة بـ «sections» تُبطَل لحظيًا من لوحة التحكم عبر
  * revalidateTag('sections') — تحديث فوري بلا إعادة نشر (Zero-Deploy).
  *
- * القائمة الثابتة SECTIONS تبقى fallback عند غياب البيانات أو فشل
- * الاستعلام — التذييل لا ينكسر أبدًا.
+ * عند غياب البيانات لا نعيد أقسامًا قديمة أو محذوفة.
  */
 
 export type LiveSection = { slug: string; name: string };
@@ -21,7 +21,7 @@ export const getActiveSections = unstable_cache(
   async (): Promise<LiveSection[]> => {
     try {
       const rows = await prisma.section.findMany({
-        where: { active: true },
+        where: { active: true, slug: { notIn: [...RETIRED_SECTION_SLUGS] } },
         select: { slug: true, name: true },
         orderBy: { sortOrder: "asc" },
       });
@@ -30,6 +30,6 @@ export const getActiveSections = unstable_cache(
       return [];
     }
   },
-  ["footer-live-sections"],
+  ["footer-live-sections-v2"],
   { revalidate: 300, tags: ["sections"] },
 );

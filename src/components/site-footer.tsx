@@ -1,6 +1,5 @@
 import { Footer } from "@/components/footer";
 import { getActiveSections } from "@/lib/db-queries";
-import { SECTIONS } from "@/lib/sections";
 
 /**
  * تذييل خادمي — التوأم الروحي لمكوّن SiteHeader:
@@ -10,8 +9,7 @@ import { SECTIONS } from "@/lib/sections";
  * ونماذج الذكاء الاصطناعي في مصدر الصفحة بالضبط ما يعتمده الأدمن في لوحة
  * التحكم — لا قوائم قديمة متجمدة تنتظر تنفيذ JavaScript لتُصحَّح.
  *
- * عند عجز مؤقت لقاعدة البيانات نعود للأقسام المعتمدة كي لا يفقد التذييل
- * بؤرته — والمكوّن العميل يجدد القائمة لحظيًا بعد الترطيب على أي حال.
+ * عند تعذر جلب الأقسام لا ننشئ روابط لأقسام قديمة أو محذوفة.
  */
 export async function SiteFooter() {
   let sections: { slug: string; name: string }[] = [];
@@ -22,11 +20,6 @@ export async function SiteFooter() {
       sections = rows.map((s) => ({ slug: s.slug, name: s.name }));
     }
   } catch {}
-
-  /* شبكة أمان عند غياب البيانات كليًا — لا تُستخدم إلا إذا فشل الاستعلام */
-  if (sections.length === 0) {
-    sections = SECTIONS.map((s) => ({ slug: s.slug, name: s.name }));
-  }
 
   return <Footer initialSections={sections} />;
 }

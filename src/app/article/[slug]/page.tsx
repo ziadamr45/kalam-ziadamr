@@ -69,7 +69,7 @@ export async function generateMetadata({
   const { slug: rawSlug } = await params;
   const slug = safeDecodeSlug(rawSlug);
   const article = await getArticleBySlug(slug);
-  if (!article) return { title: "مقال غير موجود" };
+  if (!article) notFound();
 
   const metaDescription = cleanMetaText(article.summary);
 
@@ -355,4 +355,4 @@ export default async function ArticlePage({
       </div>
     </>
   );
-}
+      }

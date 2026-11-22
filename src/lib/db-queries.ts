@@ -4,6 +4,8 @@ import type {
   Section,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { RETIRED_SECTION_SLUGS } from "@/lib/sections";
+import { cache } from "react";
 
 export type ArticleWithSection = Article & { section: Section | null };
 export type PersonalizedArticle = ArticleWithSection & { reason: string };
@@ -65,9 +67,9 @@ export function safeDecodeSlug(raw: string): string {
   }
 }
 
-export async function getArticleBySlug(
+export const getArticleBySlug = cache(async (
   slug: string,
-): Promise<ArticleWithSection | null> {
+): Promise<ArticleWithSection | null> => {
   if (!slug) return null;
   const decoded = safeDecodeSlug(slug);
   return withDbRetry(() =>
@@ -86,7 +88,15 @@ export async function getArticleBySlug(
       include: { section: true },
     }),
   );
-}
+});
+
+/** Routing must distinguish a database failure from a missing/retired section. */
+export const getRoutingSections = cache(async () =>
+  withDbRetry(() => prisma.section.findMany({
+    where: { active: true, slug: { notIn: [...RETIRED_SECTION_SLUGS] } },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  })),
+);
 
 export async function getPublishedSlugs(): Promise<{ slug: string }[]> {
   try {
@@ -105,7 +115,7 @@ export async function getActiveSections() {
   try {
     const sections = await withDbRetry(() =>
       prisma.section.findMany({
-        where: { active: true },
+        where: { active: true, slug: { notIn: [...RETIRED_SECTION_SLUGS] } },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         include: {
           _count: {
@@ -364,7 +374,7 @@ export async function getSectionSlugs(): Promise<string[]> {
   try {
     const sections = await withDbRetry(() =>
       prisma.section.findMany({
-        where: { active: true },
+        where: { active: true, slug: { notIn: [...RETIRED_SECTION_SLUGS] } },
         select: { slug: true },
       }),
     );
@@ -372,4 +382,4 @@ export async function getSectionSlugs(): Promise<string[]> {
   } catch {
     return [];
   }
-}
+      }

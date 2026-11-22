@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 
-import { Footer } from "@/components/footer";
 
 function GoogleMark({ size = 20 }: { size?: number }) {
   return (
@@ -318,7 +317,6 @@ export default function LoginGate() {
       >
         <LoginGateInner />
       </Suspense>
-      <Footer />
     </>
   );
 }
