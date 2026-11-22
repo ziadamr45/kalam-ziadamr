@@ -409,8 +409,8 @@ export function ArticleReader({
           paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-evenly gap-1.5 sm:justify-center sm:gap-2">
-            <div ref={saveMenuRef} className="shrink-0 sm:relative sm:order-4" data-tour="save-btn">
+        <div className="mx-auto flex max-w-md items-center justify-center gap-3 sm:max-w-(--breakpoint-md) sm:gap-2">
+            <div ref={saveMenuRef} className="shrink-0 max-sm:flex-1 sm:relative sm:order-4" data-tour="save-btn">
               <button
                 onClick={() => {
                   setToolsOpen(false);
@@ -419,11 +419,12 @@ export function ArticleReader({
                 }}
                 aria-expanded={saveMenuOpen}
                 aria-haspopup="menu"
-                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-sm transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
+                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-sm transition-all hover:bg-(--accent-soft) max-sm:flex max-sm:w-full max-sm:items-center max-sm:justify-center max-sm:gap-2 max-sm:border max-sm:border-(--border) max-sm:bg-(--surface) max-sm:text-(--ink)! sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
                 style={{ color: anySaved ? "var(--accent-strong)" : "var(--ink-muted)" }}
                 title="خيارات الحفظ: في حسابك متزامنًا، أو على هذا الجهاز دون إنترنت"
               >
-                <span className="sm:hidden">{anySaved ? "محفوظ ✓" : "حفظ"}</span>
+                <svg className="sm:hidden" width="18" height="18" viewBox="0 0 24 24" fill={anySaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3Z" /></svg>
+                <span className="sm:hidden">{anySaved ? "محفوظ ✓" : "حفظ المقال"}</span>
                 <span className="hidden sm:inline">{anySaved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
               </button>
 
@@ -521,15 +522,17 @@ export function ArticleReader({
             type="button"
             aria-expanded={toolsOpen}
             aria-controls="reading-tools-panel"
+            aria-label="أدوات القراءة"
             data-tour="reading-tools-btn"
-            className="min-h-11 rounded-full px-5 py-2 text-sm font-medium hover:bg-(--accent-soft) sm:hidden"
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-(--accent)/25 bg-(--accent-soft) px-4 py-2 text-sm font-semibold text-(--accent-strong) transition-colors hover:border-(--accent) sm:hidden"
             onClick={() => {
               setShowSummary(false);
               setSaveMenuOpen(false);
               setToolsOpen((value) => !value);
             }}
           >
-            أدوات القراءة <span aria-hidden>⋯</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h7m4 0h5M4 12h2m4 0h10M4 18h10m4 0h2" /><circle cx="13" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="16" cy="18" r="2" /></svg>
+            <span>أدوات</span>
           </button>
           <div
             id="reading-tools-panel"
