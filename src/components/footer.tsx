@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { SECTIONS } from "@/lib/sections";
 import { SOCIAL_KEYS, SOCIAL_LABELS, SOCIAL_LINKS, type SocialKey } from "@/lib/constants/socials";
 
 /*
@@ -107,10 +106,10 @@ export function Footer({
   const [copyright, setCopyright] = useState(DEFAULT_COPYRIGHT);
   const [socials, setSocials] = useState<SocialEntry[]>(DEFAULT_SOCIALS);
   /* الأقسام الحية — ما يمرره السيرفر يُرسم فورًا (بلا مشاكل hydration)،
-     والثابت شبكة أمان للمواضع التي لا يمرر فيها السيرفر شيئًا،
-     ويُستبدل بعد التحميل بالأقسام الفعلية من قاعدة البيانات */
+     ولا نعيد الأقسام القديمة إذا كانت القائمة فارغة.
+     تُحدّث القائمة بعد التحميل بالأقسام الفعلية من قاعدة البيانات */
   const [sections, setSections] = useState<{ slug: string; name: string }[]>(
-    initialSections && initialSections.length > 0 ? initialSections : SECTIONS,
+    initialSections ?? [],
   );
 
   /* التقسيم المتوازن على إيقاع خماسي: منصات التواصل والمتابعة (10) صفّا 5+5،
@@ -127,12 +126,12 @@ export function Footer({
       .then((d) => {
         if (alive && d?.FOOTER_TEXT) setFooterText(d.FOOTER_TEXT);
         if (alive && d?.COPYRIGHT_TEXT) setCopyright(d.COPYRIGHT_TEXT);
-        if (alive && Array.isArray(d?.LIVE_SECTIONS) && d.LIVE_SECTIONS.length > 0) {
+        if (alive && Array.isArray(d?.LIVE_SECTIONS)) {
           /* الأقسام الحية من قاعدة البيانات — مصدر الحقيقة الواحد للتذييل */
           const live = (d.LIVE_SECTIONS as { slug: string; name: string }[]).filter(
             (s) => s.slug && s.name,
           );
-          if (live.length > 0) setSections(live);
+          setSections(live);
         }
         if (alive && Array.isArray(d?.SOCIAL_LINKS) && d.SOCIAL_LINKS.length > 0) {
           /* الروابط الرسمية الموحدة من التكوين السيادي — social.* فوق الافتراضيات،
@@ -207,7 +206,7 @@ export function Footer({
               {sections.map((s) => (
                 <li key={s.slug}>
                   <Link
-                    href={`/section/${s.slug}`}
+                    href={`/section/${encodeURIComponent(s.slug)}`}
                     className="transition-colors hover:text-(--accent)"
                     style={{ color: "var(--ink-muted)" }}
                   >
@@ -268,4 +267,4 @@ export function Footer({
       </div>
     </footer>
   );
-}
+             }
