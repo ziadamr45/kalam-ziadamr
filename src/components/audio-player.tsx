@@ -628,11 +628,22 @@ export function AudioPlayer({
     const handler = (e: Event) => {
       const target = (e.target as HTMLElement | null)?.closest?.("[data-wi]") as HTMLElement | null;
       if (!target) return;
+      /* Resolve the body at click time: attaching to the element captured at
+         effect time silently dies if the body subtree is ever remounted. */
+      const body = document.getElementById("article-body");
+      if (!body || !body.contains(target)) return;
       const domIdx = Number(target.dataset.wi);
-      const audioIdx = jumpMap ? (jumpMap[domIdx] ?? -1) : domIdx;
-      const word = audioIdx >= 0 ? effWords[audioIdx] : undefined;
+      const mapped = jumpMap ? (jumpMap[domIdx] ?? -1) : domIdx;
+      /* Unmapped display words (-1) fall back to the raw index: the plain and
+         tashkeel views tokenize identically, so the raw index is the same word
+         or its immediate neighbor, and the click never dies. */
+      const audioIdx = mapped >= 0 ? mapped : domIdx;
+      const word = audioIdx >= 0 && audioIdx < effWords.length ? effWords[audioIdx] : undefined;
       const audio = audioRef.current;
       if (!word || !audio) return;
+      /* A deliberate word pick supersedes a pending resume restore; otherwise a
+         click before loadedmetadata is stomped back to the saved position. */
+      clearedResumeRef.current = true;
       if (!audio.src) {
         resolveSrc().then((u) => {
           audio.src = u;
@@ -644,9 +655,8 @@ export function AudioPlayer({
       audio.currentTime = word.s;
       if (audio.paused) audio.play().catch(() => {});
     };
-    const body = document.getElementById("article-body");
-    body?.addEventListener("click", handler);
-    return () => body?.removeEventListener("click", handler);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, [effWords, jumpMap, resolveSrc]);
 
   useEffect(() => {

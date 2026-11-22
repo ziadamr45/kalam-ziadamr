@@ -11,8 +11,9 @@ export function audioStorageKeys(slug: string, src: string, revision?: string) {
   };
 }
 
-/** One-article rollout. Other articles keep their existing cache/resume behavior. */
-export function articleAudioRevision(articleId: string, generatedAt: Date | null): string | undefined {
-  if (articleId !== "cmve6n9kf0001l607sstryfn0") return undefined;
+/** Every article gets a recording-scoped identity: without it the legacy slug-only
+    cache key keeps replaying the previous recording from IndexedDB after a
+    replacement, because resolveSrc prefers any stored blob over the new src. */
+export function articleAudioRevision(_articleId: string, generatedAt: Date | null): string | undefined {
   return generatedAt?.toISOString() ?? "recording-aware-v1";
 }
