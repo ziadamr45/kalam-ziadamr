@@ -405,6 +405,7 @@ export function ArticleReader({
         style={{
           background: "color-mix(in srgb, var(--bg) 90%, transparent)",
           borderColor: "var(--border)",
+          paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
         }}
       >
         <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-evenly gap-1.5 sm:justify-center sm:gap-2">
