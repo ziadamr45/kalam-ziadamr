@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { requestAuth, onAuthIntent } from "@/components/auth-gate";
 import { AudioPlayer } from "@/components/audio-player";
 import { QuoteGenerator } from "@/components/quote-generator";
+import { mobileReadingToolClass, ReadingToolIcon } from "@/components/reading-tool-card";
 import { ArticleBlocks } from "@/components/markdown-blocks";
 import { FirstVisitHint } from "@/components/first-visit-hint";
 import SearchJump from "@/components/search-jump";
@@ -57,6 +58,29 @@ export function ArticleReader({
   const [tashkeel, setTashkeel] = useState(false);
   const [tashkeelGateLifted, setTashkeelGateLifted] = useState(false);
   const [coverLightboxOpen, setCoverLightboxOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsButtonRef = useRef<HTMLButtonElement>(null);
+  const toolsPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!toolsOpen) return;
+    toolsPanelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setToolsOpen(false);
+        toolsButtonRef.current?.focus();
+      }
+    };
+    const onResize = () => {
+      if (window.matchMedia("(min-width: 640px)").matches) setToolsOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("keydown", close);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [toolsOpen]);
 
   useIsomorphicLayoutEffect(() => {
     let prefOn = false;
@@ -363,7 +387,7 @@ export function ArticleReader({
 
   return (
     <div className={`relative ${tashkeelAllowed ? "tashkeel-ok" : ""}`}>
-      {(showSummary || saveMenuOpen) && (
+      {(showSummary || saveMenuOpen || toolsOpen) && (
         <div
           aria-hidden
           onClick={(e) => {
@@ -371,6 +395,7 @@ export function ArticleReader({
             e.stopPropagation();
             setShowSummary(false);
             setSaveMenuOpen(false);
+            setToolsOpen(false);
           }}
           className="page-chrome no-print fixed inset-0 z-35"
         />
@@ -381,59 +406,25 @@ export function ArticleReader({
         style={{
           background: "color-mix(in srgb, var(--bg) 90%, transparent)",
           borderColor: "var(--border)",
+          paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1.5 sm:justify-center sm:gap-2">
-          {tashkeelAllowed && (
-            <>
-              <button
-                onClick={toggleTashkeel}
-                role="switch"
-                aria-checked={tashkeel}
-                data-tour="tashkeel-btn"
-                className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
-                title="تبديل النص المشكول بالحركات الكاملة"
-              >
-                <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
-                  تشكيل
-                </span>
-                <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
-                  <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
-                </span>
-              </button>
-              <span className="h-4 w-px shrink-0" style={{ background: "var(--border)" }} aria-hidden />
-            </>
-          )}
-
-          <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-center sm:gap-1">
-            <button
-              ref={summaryBtnRef}
-              onClick={() => {
-                setSaveMenuOpen(false);
-                setShowSummary((v) => !v);
-              }}
-              aria-expanded={showSummary}
-              data-tour="summary-btn"
-              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
-              style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
-            >
-              <span className="sm:hidden">المختصر</span>
-              <span className="hidden sm:inline">المختصر المفيد</span>
-            </button>
-
-            <div ref={saveMenuRef} className="shrink-0 sm:relative" data-tour="save-btn">
+        <div className="mx-auto flex max-w-md items-center justify-center gap-3 sm:max-w-(--breakpoint-md) sm:gap-2">
+            <div ref={saveMenuRef} className="shrink-0 max-sm:flex-1 sm:relative sm:order-4" data-tour="save-btn">
               <button
                 onClick={() => {
+                  setToolsOpen(false);
                   setShowSummary(false);
                   setSaveMenuOpen((v) => !v);
                 }}
                 aria-expanded={saveMenuOpen}
                 aria-haspopup="menu"
-                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
+                className={`min-h-11 whitespace-nowrap rounded-full px-2 py-1 text-sm transition-all hover:bg-(--accent-soft) max-sm:flex max-sm:w-full max-sm:items-center max-sm:justify-center max-sm:gap-2 max-sm:border max-sm:border-(--border) max-sm:bg-(--surface) max-sm:text-(--ink)! sm:px-3 sm:text-sm ${saveMenuOpen ? "bg-(--accent-soft)" : ""}`}
                 style={{ color: anySaved ? "var(--accent-strong)" : "var(--ink-muted)" }}
                 title="خيارات الحفظ: في حسابك متزامنًا، أو على هذا الجهاز دون إنترنت"
               >
-                <span className="sm:hidden">{anySaved ? "محفوظ ✓" : "حفظ"}</span>
+                <svg className="sm:hidden" width="18" height="18" viewBox="0 0 24 24" fill={anySaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3Z" /></svg>
+                <span className="sm:hidden">{anySaved ? "محفوظ ✓" : "حفظ المقال"}</span>
                 <span className="hidden sm:inline">{anySaved ? "محفوظ في مكتبتي ✓" : "حفظ في مكتبتي"}</span>
               </button>
 
@@ -526,20 +517,93 @@ export function ArticleReader({
                 </div>
               )}
             </div>
+          <button
+            ref={toolsButtonRef}
+            type="button"
+            aria-expanded={toolsOpen}
+            aria-controls="reading-tools-panel"
+            aria-label="أدوات القراءة"
+            data-tour="reading-tools-btn"
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-(--accent)/25 bg-(--accent-soft) px-4 py-2 text-sm font-semibold text-(--accent-strong) transition-colors hover:border-(--accent) sm:hidden"
+            onClick={() => {
+              setShowSummary(false);
+              setSaveMenuOpen(false);
+              setToolsOpen((value) => !value);
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h7m4 0h5M4 12h2m4 0h10M4 18h10m4 0h2" /><circle cx="13" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="16" cy="18" r="2" /></svg>
+            <span>أدوات</span>
+          </button>
+          <div
+            id="reading-tools-panel"
+            ref={toolsPanelRef}
+            role={toolsOpen ? "region" : undefined}
+            aria-label={toolsOpen ? "أدوات القراءة" : undefined}
+            className={`${toolsOpen ? "grid" : "hidden"} absolute inset-x-3 bottom-full mb-3 max-h-[calc(100dvh-7rem)] grid-cols-2 gap-2.5 overflow-y-auto rounded-3xl border p-4 shadow-lift max-sm:[&_.tashkeel-toggle-label]:text-sm sm:contents`}
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+          >
+            <div className="col-span-2 mb-1 flex items-center justify-between border-b border-(--border) pb-2 sm:hidden">
+              <h2 className="text-sm font-bold">أدوات القراءة</h2>
+              <button type="button" aria-label="إغلاق أدوات القراءة" className="min-h-11 min-w-11 rounded-full hover:bg-(--accent-soft)" onClick={() => { setToolsOpen(false); toolsButtonRef.current?.focus(); }}>✕</button>
+            </div>
+          {tashkeelAllowed && (
+            <>
+              <button
+                onClick={toggleTashkeel}
+                role="switch"
+                aria-checked={tashkeel}
+                data-tour="tashkeel-btn"
+                className={`${mobileReadingToolClass} flex shrink-0 cursor-pointer items-center sm:order-1 gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2 ${tashkeel ? "max-sm:border-(--accent)! max-sm:bg-(--accent-soft)!" : ""}`}
+                title="تبديل النص المشكول بالحركات الكاملة"
+              >
+                <ReadingToolIcon kind="tashkeel" />
+                <span className="flex items-center gap-2">
+                <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
+                  تشكيل
+                </span>
+                <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
+                  <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
+                </span>
+                </span>
+              </button>
+              <span className="hidden h-4 w-px shrink-0 sm:block sm:order-2" style={{ background: "var(--border)" }} aria-hidden />
+            </>
+          )}
+
+
+            <button
+              ref={summaryBtnRef}
+              onClick={() => {
+                setToolsOpen(false);
+                setSaveMenuOpen(false);
+                setShowSummary((v) => !v);
+              }}
+              aria-expanded={showSummary}
+              data-tour="summary-btn"
+              className={`${mobileReadingToolClass} sm:order-3 min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm`}
+              style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
+            >
+              <ReadingToolIcon kind="summary" />
+              <span className="sm:hidden">المختصر المفيد</span>
+              <span className="hidden sm:inline">المختصر المفيد</span>
+            </button>
+
+
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => { setToolsOpen(false); window.print(); }}
               data-tour="pdf-btn"
-              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className={`${mobileReadingToolClass} sm:order-5 min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm`}
               style={{ color: "var(--ink-muted)" }}
               title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
             >
-              <span className="sm:hidden">PDF</span>
+              <ReadingToolIcon kind="pdf" />
+              <span className="sm:hidden">حفظ PDF</span>
               <span className="hidden sm:inline">طباعة / حفظ PDF</span>
             </button>
 
-            <div className="flex min-h-11 items-center" data-tour="quote-btn">
+            <div className="flex min-h-11 items-center max-sm:[&>button]:w-full sm:order-6" data-tour="quote-btn" onClick={() => setToolsOpen(false)}>
               <QuoteGenerator
                 articleId={article.id}
                 articleTitle={article.title}
@@ -547,8 +611,11 @@ export function ArticleReader({
                 articleCover={article.coverImage}
                 containerSelector="#article-body"
                 suggestedQuotes={suggestedQuotes}
+                readingTool
               />
             </div>
+
+
           </div>
         </div>
       </div>
@@ -601,6 +668,11 @@ export function ArticleReader({
             selector: "#article-body",
             title: "من هنا تقرأ المقال",
             text: "اقرأ النص بهدوء، وبالتمرير للأسفل يُحفظ موضع قراءتك تلقائيًا لتستأنفه في أي وقت.",
+          },
+          {
+            selector: "[data-tour='reading-tools-btn']",
+            title: "أدوات القراءة",
+            text: "افتح هذه اللوحة للتشكيل والمختصر المفيد وحفظ PDF وصنع بطاقة اقتباس.",
           },
           {
             selector: "[data-tour='tashkeel-btn']",

@@ -142,7 +142,6 @@ export default async function ArticlePage({
       <ReadingProgress />
       <SiteHeader />
       <BackToTop />
-      <ContinueReadingBadge slug={article.slug} articleId={article.id} />
 
       <main className="flex-1">
         <article id="printable-article" className="mx-auto max-w-3xl px-4 pt-22 pb-24 sm:px-6 sm:pt-28 sm:pb-28">
@@ -222,6 +221,7 @@ export default async function ArticlePage({
               </span>
             </div>
             <div className="mx-auto mt-5 h-[3px] w-16 rounded-full sm:mt-6" style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }} />
+            <ContinueReadingBadge slug={article.slug} articleId={article.id} />
           </header>
 
           <ArticleReader
