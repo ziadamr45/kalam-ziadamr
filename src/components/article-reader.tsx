@@ -57,6 +57,29 @@ export function ArticleReader({
   const [tashkeel, setTashkeel] = useState(false);
   const [tashkeelGateLifted, setTashkeelGateLifted] = useState(false);
   const [coverLightboxOpen, setCoverLightboxOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsButtonRef = useRef<HTMLButtonElement>(null);
+  const toolsPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!toolsOpen) return;
+    toolsPanelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setToolsOpen(false);
+        toolsButtonRef.current?.focus();
+      }
+    };
+    const onResize = () => {
+      if (window.matchMedia("(min-width: 640px)").matches) setToolsOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("keydown", close);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [toolsOpen]);
 
   useIsomorphicLayoutEffect(() => {
     let prefOn = false;
@@ -363,7 +386,7 @@ export function ArticleReader({
 
   return (
     <div className={`relative ${tashkeelAllowed ? "tashkeel-ok" : ""}`}>
-      {(showSummary || saveMenuOpen) && (
+      {(showSummary || saveMenuOpen || toolsOpen) && (
         <div
           aria-hidden
           onClick={(e) => {
@@ -371,6 +394,7 @@ export function ArticleReader({
             e.stopPropagation();
             setShowSummary(false);
             setSaveMenuOpen(false);
+            setToolsOpen(false);
           }}
           className="page-chrome no-print fixed inset-0 z-35"
         />
@@ -383,47 +407,11 @@ export function ArticleReader({
           borderColor: "var(--border)",
         }}
       >
-        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-between gap-1.5 sm:justify-center sm:gap-2">
-          {tashkeelAllowed && (
-            <>
-              <button
-                onClick={toggleTashkeel}
-                role="switch"
-                aria-checked={tashkeel}
-                data-tour="tashkeel-btn"
-                className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
-                title="تبديل النص المشكول بالحركات الكاملة"
-              >
-                <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
-                  تشكيل
-                </span>
-                <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
-                  <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
-                </span>
-              </button>
-              <span className="h-4 w-px shrink-0" style={{ background: "var(--border)" }} aria-hidden />
-            </>
-          )}
-
-          <div className="flex min-w-0 flex-1 items-center justify-evenly sm:flex-initial sm:justify-center sm:gap-1">
-            <button
-              ref={summaryBtnRef}
-              onClick={() => {
-                setSaveMenuOpen(false);
-                setShowSummary((v) => !v);
-              }}
-              aria-expanded={showSummary}
-              data-tour="summary-btn"
-              className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
-              style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
-            >
-              <span className="sm:hidden">المختصر</span>
-              <span className="hidden sm:inline">المختصر المفيد</span>
-            </button>
-
-            <div ref={saveMenuRef} className="shrink-0 sm:relative" data-tour="save-btn">
+        <div className="mx-auto flex max-w-(--breakpoint-md) items-center justify-evenly gap-1.5 sm:justify-center sm:gap-2">
+            <div ref={saveMenuRef} className="shrink-0 sm:relative sm:order-4" data-tour="save-btn">
               <button
                 onClick={() => {
+                  setToolsOpen(false);
                   setShowSummary(false);
                   setSaveMenuOpen((v) => !v);
                 }}
@@ -526,20 +514,86 @@ export function ArticleReader({
                 </div>
               )}
             </div>
+          <button
+            ref={toolsButtonRef}
+            type="button"
+            aria-expanded={toolsOpen}
+            aria-controls="reading-tools-panel"
+            data-tour="reading-tools-btn"
+            className="min-h-11 rounded-full px-5 py-2 text-sm font-medium hover:bg-(--accent-soft) sm:hidden"
+            onClick={() => {
+              setShowSummary(false);
+              setSaveMenuOpen(false);
+              setToolsOpen((value) => !value);
+            }}
+          >
+            أدوات القراءة <span aria-hidden>⋯</span>
+          </button>
+          <div
+            id="reading-tools-panel"
+            ref={toolsPanelRef}
+            role={toolsOpen ? "region" : undefined}
+            aria-label={toolsOpen ? "أدوات القراءة" : undefined}
+            className={`${toolsOpen ? "flex" : "hidden"} absolute inset-x-3 bottom-full mb-3 max-h-[calc(100dvh-7rem)] flex-col gap-2 overflow-y-auto rounded-2xl border p-4 shadow-lift sm:contents`}
+            style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+          >
+            <div className="mb-1 flex items-center justify-between sm:hidden">
+              <h2 className="text-sm font-bold">أدوات القراءة</h2>
+              <button type="button" aria-label="إغلاق أدوات القراءة" className="min-h-11 min-w-11 rounded-full hover:bg-(--accent-soft)" onClick={() => { setToolsOpen(false); toolsButtonRef.current?.focus(); }}>✕</button>
+            </div>
+          {tashkeelAllowed && (
+            <>
+              <button
+                onClick={toggleTashkeel}
+                role="switch"
+                aria-checked={tashkeel}
+                data-tour="tashkeel-btn"
+                className="flex shrink-0 cursor-pointer items-center sm:order-1 gap-1 rounded-full px-1.5 py-2 transition-all hover:bg-(--accent-soft) sm:gap-1.5 sm:px-2"
+                title="تبديل النص المشكول بالحركات الكاملة"
+              >
+                <span className="tashkeel-toggle-label text-[11px] font-medium sm:text-xs">
+                  تشكيل
+                </span>
+                <span className="tashkeel-toggle-track relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300 sm:w-9">
+                  <span className="tashkeel-toggle-knob absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid" />
+                </span>
+              </button>
+              <span className="hidden h-4 w-px shrink-0 sm:block sm:order-2" style={{ background: "var(--border)" }} aria-hidden />
+            </>
+          )}
+
+
+            <button
+              ref={summaryBtnRef}
+              onClick={() => {
+                setToolsOpen(false);
+                setSaveMenuOpen(false);
+                setShowSummary((v) => !v);
+              }}
+              aria-expanded={showSummary}
+              data-tour="summary-btn"
+              className="sm:order-3 min-h-11 shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              style={{ color: showSummary ? "var(--accent-strong)" : "var(--ink-muted)" }}
+            >
+              <span className="sm:hidden">المختصر المفيد</span>
+              <span className="hidden sm:inline">المختصر المفيد</span>
+            </button>
+
+
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => { setToolsOpen(false); window.print(); }}
               data-tour="pdf-btn"
-              className="min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
+              className="sm:order-5 min-h-11 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-2 py-1 text-[11px] transition-all hover:bg-(--accent-soft) sm:px-3 sm:text-sm"
               style={{ color: "var(--ink-muted)" }}
               title="نسخة ورقية رسمية بمحرك الطباعة الأصيل للمتصفح — اختر «حفظ كـ PDF» من نافذة الطباعة"
             >
-              <span className="sm:hidden">PDF</span>
+              <span className="sm:hidden">طباعة / حفظ PDF</span>
               <span className="hidden sm:inline">طباعة / حفظ PDF</span>
             </button>
 
-            <div className="flex min-h-11 items-center" data-tour="quote-btn">
+            <div className="flex min-h-11 items-center sm:order-6" data-tour="quote-btn" onClick={() => setToolsOpen(false)}>
               <QuoteGenerator
                 articleId={article.id}
                 articleTitle={article.title}
@@ -549,6 +603,8 @@ export function ArticleReader({
                 suggestedQuotes={suggestedQuotes}
               />
             </div>
+
+
           </div>
         </div>
       </div>
@@ -601,6 +657,11 @@ export function ArticleReader({
             selector: "#article-body",
             title: "من هنا تقرأ المقال",
             text: "اقرأ النص بهدوء، وبالتمرير للأسفل يُحفظ موضع قراءتك تلقائيًا لتستأنفه في أي وقت.",
+          },
+          {
+            selector: "[data-tour='reading-tools-btn']",
+            title: "أدوات القراءة",
+            text: "افتح هذه اللوحة للتشكيل والمختصر المفيد وحفظ PDF وصنع بطاقة اقتباس.",
           },
           {
             selector: "[data-tour='tashkeel-btn']",
@@ -725,4 +786,4 @@ export function ArticleReader({
       <div id="article-end-marker" className="h-1" aria-hidden />
     </div>
   );
-}
+            }
