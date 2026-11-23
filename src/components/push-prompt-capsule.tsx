@@ -157,7 +157,7 @@ export default function PushPromptCapsule() {
           </svg>
         </span>
         <p className="min-w-0 flex-1 text-sm leading-7" style={{ color: "var(--ink)" }}>
-          فعّل إشعارات المنصة ليصلك كل مقال فكري جديد فور نشره، وتنبه بالردود على تعليقاتك.
+          فعّل الإشعارات لتبقى على اطلاع بآخر مستجدات المنصة.
         </p>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -166,7 +166,7 @@ export default function PushPromptCapsule() {
             className="rounded-full px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{ background: "var(--accent)", color: "#fff" }}
           >
-            {busy ? "لحظة.." : "تفعيل الإشعارات الآن"}
+            {busy ? "لحظة.." : "فعّل الإشعارات"}
           </button>
           <button
             onClick={() => dismiss(true)}
