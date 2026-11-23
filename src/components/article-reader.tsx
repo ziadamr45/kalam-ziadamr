@@ -8,6 +8,7 @@ import { QuoteGenerator } from "@/components/quote-generator";
 import { mobileReadingToolClass, ReadingToolIcon } from "@/components/reading-tool-card";
 import { ArticleBlocks } from "@/components/markdown-blocks";
 import { FirstVisitHint } from "@/components/first-visit-hint";
+import { isReadingToolsPanelStep } from "@/lib/tour-steps";
 import SearchJump from "@/components/search-jump";
 import { trackView, trackComplete, trackDwell } from "@/lib/analytics";
 import {
@@ -63,6 +64,38 @@ export function ArticleReader({
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsButtonRef = useRef<HTMLButtonElement>(null);
   const toolsPanelRef = useRef<HTMLDivElement>(null);
+  /* الجولة تفتح لوحة الأدوات لعرض خطواتها على الهاتف ثم تغلقها بعد مغادرتها —
+     لا تُغلق لوحة فتحها القارئ بنفسه */
+  const tourOpenedToolsRef = useRef(false);
+  const openToolsForTour = useCallback(() => {
+    tourOpenedToolsRef.current = true;
+    setToolsOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const closeIfTourOpened = () => {
+      if (tourOpenedToolsRef.current) {
+        tourOpenedToolsRef.current = false;
+        setToolsOpen(false);
+      }
+    };
+    const onStep = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; selector?: string | null }>).detail;
+      if (d?.id !== "article-tools") return;
+      if (!isReadingToolsPanelStep(d.selector)) closeIfTourOpened();
+    };
+    const onFinish = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string }>).detail;
+      if (d?.id !== "article-tools") return;
+      closeIfTourOpened();
+    };
+    window.addEventListener("kalam:tour-step", onStep);
+    window.addEventListener("kalam:tour-finished", onFinish);
+    return () => {
+      window.removeEventListener("kalam:tour-step", onStep);
+      window.removeEventListener("kalam:tour-finished", onFinish);
+    };
+  }, []);
 
   useEffect(() => {
     if (!toolsOpen) return;
@@ -676,26 +709,30 @@ export function ArticleReader({
             selector: "[data-tour='tashkeel-btn']",
             title: "مفتاح التشكيل",
             text: "من هنا يمكنك إظهار الحركات الكاملة أو إخفاؤها بضغطة واحدة دون أن تفقد موضع قراءتك.",
+            beforeShow: openToolsForTour,
           },
           {
             selector: "[data-tour='summary-btn']",
             title: "المختصر المفيد",
             text: "من هنا تفتح خلاصة المقال وأهم نقاطه العملية في لمحة سريعة.",
-          },
-          {
-            selector: "[data-tour='save-btn']",
-            title: "حفظ المقال",
-            text: "من هنا تحفظ المقال في حسابك للمزامنة بين أجهزتك، أو تحفظه على هذا الجهاز للقراءة بدون إنترنت.",
+            beforeShow: openToolsForTour,
           },
           {
             selector: "[data-tour='pdf-btn']",
             title: "طباعة أو حفظ PDF",
             text: "من هنا تحفظ المقال كملف PDF منسّق وجاهز للقراءة أو الطباعة في أي وقت.",
+            beforeShow: openToolsForTour,
           },
           {
             selector: "[data-tour='quote-btn']",
             title: "اقتباس ومشاركة",
             text: "من هنا تصمّم بطاقة اقتباس مصوّرة بهوية المنصة لمشاركتها مباشرة.",
+            beforeShow: openToolsForTour,
+          },
+          {
+            selector: "[data-tour='save-btn']",
+            title: "حفظ المقال",
+            text: "من هنا تحفظ المقال في حسابك للمزامنة بين أجهزتك، أو تحفظه على هذا الجهاز للقراءة بدون إنترنت.",
           },
           {
             selector: "[data-tour='discuss-trigger']",

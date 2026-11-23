@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { selectTourSteps } from "@/lib/tour-steps";
 
 export type HintStep = {
   title: string;
   text: string;
   /** معرّف CSS للعنصر المستهدف عند تفعيل الجولة التفاعلية الموجهة */
   selector?: string;
+  /** يجهّز الهدف المخفي قبل إظهاره (مثل فتح لوحة أدوات القراءة) — يُستدعى مرة واحدة عند الحاجة */
+  beforeShow?: () => void;
 };
 
 type Rect = { top: number; left: number; width: number; height: number };
@@ -61,6 +64,10 @@ export function FirstVisitHint({
   const [stepIdx, setStepIdx] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
+  /* الخطوات الفعلية على هذا الجهاز: ما لا هدف ظاهر له ولا تهيئة يخرج من العد */
+  const [effectiveSteps, setEffectiveSteps] = useState<HintStep[]>(steps ?? []);
+  const preparedRef = useRef<Set<number>>(new Set());
+  const [measureTick, setMeasureTick] = useState(0);
   const storageKey = mode === "tour" ? `kalam_tour_${id}_v4` : `kalam_hint_${id}_v2`;
 
   const resolvedSteps = useMemo<HintStep[]>(
@@ -82,6 +89,14 @@ export function FirstVisitHint({
     try {
       if (!window.localStorage.getItem(storageKey)) {
         const t = setTimeout(() => {
+          preparedRef.current = new Set();
+          setEffectiveSteps(
+            selectTourSteps(
+              resolvedSteps,
+              (sel) => Boolean(findVisibleTarget(sel)),
+              (sel) => Boolean(document.querySelector(sel)),
+            ),
+          );
           setStepIdx(0);
           setVisible(true);
         }, 380);
@@ -116,14 +131,23 @@ export function FirstVisitHint({
   const measureTarget = useCallback(
     (shouldScroll: boolean) => {
       if (!visible || mode !== "tour" || !active) return;
-      const step = resolvedSteps[stepIdx];
+      const step = effectiveSteps[stepIdx];
       if (!step?.selector) {
         setRect(null);
         return;
       }
       const el = findVisibleTarget(step.selector);
       if (!el) {
-        if (stepIdx < resolvedSteps.length - 1) {
+        /* هدف مؤجل التهيئة (مثل زر داخل لوحة مغلقة): جهّزه مرة واحدة ثم أعد القياس */
+        if (step.beforeShow && !preparedRef.current.has(stepIdx)) {
+          preparedRef.current.add(stepIdx);
+          try {
+            step.beforeShow();
+          } catch {}
+          const t = setTimeout(() => setMeasureTick((v) => v + 1), 420);
+          return () => clearTimeout(t);
+        }
+        if (stepIdx < effectiveSteps.length - 1) {
           setStepIdx((i) => i + 1);
         } else {
           dismiss();
@@ -172,8 +196,19 @@ export function FirstVisitHint({
         return () => clearTimeout(t);
       }
     },
-    [visible, mode, active, resolvedSteps, stepIdx, dismiss],
+    [visible, mode, active, effectiveSteps, stepIdx, dismiss, measureTick],
   );
+
+  /* إعلام الصفحة بالخطوة الحالية لتجهّز سياقها (فتح لوحة الأدوات مثلًا) */
+  useEffect(() => {
+    if (!visible || mode !== "tour" || !active) return;
+    const step = effectiveSteps[stepIdx];
+    try {
+      window.dispatchEvent(
+        new CustomEvent("kalam:tour-step", { detail: { id, selector: step?.selector ?? null } }),
+      );
+    } catch {}
+  }, [visible, mode, active, id, stepIdx, effectiveSteps]);
 
   useEffect(() => {
     if (!visible || mode !== "tour" || !active) return;
@@ -199,11 +234,11 @@ export function FirstVisitHint({
     };
   }, [visible, mode, active, measureTarget, dismiss]);
 
-  if (!visible || !active || resolvedSteps.length === 0) return null;
+  if (!visible || !active || resolvedSteps.length === 0 || effectiveSteps.length === 0) return null;
 
-  const current = resolvedSteps[stepIdx] ?? resolvedSteps[0];
+  const current = effectiveSteps[stepIdx] ?? effectiveSteps[0];
   const isFirst = stepIdx === 0;
-  const isLast = stepIdx >= resolvedSteps.length - 1;
+  const isLast = stepIdx >= effectiveSteps.length - 1;
   const arNum = (n: number) => new Intl.NumberFormat("ar-EG").format(n);
 
   if (mode === "tour") {
@@ -277,12 +312,12 @@ export function FirstVisitHint({
                 <p className="font-bold" style={{ color: "var(--accent-strong)" }}>
                   {current.title}
                 </p>
-                {resolvedSteps.length > 1 && (
+                {effectiveSteps.length > 1 && (
                   <span
                     className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                     style={{ background: "var(--bg-soft)", color: "var(--ink-muted)" }}
                   >
-                    {arNum(stepIdx + 1)} من {arNum(resolvedSteps.length)}
+                    {arNum(stepIdx + 1)} من {arNum(effectiveSteps.length)}
                   </span>
                 )}
               </div>
