@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import { get, set } from "idb-keyval";
 import { audioStorageKeys } from "@/lib/audio-storage";
-import { followReturnAriaLabel, followReturnLabel, followTargetDirection, type FollowTarget } from "@/lib/follow-target";
+import { followReturnAriaLabel, followReturnLabel, followTargetDirection, gentleFollowScrollTop, isWordOutOfUsableArea, withinComfortBand, type FollowTarget } from "@/lib/follow-target";
 import { easternDigits } from "@/lib/utils";
 
 type Cue = { t: number; id: string };
@@ -96,6 +96,8 @@ export function AudioPlayer({
   /* اتجاه الكلام المسموع بالنسبة للشاشة أثناء التوقف المؤقت — يقود سهم الرجوع ونصه */
   const [followTarget, setFollowTarget] = useState<FollowTarget>("down");
   const followActiveRef = useRef(true);
+  const followRef = useRef(true);
+  const idleReengageRef = useRef<number | null>(null);
   const programmaticScrollUntilRef = useRef(0);
   const [sessionActive, setSessionActive] = useState(false);
   const [inlineInView, setInlineInView] = useState(true);
@@ -276,11 +278,9 @@ export function AudioPlayer({
         allowScrollOnSeekRef.current = false;
         if (shouldScroll) {
           const rect = el.getBoundingClientRect();
-          const topBand = window.innerHeight * 0.22;
-          const bottomBand = window.innerHeight * 0.78;
-          if (rect.top < topBand || rect.bottom > bottomBand) {
+          if (!withinComfortBand(rect.top, rect.bottom, window.innerHeight)) {
             programmaticScrollUntilRef.current = Date.now() + 1500;
-            el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+            window.scrollTo({ top: gentleFollowScrollTop(rect.top, window.scrollY, window.innerHeight), behavior: scrollBehavior() });
           }
         }
       } else {
@@ -404,9 +404,9 @@ export function AudioPlayer({
           allowScrollOnSeekRef.current = false;
           if (shouldScroll) {
             const r = el.getBoundingClientRect();
-            if (r.top < window.innerHeight * 0.22 || r.bottom > window.innerHeight * 0.78) {
+            if (!withinComfortBand(r.top, r.bottom, window.innerHeight)) {
               programmaticScrollUntilRef.current = Date.now() + 1500;
-              el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+              window.scrollTo({ top: gentleFollowScrollTop(r.top, window.scrollY, window.innerHeight), behavior: scrollBehavior() });
             }
           }
         } else {
@@ -519,15 +519,9 @@ export function AudioPlayer({
   /* زر واحد مشترك (المشغل الكبير والمصغّر): تشغيل ← إيقاف ← تشغيل،
      وعند التوقف المؤقت بسبب تحريك الصفحة يعيد القارئ لمكان القراءة — أو يستأنف
      التتبع في مكانه إذا كان الكلام المسموع ظاهرًا بالفعل على الشاشة. */
-  const followLabel = !follow
-    ? "تشغيل تتبع الصوت تلقائيًا"
-    : followPaused
-      ? followReturnAriaLabel(followTarget)
-      : "إيقاف تتبع الصوت تلقائيًا";
-
-  /* تتبّع اتجاه موضع القراءة أثناء التوقف المؤقت: يتغير مع تمرير القارئ وتقدم الصوت */
+  /* تتبّع اتجاه الكلام المسموع أثناء التشغيل ليقود سهم «ارجع للقراءة» */
   useEffect(() => {
-    if (!followPaused) return;
+    if (!playing) return;
     const update = () => {
       const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
       if (!active) return;
@@ -541,57 +535,102 @@ export function AudioPlayer({
       window.clearInterval(interval);
       window.removeEventListener("scroll", update);
     };
-  }, [followPaused]);
+  }, [playing]);
 
-  const toggleFollow = useCallback(() => {
-    if (follow && followPaused) {
-      setFollowPaused(false);
-      followActiveRef.current = true;
-      allowScrollOnSeekRef.current = true;
-      const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
-      if (active) {
-        const rect = active.getBoundingClientRect();
-        const offScreen = rect.bottom < 0 || rect.top > window.innerHeight;
-        /* الكلام المسموع ظاهر بالفعل: استئناف التتبع في مكانه دون قفزة لا معنى لها */
-        if (offScreen) {
-          programmaticScrollUntilRef.current = Date.now() + 1500;
-          active.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
-        }
-        allowScrollOnSeekRef.current = false;
-      }
+  /* «الكلمة مختفية فعلًا» خارج مساحة القراءة بعد استبعاد الشريطين الثابتين —
+     وحدها من تُظهر زر «ارجع للقراءة»؛ الاقتراب من الحافة لا يُظهر شيئًا */
+  const [wordAway, setWordAway] = useState(false);
+  useEffect(() => {
+    if (!playing) {
+      setWordAway(false);
       return;
     }
+    const check = () => {
+      const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+      if (!active) {
+        setWordAway(false);
+        return;
+      }
+      const r = active.getBoundingClientRect();
+      const bottomChrome =
+        (isMobile ? mobileToolbarHeight : 0) + (miniPlayerRef.current?.getBoundingClientRect().height ?? 0) + 12;
+      setWordAway(isWordOutOfUsableArea(r.top, r.bottom, window.innerHeight, 12, bottomChrome));
+    };
+    check();
+    const interval = window.setInterval(check, 400);
+    window.addEventListener("scroll", check, { passive: true });
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("scroll", check);
+    };
+  }, [playing, isMobile, mobileToolbarHeight]);
+
+  /* مفتاح «التتبع التلقائي» في المشغل الكبير — التفضيل الوحيد المحفوظ */
+  const toggleFollowPref = useCallback(() => {
     const next = !follow;
     setFollow(next);
     setFollowPaused(false);
+    followActiveRef.current = next;
     try {
       localStorage.setItem(FOLLOW_KEY, next ? "on" : "off");
     } catch {}
-  }, [follow, followPaused]);
+  }, [follow]);
+
+  /* «ارجع للقراءة»: يعيد الكلمة لسطر قراءة مريح — ويستأنف التتبع إن كان مفتوحًا،
+     أو يكتفي بالرجوع مرة واحدة إن كان مقفولًا من المفتاح دون قلب التفضيل */
+  const returnToWord = useCallback(() => {
+    const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+    if (active) {
+      const rect = active.getBoundingClientRect();
+      programmaticScrollUntilRef.current = Date.now() + 1500;
+      window.scrollTo({
+        top: gentleFollowScrollTop(rect.top, window.scrollY, window.innerHeight),
+        behavior: scrollBehavior(),
+      });
+    }
+    if (follow) {
+      setFollowPaused(false);
+      followActiveRef.current = true;
+    }
+  }, [follow]);
 
   useEffect(() => {
     followActiveRef.current = follow && !followPaused;
+    followRef.current = follow;
   }, [follow, followPaused]);
 
   /* تحريك القارئ للصفحة بيده (عجلة/لمس/لوحة مفاتيح/سحب شريط التمرير) أثناء التشغيل
-     يوقف المتابعة مؤقتًا؛ التمرير البرمجي لا يُحتسب. */
+     يفكّ التتبع فورًا وبصمت — لا يشدّ القارئ رجوعًا. إن توقف التمرير ~٥ ثوانٍ
+     والكلمة ما زالت داخل نطاق الراحة، يستأنف التتبع دون تحريك الصفحة إطلاقًا.
+     التمرير البرمجي لا يُحتسب. */
   useEffect(() => {
     if (!playing) return;
-    const pause = () => {
+    const disengage = () => {
       if (followActiveRef.current) {
         followActiveRef.current = false;
         setFollowPaused(true);
       }
+      if (idleReengageRef.current !== null) window.clearTimeout(idleReengageRef.current);
+      idleReengageRef.current = window.setTimeout(() => {
+        idleReengageRef.current = null;
+        if (!followRef.current) return;
+        const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+        if (!active) return;
+        const r = active.getBoundingClientRect();
+        if (withinComfortBand(r.top, r.bottom, window.innerHeight)) {
+          setFollowPaused(false);
+        }
+      }, 5000);
     };
-    const onWheel = () => pause();
-    const onTouch = () => pause();
+    const onWheel = () => disengage();
+    const onTouch = () => disengage();
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) pause();
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) disengage();
     };
     const onScroll = () => {
-      if (Date.now() > programmaticScrollUntilRef.current && !seekingBarRef.current) pause();
+      if (Date.now() > programmaticScrollUntilRef.current && !seekingBarRef.current) disengage();
     };
     window.addEventListener("wheel", onWheel, { passive: true });
     window.addEventListener("touchmove", onTouch, { passive: true });
@@ -956,15 +995,23 @@ export function AudioPlayer({
         </button>
 
         <button
-          onClick={toggleFollow}
-          className={`order-3 flex items-center gap-1 rounded-full p-2 text-[11px] font-bold transition-colors hover:bg-(--accent-soft) sm:order-none ${follow ? "" : "opacity-40"} ${followPaused ? "bg-amber-500/15" : ""}`}
-          style={{ color: "var(--accent-strong)" }}
-          title={followLabel}
-          aria-label={followLabel}
-          aria-pressed={follow && !followPaused}
+          onClick={toggleFollowPref}
+          role="switch"
+          aria-checked={follow}
+          aria-label="التتبع التلقائي مع الصوت"
+          className="order-3 flex shrink-0 cursor-pointer items-center gap-2 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-(--accent-soft) sm:order-none"
+          style={{ color: follow ? "var(--accent-strong)" : "var(--ink-muted)" }}
         >
-          <FollowIcon paused={followPaused} target={followTarget} size={18} />
-          <span className={followPaused ? "" : "sr-only"}>{followPaused ? followReturnLabel(followTarget) : followLabel}</span>
+          <span>التتبع التلقائي</span>
+          <span
+            className="relative inline-block h-5 w-8 shrink-0 rounded-full transition-colors duration-300"
+            style={{ background: follow ? "var(--accent)" : "var(--border)" }}
+          >
+            <span
+              className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-300 ease-fluid"
+              style={{ right: follow ? "2px" : "18px" }}
+            />
+          </span>
         </button>
       </div>
       </div>
@@ -977,11 +1024,12 @@ export function AudioPlayer({
                 الشاشات الكبيرة: كبسولة عائمة مدمجة كما كانت */}
             <div style={{ paddingBottom: isMobile ? `${mobileToolbarHeight}px` : undefined }} className="flex justify-start sm:pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
-                className={`pointer-events-auto flex w-full items-center gap-1 border-t border-amber-500/30 px-2 py-1.5 backdrop-blur-md transition-all duration-300 sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 ${
-                  /* الإيقاف المؤقت يهدّئ الظل لا وضوح الأزرار — القارئ يحتاج أزرارًا مقروءة وهو متوقف */
+                className={`pointer-events-auto flex w-full items-center gap-1 border-t border-(--border) px-2 py-1 backdrop-blur-md transition-all duration-300 max-sm:shadow-none sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:border-amber-500/30 sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 ${
+                  /* الإيقاف المؤقت يهدّئ الظل لا وضوح الأزرار — القارئ يحتاج أزرارًا مقروءة وهو متوقف.
+                     على الهاتف الشريط ملتحم بشريط الأدوات بلا ظل حتى لا يبدو سطحًا منفصلًا */
                   playing
-                    ? "shadow-2xl sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)]"
-                    : "shadow-md"
+                    ? "sm:shadow-2xl sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)]"
+                    : "sm:shadow-md"
                 }`}
                 style={{
                   /* ألوان الموقع نفسها: كريمي فاتح في الوضع الساطع، غامق في الوضع الداكن — والتفاصيل ذهبية.
@@ -998,7 +1046,7 @@ export function AudioPlayer({
                 <button
                   onClick={toggle}
                   aria-label={playing ? "إيقاف الصوت مؤقتًا" : "متابعة التشغيل"}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95 sm:h-12 sm:w-12"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white transition-transform hover:scale-105 active:scale-95 sm:h-12 sm:w-12 sm:shadow-md"
                 >
                   {playing ? (
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
@@ -1069,17 +1117,19 @@ export function AudioPlayer({
                   </div>
                 </div>
 
-                <button
-                  onClick={toggleFollow}
-                  aria-label={followLabel}
-                  aria-pressed={follow && !followPaused}
-                  title={followLabel}
-                  className={`no-touch-grow flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-1.5 text-[11px] font-bold transition-colors hover:bg-(--accent-soft) ${follow ? "" : "opacity-40"} ${followPaused ? "bg-amber-500/20" : ""}`}
-                  style={{ color: "var(--accent-strong)" }}
-                >
-                  <FollowIcon paused={followPaused} target={followTarget} size={17} />
-                  {followPaused ? <span>{followReturnLabel(followTarget)}</span> : null}
-                </button>
+                {/* لا زر تتبع في الحالة الطبيعية — يظهر «ارجع للقراءة» فقط عندما تختفي الكلمة فعلًا */}
+                {wordAway && (followPaused || !follow) && (
+                  <button
+                    onClick={returnToWord}
+                    aria-label={followReturnAriaLabel(followTarget)}
+                    title={followReturnAriaLabel(followTarget)}
+                    className="no-touch-grow flex h-8 shrink-0 items-center justify-center gap-1 rounded-full bg-amber-500/20 px-1.5 text-[11px] font-bold transition-colors hover:bg-(--accent-soft)"
+                    style={{ color: "var(--accent-strong)" }}
+                  >
+                    <FollowIcon paused target={followTarget} size={17} />
+                    <span>{followReturnLabel(followTarget)}</span>
+                  </button>
+                )}
 
                 <button
                   onClick={cycleRate}
