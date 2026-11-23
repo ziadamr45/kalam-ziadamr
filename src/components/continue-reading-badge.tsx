@@ -167,7 +167,8 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       {progress > 5 && progress < 96 && !resume && (
         <div
           className={`no-print pointer-events-none fixed left-1/2 z-30 -translate-x-1/2 rounded-full border px-3.5 py-1.5 text-xs shadow-soft transition-all duration-300 motion-reduce:transition-none ${scrolling ? "opacity-100" : "opacity-0 sm:opacity-100"} ${
-            audioActive ? "bottom-36 sm:bottom-19" : "bottom-19"
+            /* الكبسولة الصوتية على الشاشات الكبيرة أسفل اليسار في نفس ارتفاع المؤشر — ارفع المؤشر فوقها دائمًا */
+            audioActive ? "bottom-36" : "bottom-19"
           }`}
           style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--ink-muted)" }}
           aria-hidden
