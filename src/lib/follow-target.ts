@@ -13,7 +13,7 @@ export function followTargetDirection(
 }
 
 export function followReturnLabel(target: FollowTarget): string {
-  return target === "here" ? "تابع مع الصوت" : "ارجع لمكان القراءة";
+  return target === "here" ? "تابع مع الصوت" : "ارجع للقراءة";
 }
 
 export function followReturnAriaLabel(target: FollowTarget): string {
