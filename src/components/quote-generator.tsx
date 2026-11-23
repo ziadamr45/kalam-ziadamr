@@ -1132,7 +1132,7 @@ export function QuoteGenerator({
                         style={{ borderColor: "var(--border)", color: "var(--ink)" }}
                       >
                         <span style={{ color: "var(--accent-strong)" }}>«</span>
-                        {clean.length > 140 ? `${clean.slice(0, 140)}…` : clean}
+                        {clean}
                         <span style={{ color: "var(--accent-strong)" }}>»</span>
                       </button>
                     );

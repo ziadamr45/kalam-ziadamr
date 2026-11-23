@@ -17,6 +17,7 @@ import {
 } from "@/lib/indexeddb";
 import { parseBlocks, blockWordCount, blockPlainWords } from "@/lib/content-blocks";
 import { stripDiacritics } from "@/lib/utils";
+import { suggestQuotes } from "@/lib/quote-suggestions";
 import type { OfflineArticle } from "@/types/offline";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -374,15 +375,10 @@ export function ArticleReader({
     [article.summary],
   );
 
-  const suggestedQuotes = useMemo(() => {
-    const quotes: string[] = [];
-    for (const line of article.content.split("\n")) {
-      const t = line.trim();
-      if (t.startsWith("> ")) quotes.push(t.slice(2).trim());
-    }
-    if (quotes.length < 3) quotes.push(...summaryPoints);
-    return Array.from(new Set(quotes.filter((q) => q.length >= 20))).slice(0, 6);
-  }, [article.content, summaryPoints]);
+  const suggestedQuotes = useMemo(
+    () => suggestQuotes(article.content, article.summary),
+    [article.content, article.summary],
+  );
 
   const watermarkedCover = useMemo(() => withCoverWatermark(article.coverImage), [article.coverImage]);
 
