@@ -577,9 +577,34 @@ export function QuoteGenerator({
     const previous = document.activeElement as HTMLElement | null;
     dialogEl?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (open) setOpen(false);
-      else setPickerOpen(false);
+      if (e.key === "Escape") {
+        if (open) setOpen(false);
+        else setPickerOpen(false);
+        return;
+      }
+      /* احتواء التركيز داخل اللوحة المفتوحة — Tab/Shift+Tab يدوران على عناصرها فقط */
+      if (e.key !== "Tab" || !dialogEl) return;
+      const focusables = Array.from(
+        dialogEl.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetWidth > 0 && el.offsetHeight > 0);
+      if (focusables.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey) {
+        if (!active || !dialogEl.contains(active) || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!active || !dialogEl.contains(active) || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => {
