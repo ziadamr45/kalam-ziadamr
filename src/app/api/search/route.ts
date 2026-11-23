@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { buildSearchSnippet } from "@/lib/search-snippet";
 import { rateLimit, rateLimitDurable, requestIp } from "@/lib/rate-limit";
 
 /**
@@ -20,16 +21,6 @@ type Hit = {
   views: number;
   snippet: string | null;
 };
-
-function buildSnippet(content: string, q: string): string | null {
-  if (!q) return null;
-  const lower = content.toLowerCase();
-  const at = lower.indexOf(q.toLowerCase());
-  if (at < 0) return null;
-  const from = Math.max(0, at - 60);
-  const raw = content.slice(from, at + q.length + 90).replace(/\s+/g, " ").trim();
-  return `${from > 0 ? "…" : ""}${raw}…`;
-}
 
 export async function GET(request: Request) {
   try {
@@ -80,7 +71,7 @@ export async function GET(request: Request) {
       sectionColor: r.section?.color ?? null,
       readingTimeSec: r.readingTimeSec,
       views: r.views,
-      snippet: buildSnippet(r.content, q),
+      snippet: buildSearchSnippet(r.content, q),
     }));
 
     return NextResponse.json({ ok: true, hits });

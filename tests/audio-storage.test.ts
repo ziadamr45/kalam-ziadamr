@@ -20,10 +20,11 @@ test("separators in identities cannot collide", () => {
   assert.notDeepEqual(audioStorageKeys("a:b", "d", "c"), audioStorageKeys("a", "d", "b:c"));
 });
 
-test("revision rollout is limited to the chosen article and changes with generation", () => {
+test("every article is recording-scoped and changes with generation", () => {
   const first = new Date("2026-11-22T14:00:00Z");
   const next = new Date("2026-11-22T15:00:00Z");
-  assert.equal(articleAudioRevision("other-article", first), undefined);
+  assert.equal(articleAudioRevision("other-article", first), first.toISOString());
+  assert.equal(articleAudioRevision("other-article", null), "recording-aware-v1");
   assert.equal(articleAudioRevision("cmve6n9kf0001l607sstryfn0", first), first.toISOString());
   assert.notEqual(articleAudioRevision("cmve6n9kf0001l607sstryfn0", first), articleAudioRevision("cmve6n9kf0001l607sstryfn0", next));
   assert.equal(articleAudioRevision("cmve6n9kf0001l607sstryfn0", null), "recording-aware-v1");
