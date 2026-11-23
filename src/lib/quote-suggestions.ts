@@ -35,7 +35,7 @@ function wordCount(t: string): number {
 function isStandalone(t: string): boolean {
   const n = wordCount(t);
   if (n < MIN_SUGGESTED_WORDS || n > MAX_SUGGESTED_WORDS) return false;
-  if (!/[.!؟?…»”"]$/.test(t)) return false;
+  if (!/[.!…»”"]$/.test(t)) return false; // الأسئلة تحتاج سياقها فلا تُقترح
   if (/^[﴿«]/.test(t)) return false; // الآيات والأحاديث لها كتلها الخاصة
   if (/^(و|ف|لكن|لذلك|ولكن|إذن|بل|ثم|أي|أو)(\s|$)/.test(t)) return false;
   return true;
