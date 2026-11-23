@@ -33,3 +33,12 @@ export async function isArticleSaved(id: string): Promise<boolean> {
   const value = await get(id, store);
   return Boolean(value);
 }
+
+/** نسخة مقال واحدة من ذاكرة الجهاز — لقارئ القراءة دون اتصال */
+export async function getOfflineArticle(
+  id: string,
+): Promise<(OfflineArticle & { savedAt?: number }) | null> {
+  if (!store) return null;
+  const value = await get<OfflineArticle & { savedAt?: number }>(id, store);
+  return value ?? null;
+}

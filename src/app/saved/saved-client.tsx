@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
@@ -57,6 +58,7 @@ function SaveCard({
   summary,
   meta,
   href,
+  navigation = "router",
   onRemove,
   removeLabel,
   badges,
@@ -66,20 +68,30 @@ function SaveCard({
   summary: string;
   meta: string;
   href: string;
+  /* document: تنقّل كامل عبر عامل الخدمة — إلزامي لنسخ الجهاز حتى تعمل دون اتصال
+     (تنقّل الراوتر الداخلي يطلب حمولة RSC من الشبكة فيسقط عند الانقطاع) */
+  navigation?: "router" | "document";
   onRemove: () => void;
   removeLabel: string;
   badges?: React.ReactNode;
   action?: React.ReactNode;
 }) {
+  const titleClass = "font-body text-lg font-bold leading-8 hover:underline";
   return (
     <li className="rounded-2xl border p-5 shadow-soft sm:p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           {/* شارات الحالة الفورية: سحابة = الحساب المتزامن، هاتف = نسخة هذا الجهاز */}
           {badges && <div className="mb-2.5 flex flex-wrap items-center gap-1.5">{badges}</div>}
-          <Link href={href} className="font-body text-lg font-bold leading-8 hover:underline" style={{ color: "var(--ink)" }}>
-            {title}
-          </Link>
+          {navigation === "document" ? (
+            <a href={href} className={titleClass} style={{ color: "var(--ink)" }}>
+              {title}
+            </a>
+          ) : (
+            <Link href={href} className={titleClass} style={{ color: "var(--ink)" }}>
+              {title}
+            </Link>
+          )}
           <p className="mt-2 line-clamp-2 text-sm leading-7" style={{ color: "var(--ink-muted)" }}>
             {summary}
           </p>
@@ -144,6 +156,15 @@ export default function SavedClient() {
   useEffect(() => {
     refreshDevice();
   }, [refreshDevice]);
+
+  /* تجهيز قارئ «دون اتصال» مسبقًا ما دامت الشبكة متاحة: تحميل حزمة الصفحة
+     إلى كاش المتصفح الآن يضمن فتح النسخ المحفوظة لاحقًا عند انقطاع الإنترنت */
+  const router = useRouter();
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.onLine && device && device.length > 0) {
+      router.prefetch("/read-offline");
+    }
+  }, [device, router]);
 
   const cloudIds = new Set((saves ?? []).map((s) => s.id));
   const deviceIds = new Set((device ?? []).map((a) => a.id));
@@ -365,7 +386,8 @@ export default function SavedClient() {
                           title={a.title}
                           summary={a.summary}
                           meta={`متاح دون إنترنت — ${formatReadingTime(a.readingTimeSec)}`}
-                          href={`/article/${a.slug}`}
+                          href={`/read-offline#${a.id}`}
+                          navigation="document"
                           onRemove={() => void removeDevice(a.id)}
                           removeLabel="إزالة من الجهاز"
                           badges={<StateBadge kind="device" />}

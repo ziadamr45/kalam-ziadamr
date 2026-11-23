@@ -4,8 +4,8 @@
    الأصول الثابتة كاش أولًا. القراءة دون اتصال عبر IndexedDB.
    ============================================================ */
 
-/* رفع الإصدار: تصفية الكاش القديم لضمان أحدث ترويسة وأيقونات */
-const CACHE_VERSION = "kalam-v11";
+/* رفع الإصدار: إضافة قارئ القراءة دون اتصال إلى التخزين المسبق */
+const CACHE_VERSION = "kalam-v12";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -13,6 +13,7 @@ const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const PRECACHE_URLS = [
   "/",
   "/offline",
+  "/read-offline",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
