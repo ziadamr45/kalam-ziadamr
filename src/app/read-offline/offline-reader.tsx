@@ -144,7 +144,11 @@ export default function OfflineReader() {
           </div>
         )}
 
-        <div className={tashkeel ? "tashkeel-ok" : undefined}>
+        <div
+          id="article-body"
+          className={`article-body mt-10 pb-8 sm:pb-10 ${tashkeel ? "is-tashkeel" : ""}`}
+          style={{ color: "var(--ink)" }}
+        >
           <ArticleBlocks blocks={blocks} />
         </div>
 
