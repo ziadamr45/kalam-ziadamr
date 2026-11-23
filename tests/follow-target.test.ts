@@ -22,8 +22,8 @@ test("narration inside the viewport is here, not a direction", () => {
 });
 
 test("return wording names the reading place and preserves resume-in-place", () => {
-  assert.equal(followReturnLabel("up"), "ارجع لمكان القراءة");
-  assert.equal(followReturnLabel("down"), "ارجع لمكان القراءة");
+  assert.equal(followReturnLabel("up"), "ارجع للقراءة");
+  assert.equal(followReturnLabel("down"), "ارجع للقراءة");
   assert.equal(followReturnLabel("here"), "تابع مع الصوت");
   assert.equal(followReturnAriaLabel("down"), "العودة إلى مكان القراءة");
   assert.equal(followReturnAriaLabel("here"), "استئناف تتبع القراءة مع الصوت");
