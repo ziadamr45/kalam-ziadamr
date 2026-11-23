@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { analyzeComment } from "@/lib/moderation";
@@ -15,6 +15,10 @@ import {
   SOCIAL_LINK_LABELS,
   type VerifiedSocialLinks,
 } from "@/lib/verification-meta";
+
+const subscribeDateHydration = () => () => {};
+const clientDatesReady = () => true;
+const serverDatesReady = () => false;
 
 type PublicComment = {
   id: string;
@@ -86,6 +90,7 @@ export function CommentsSection({
   isLoggedIn?: boolean;
 }) {
   const { data: session } = useSession();
+  const datesReady = useSyncExternalStore(subscribeDateHydration, clientDatesReady, serverDatesReady);
   const [comments, setComments] = useState(initialComments);
   useEffect(() => {
     setComments(initialComments);
@@ -602,7 +607,7 @@ export function CommentsSection({
                 )}
               </div>
               <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                <span>{formatArabicDate(c.createdAt)}</span>
+                <time dateTime={c.createdAt} className="inline-block min-w-20">{datesReady ? formatArabicDate(c.createdAt) : "\u00a0"}</time>
                 {mine && (
                   <span className="font-semibold" style={{ color: "var(--accent-strong)" }}>
                     | تعليقك
@@ -612,7 +617,7 @@ export function CommentsSection({
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
                     style={{ background: "var(--bg-soft)", color: "var(--ink-muted)" }}
-                    title={`عُدِّل في ${formatArabicDate(c.editedAt)}`}
+                    title={datesReady ? `عُدِّل في ${formatArabicDate(c.editedAt)}` : undefined}
                   >
                     (معدَّل)
                   </span>
