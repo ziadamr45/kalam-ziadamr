@@ -124,7 +124,11 @@
   color: var(--sec-color);
 }
 [data-theme="dark"] .section-card-custom {
+  /* الوضع الداكن: نفس درجة اللون المخزَّنة، فقط أفتح — بلا غسل لونه نحو الرمادي.
+     relative color يرفع الإضاءة ويحافظ على هوية اللون (teal يبقى teal وslate يبقى slate)،
+     وسطر color-mix أعلاه fallback للمتصفحات الأقدم */
   --sec-lit: color-mix(in srgb, var(--sec-color) 62%, #f8fafc);
+  --sec-lit: oklch(from var(--sec-color) min(calc(l + 0.3), 0.86) c h);
   background: linear-gradient(to bottom-left, color-mix(in srgb, var(--sec-lit) 12%, transparent), var(--surface) 65%);
   border-color: color-mix(in srgb, var(--sec-lit) 26%, transparent);
   border-right-color: var(--sec-lit);
