@@ -558,6 +558,9 @@ export function QuoteGenerator({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chipRef = useRef<HTMLDivElement | null>(null);
   const chipGraceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* مراجع لوحتي الحوار — نقل التركيز عند الفتح وإغلاق بـ Escape */
+  const cardDialogRef = useRef<HTMLDivElement | null>(null);
+  const pickerDialogRef = useRef<HTMLDivElement | null>(null);
 
   const showHint = useCallback((msg: string) => {
     setSelectionHint(msg);
@@ -566,6 +569,24 @@ export function QuoteGenerator({
   }, []);
 
   useEffect(() => setMounted(true), []);
+
+  /* إتاحة لوحات الحوار: دور dialog + نقل التركيز عند الفتح + إغلاق بـ Escape + استرجاع التركيز عند الإغلاق */
+  useEffect(() => {
+    if (!open && !pickerOpen) return;
+    const dialogEl = open ? cardDialogRef.current : pickerDialogRef.current;
+    const previous = document.activeElement as HTMLElement | null;
+    dialogEl?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (open) setOpen(false);
+      else setPickerOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      previous?.focus?.();
+    };
+  }, [open, pickerOpen]);
 
   /* حالة التحديد الحالي بالنسبة للسقف — مرجع موحد للشريحة والزر */
   const selectedWords = countWords(selectedText.trim());
@@ -957,7 +978,18 @@ export function QuoteGenerator({
             onClick={() => setOpen(false)}
           >
             <div
-              className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-3xl border p-5 shadow-lift"
+              ref={cardDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label={
+                variant === "quran"
+                  ? "بطاقة الآية الكريمة"
+                  : variant === "hadith"
+                    ? "بطاقة الحديث الشريف"
+                    : "بطاقة الاقتباس"
+              }
+              tabIndex={-1}
+              className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-3xl border p-5 shadow-lift outline-none"
               style={{ background: "var(--surface)", borderColor: "var(--border)" }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1084,7 +1116,12 @@ export function QuoteGenerator({
             onClick={() => setPickerOpen(false)}
           >
             <div
-              className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl border p-5 shadow-lift sm:rounded-3xl"
+              ref={pickerDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="اختر جملة لبطاقة الاقتباس"
+              tabIndex={-1}
+              className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl border p-5 shadow-lift outline-none sm:rounded-3xl"
               style={{ background: "var(--surface)", borderColor: "var(--border)" }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -1180,4 +1217,4 @@ function trackShareBySlug(slug: string, platform: string, quoteLen: number) {
     body: JSON.stringify({ type: "share", slug, platform, quoteLen }),
     keepalive: true,
   }).catch(() => {});
-}
+  }
