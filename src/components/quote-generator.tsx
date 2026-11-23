@@ -1120,18 +1120,23 @@ export function QuoteGenerator({
               {/* الاقتباسات المنتقاة تلقائيًا من المقال */}
               {suggestedQuotes.length > 0 && (
                 <div className="mb-4 space-y-2">
-                  {suggestedQuotes.map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => adoptQuote(q)}
-                      className="block w-full rounded-2xl border px-4 py-3 text-right text-sm leading-7 transition-all hover:border-(--accent) hover:bg-(--accent-soft)"
-                      style={{ borderColor: "var(--border)", color: "var(--ink)" }}
-                    >
-                      <span style={{ color: "var(--accent-strong)" }}>«</span>
-                      {q.length > 140 ? `${q.slice(0, 140)}…` : q}
-                      <span style={{ color: "var(--accent-strong)" }}>»</span>
-                    </button>
-                  ))}
+                  {suggestedQuotes.map((q, i) => {
+                    /* العرض دائمًا نص صافٍ — الوسوم (مثل **التغميق**) تُنظَّف في البطاقة
+                       المولَّدة أصلًا، فلا معنى لإظهارها هنا كرموز غامضة */
+                    const clean = stripMarkdown(q);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => adoptQuote(q)}
+                        className="block w-full rounded-2xl border px-4 py-3 text-right text-sm leading-7 transition-all hover:border-(--accent) hover:bg-(--accent-soft)"
+                        style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+                      >
+                        <span style={{ color: "var(--accent-strong)" }}>«</span>
+                        {clean.length > 140 ? `${clean.slice(0, 140)}…` : clean}
+                        <span style={{ color: "var(--accent-strong)" }}>»</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 

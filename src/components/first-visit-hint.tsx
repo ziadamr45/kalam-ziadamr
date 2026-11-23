@@ -234,7 +234,7 @@ export function FirstVisitHint({
       <div className="page-chrome no-print" aria-live="polite">
         {rect && (
           <div
-            className="pointer-events-none fixed z-95 rounded-2xl transition-all duration-300"
+            className="pointer-events-none fixed z-45 rounded-2xl transition-all duration-300"
             style={{
               top: Math.max(4, rect.top - pad),
               left: Math.max(4, rect.left - pad),
@@ -250,7 +250,7 @@ export function FirstVisitHint({
         <div
           role="dialog"
           aria-label={current.title}
-          className="fixed z-96 rounded-2xl border p-4 text-xs shadow-lift transition-all duration-300 animate-fade-in"
+          className="fixed z-46 rounded-2xl border p-4 text-xs shadow-lift transition-all duration-300 animate-fade-in"
           style={{
             top: cardTop,
             left: cardLeft,
