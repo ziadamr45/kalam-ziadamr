@@ -1024,13 +1024,7 @@ export function AudioPlayer({
                 الشاشات الكبيرة: كبسولة عائمة مدمجة كما كانت */}
             <div style={{ paddingBottom: isMobile ? `${mobileToolbarHeight}px` : undefined }} className="flex justify-start sm:pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
-                className={`pointer-events-auto flex w-full items-center gap-1 border-t border-(--border) px-2 py-1 backdrop-blur-md transition-all duration-300 max-sm:shadow-none sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:border-amber-500/30 sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 ${
-                  /* الإيقاف المؤقت يهدّئ الظل لا وضوح الأزرار — القارئ يحتاج أزرارًا مقروءة وهو متوقف.
-                     على الهاتف الشريط ملتحم بشريط الأدوات بلا ظل حتى لا يبدو سطحًا منفصلًا */
-                  playing
-                    ? "sm:shadow-2xl sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)]"
-                    : "sm:shadow-md"
-                }`}
+                className={`pointer-events-auto flex w-full items-center gap-1 border-t border-(--border) px-2 py-1 backdrop-blur-md transition-all duration-300 max-sm:shadow-none sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:border-(--border) sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 sm:shadow-soft`}
                 style={{
                   /* ألوان الموقع نفسها: كريمي فاتح في الوضع الساطع، غامق في الوضع الداكن — والتفاصيل ذهبية.
                      عند الإيقاف خلفية شبه مصمتة حتى لا يتشوش النص خلف الأزرار على الشاشات اللمسية */
@@ -1046,7 +1040,7 @@ export function AudioPlayer({
                 <button
                   onClick={toggle}
                   aria-label={playing ? "إيقاف الصوت مؤقتًا" : "متابعة التشغيل"}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white transition-transform hover:scale-105 active:scale-95 sm:h-12 sm:w-12 sm:shadow-md"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white transition-transform hover:scale-105 active:scale-95 sm:h-12 sm:w-12"
                 >
                   {playing ? (
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
