@@ -53,6 +53,7 @@ export function AudioPlayer({
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(durationSec ?? 0);
   const [rate, setRate] = useState(1);
@@ -672,8 +673,8 @@ export function AudioPlayer({
     <>
       <div
         ref={inlinePlayerRef}
-        className="rounded-2xl border p-4 shadow-soft"
-        style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        className="overflow-hidden rounded-[1.4rem] border shadow-soft"
+        style={{ background: "linear-gradient(120deg, var(--bg-soft), var(--bg))", borderColor: "var(--border)" }}
         dir="rtl"
       >
       <audio
@@ -693,6 +694,7 @@ export function AudioPlayer({
         onTimeUpdate={onTimeUpdate}
         onPlay={() => {
           setPlaying(true);
+          setControlsOpen(true);
           setSessionActive(true);
           lastSaveRef.current = 0;
         }}
@@ -716,6 +718,37 @@ export function AudioPlayer({
         onError={() => setActiveWord(-1)}
       />
 
+      <div className="flex items-center gap-3 p-3.5 sm:px-5 sm:pb-2">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={playing ? "إيقاف مؤقت" : "استمع للمقال"}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] shadow-sm transition-transform active:scale-95"
+          style={{ background: "linear-gradient(145deg, var(--accent), var(--accent-strong))", color: "#fff" }}
+        >
+          {playing ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5v14l11-7z"/></svg>
+          )}
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 text-sm font-bold" style={{ color: "var(--ink)" }}>استمع للمقال <span className="inline-flex h-4 items-center gap-0.5" style={{ color: "var(--accent)" }} aria-hidden>{[6,12,8,16,10].map((h,i)=><span key={i} className="w-0.5 rounded-full" style={{height:h,background:"currentColor"}} />)}</span></p>
+          <p className="mt-0.5 text-xs" style={{ color: "var(--ink-muted)" }}>{sessionActive ? `${fmtTime(current)} / ${fmtTime(duration)}` : `${fmtTime(duration)} · استمع واقرأ معًا`}</p>
+        </div>
+        <button
+          type="button"
+          aria-expanded={controlsOpen}
+          aria-label={controlsOpen ? "إخفاء أدوات الصوت" : "إظهار أدوات الصوت"}
+          onClick={() => setControlsOpen((open) => !open)}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-xs transition-colors hover:bg-(--accent-soft) sm:hidden"
+          style={{ color: "var(--accent-strong)", borderColor: "var(--border)" }}
+        >
+          <span className="sr-only">أدوات الصوت</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+        </button>
+      </div>
+      <div className={`${controlsOpen ? "block" : "hidden"} border-t px-4 pb-3 pt-3 sm:block sm:border-0 sm:px-5 sm:pt-1`} style={{ borderColor: "var(--border)" }}>
       {effWords ? (
         <p className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
           <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} aria-hidden />
@@ -724,19 +757,6 @@ export function AudioPlayer({
       ) : null}
 
       <div className="audio-controls flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3">
-        <button
-          onClick={toggle}
-          aria-label={playing ? "إيقاف مؤقت" : "تشغيل"}
-          className="order-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-soft transition-transform hover:scale-105 active:scale-95 sm:order-none"
-          style={{ background: "var(--accent)", color: "#fff" }}
-        >
-          {playing ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72c0 .8.87 1.3 1.55.87l10.4-6.86a1 1 0 0 0 0-1.72L9.55 4.27A1 1 0 0 0 8 5.14Z" /></svg>
-          )}
-        </button>
-
         <button onClick={() => skip(-10)} aria-label="إرجاع ١٠ ثوانٍ إلى الخلف" className="order-3 rounded-full p-2 text-sm transition-colors hover:bg-(--accent-soft) sm:order-none" style={{ color: "var(--ink-muted)" }} title="إرجاع ١٠ ثوانٍ إلى الخلف">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><g transform="scale(-1,1) translate(-24,0)"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></g><text x="12" y="15.3" textAnchor="middle" fontSize="7.2" fontWeight="800" fill="currentColor">١٠</text></svg>
         </button>
@@ -760,7 +780,7 @@ export function AudioPlayer({
         )}
 
         {/* شريط التقدم RTL — يدعم السحب والنقر بالإصبع والماوس دون تشتيت المقال أثناء السحب */}
-        <div className="order-2 min-w-[calc(100%-4rem)] flex-1 sm:order-none sm:min-w-0">
+        <div className="order-first w-full flex-auto sm:order-none sm:w-auto sm:flex-1">
           <div
             onPointerDown={(e) => {
               seekingBarRef.current = true;
@@ -818,6 +838,7 @@ export function AudioPlayer({
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
         </button>
+      </div>
       </div>
       </div>
 
