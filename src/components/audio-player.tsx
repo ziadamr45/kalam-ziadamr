@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import { get, set } from "idb-keyval";
 import { audioStorageKeys } from "@/lib/audio-storage";
+import { followReturnAriaLabel, followReturnLabel, followTargetDirection, type FollowTarget } from "@/lib/follow-target";
 import { easternDigits } from "@/lib/utils";
 
 type Cue = { t: number; id: string };
@@ -14,6 +15,29 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 
 const RATE_KEY = "kalam_audio_rate";
 const FOLLOW_KEY = "kalam_audio_follow";
+
+/* أيقونة زر التتبع: سهم يشاور فعلًا ناحية الكلام المسموع عند الرجوع،
+   وعلامة محايدة للتتبع التلقائي حتى لا ينسرق معنى السهم الاتجاهي */
+function FollowIcon({ paused, target, size }: { paused: boolean; target: FollowTarget; size: number }) {
+  if (paused && target === "up") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+    );
+  }
+  if (paused && target === "down") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+    );
+  }
+  if (paused) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" /></svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="6" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+  );
+}
 
 /* احترام «تقليل الحركة»: قفزة فورية بدل التمرير الناعم */
 function scrollBehavior(): ScrollBehavior {
@@ -69,6 +93,8 @@ export function AudioPlayer({
   const [follow, setFollow] = useState(true);
   /* إيقاف مؤقت للمتابعة بسبب تحريك القارئ للصفحة بيده — لا يُحفظ، ولا يوقف الصوت أو التظليل */
   const [followPaused, setFollowPaused] = useState(false);
+  /* اتجاه الكلام المسموع بالنسبة للشاشة أثناء التوقف المؤقت — يقود سهم الرجوع ونصه */
+  const [followTarget, setFollowTarget] = useState<FollowTarget>("down");
   const followActiveRef = useRef(true);
   const programmaticScrollUntilRef = useRef(0);
   const [sessionActive, setSessionActive] = useState(false);
@@ -491,12 +517,31 @@ export function AudioPlayer({
   }, [rate]);
 
   /* زر واحد مشترك (المشغل الكبير والمصغّر): تشغيل ← إيقاف ← تشغيل،
-     وعند التوقف المؤقت بسبب تحريك الصفحة يعيد القارئ لموضع الصوت. */
+     وعند التوقف المؤقت بسبب تحريك الصفحة يعيد القارئ لمكان القراءة — أو يستأنف
+     التتبع في مكانه إذا كان الكلام المسموع ظاهرًا بالفعل على الشاشة. */
   const followLabel = !follow
     ? "تشغيل تتبع الصوت تلقائيًا"
     : followPaused
-      ? "العودة إلى موضع الصوت"
+      ? followReturnAriaLabel(followTarget)
       : "إيقاف تتبع الصوت تلقائيًا";
+
+  /* تتبّع اتجاه موضع القراءة أثناء التوقف المؤقت: يتغير مع تمرير القارئ وتقدم الصوت */
+  useEffect(() => {
+    if (!followPaused) return;
+    const update = () => {
+      const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+      if (!active) return;
+      const rect = active.getBoundingClientRect();
+      setFollowTarget(followTargetDirection(rect.top, rect.bottom, window.innerHeight));
+    };
+    update();
+    const interval = window.setInterval(update, 400);
+    window.addEventListener("scroll", update, { passive: true });
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("scroll", update);
+    };
+  }, [followPaused]);
 
   const toggleFollow = useCallback(() => {
     if (follow && followPaused) {
@@ -505,8 +550,13 @@ export function AudioPlayer({
       allowScrollOnSeekRef.current = true;
       const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
       if (active) {
-        programmaticScrollUntilRef.current = Date.now() + 1500;
-        active.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+        const rect = active.getBoundingClientRect();
+        const offScreen = rect.bottom < 0 || rect.top > window.innerHeight;
+        /* الكلام المسموع ظاهر بالفعل: استئناف التتبع في مكانه دون قفزة لا معنى لها */
+        if (offScreen) {
+          programmaticScrollUntilRef.current = Date.now() + 1500;
+          active.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+        }
         allowScrollOnSeekRef.current = false;
       }
       return;
@@ -810,7 +860,7 @@ export function AudioPlayer({
         </button>
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-sm font-bold" style={{ color: "var(--ink)" }}>استمع للمقال <span className="inline-flex h-4 items-center gap-0.5" style={{ color: "var(--accent)" }} aria-hidden>{[6,12,8,16,10].map((h,i)=><span key={i} className="w-0.5 rounded-full" style={{height:h,background:"currentColor"}} />)}</span></p>
-          <p className="mt-0.5 text-xs" style={{ color: "var(--ink-muted)" }}>{sessionActive ? `${fmtTime(current)} / ${fmtTime(duration)}` : `${fmtTime(duration)} · استمع واقرأ معًا`}</p>
+          <p className="mt-0.5 text-xs" style={{ color: "var(--ink-muted)" }}>{sessionActive ? `${fmtTime(current)} / ${fmtTime(duration)}` : resumedFrom > 0 ? `يكمل من ${fmtTime(resumedFrom)} · استمع واقرأ معًا` : `${fmtTime(duration)} · استمع واقرأ معًا`}</p>
         </div>
         <button
           type="button"
@@ -824,13 +874,13 @@ export function AudioPlayer({
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
         </button>
       </div>
-      <div className={`${controlsOpen ? "block" : "hidden"} border-t px-4 pb-3 pt-3 sm:block sm:border-0 sm:px-5 sm:pt-1`} style={{ borderColor: "var(--border)" }}>
       {effWords ? (
-        <p className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+        <p className="flex items-center gap-2 border-t px-4 pb-1 pt-2.5 text-[11px] sm:border-0 sm:px-5" style={{ color: "var(--ink-muted)", borderColor: "var(--border)" }}>
           <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} aria-hidden />
           قراءة متزامنة كلمة بكلمة — انقر أي كلمة ليبدأ الصوت منها
         </p>
       ) : null}
+      <div className={`${controlsOpen ? "block" : "hidden"} px-4 pb-3 pt-3 sm:block sm:border-0 sm:px-5 sm:pt-1`} style={{ borderColor: "var(--border)" }}>
 
       <div className="audio-controls flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3">
         <button onClick={() => skip(-10)} aria-label="إرجاع ١٠ ثوانٍ إلى الخلف" className="order-3 rounded-full p-2 text-sm transition-colors hover:bg-(--accent-soft) sm:order-none" style={{ color: "var(--ink-muted)" }} title="إرجاع ١٠ ثوانٍ إلى الخلف">
@@ -913,8 +963,8 @@ export function AudioPlayer({
           aria-label={followLabel}
           aria-pressed={follow && !followPaused}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12l7 7 7-7" /></svg>
-          <span className={followPaused ? "" : "sr-only"}>{followPaused ? "ارجع لموضع الصوت" : followLabel}</span>
+          <FollowIcon paused={followPaused} target={followTarget} size={18} />
+          <span className={followPaused ? "" : "sr-only"}>{followPaused ? followReturnLabel(followTarget) : followLabel}</span>
         </button>
       </div>
       </div>
@@ -928,7 +978,7 @@ export function AudioPlayer({
             <div style={{ paddingBottom: isMobile ? `${mobileToolbarHeight}px` : undefined }} className="flex justify-start sm:pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
                 className={`pointer-events-auto flex w-full items-center gap-1 border-t border-amber-500/30 px-2 py-1.5 shadow-2xl backdrop-blur-md transition-all duration-300 sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] ${
-                  playing ? "opacity-100" : "opacity-35 [@media(hover:hover)]:hover:opacity-100"
+                  playing ? "opacity-100" : "opacity-70 [@media(hover:hover)]:hover:opacity-100"
                 }`}
                 style={{
                   /* ألوان الموقع نفسها: كريمي فاتح في الوضع الساطع، غامق في الوضع الداكن — والتفاصيل ذهبية */
@@ -1021,8 +1071,8 @@ export function AudioPlayer({
                   className={`no-touch-grow flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-1.5 text-[11px] font-bold transition-colors hover:bg-(--accent-soft) ${follow ? "" : "opacity-40"} ${followPaused ? "bg-amber-500/20" : ""}`}
                   style={{ color: "var(--accent-strong)" }}
                 >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12l7 7 7-7" /></svg>
-                  {followPaused ? <span>ارجع للصوت</span> : null}
+                  <FollowIcon paused={followPaused} target={followTarget} size={17} />
+                  {followPaused ? <span>{followReturnLabel(followTarget)}</span> : null}
                 </button>
 
                 <button
