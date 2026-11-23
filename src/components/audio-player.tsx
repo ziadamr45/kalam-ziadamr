@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import { get, set } from "idb-keyval";
 import { audioStorageKeys } from "@/lib/audio-storage";
-import { followReturnAriaLabel, followReturnLabel, followTargetDirection, gentleFollowScrollTop, isWordOutOfUsableArea, withinComfortBand, type FollowTarget } from "@/lib/follow-target";
+import { canSilentlyReengage, followReturnAriaLabel, followReturnLabel, followTargetDirection, gentleFollowScrollTop, isWordOutOfUsableArea, withinComfortBand, type FollowTarget } from "@/lib/follow-target";
 import { easternDigits } from "@/lib/utils";
 
 type Cue = { t: number; id: string };
@@ -523,7 +523,7 @@ export function AudioPlayer({
   useEffect(() => {
     if (!playing) return;
     const update = () => {
-      const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+      const active = (document.querySelector<HTMLElement>("#article-body .audio-word-active") ?? document.querySelector<HTMLElement>("#article-body .audio-active"));
       if (!active) return;
       const rect = active.getBoundingClientRect();
       setFollowTarget(followTargetDirection(rect.top, rect.bottom, window.innerHeight));
@@ -546,7 +546,7 @@ export function AudioPlayer({
       return;
     }
     const check = () => {
-      const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+      const active = (document.querySelector<HTMLElement>("#article-body .audio-word-active") ?? document.querySelector<HTMLElement>("#article-body .audio-active"));
       if (!active) {
         setWordAway(false);
         return;
@@ -579,7 +579,7 @@ export function AudioPlayer({
   /* «ارجع للقراءة»: يعيد الكلمة لسطر قراءة مريح — ويستأنف التتبع إن كان مفتوحًا،
      أو يكتفي بالرجوع مرة واحدة إن كان مقفولًا من المفتاح دون قلب التفضيل */
   const returnToWord = useCallback(() => {
-    const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+    const active = (document.querySelector<HTMLElement>("#article-body .audio-word-active") ?? document.querySelector<HTMLElement>("#article-body .audio-active"));
     if (active) {
       const rect = active.getBoundingClientRect();
       programmaticScrollUntilRef.current = Date.now() + 1500;
@@ -614,10 +614,10 @@ export function AudioPlayer({
       idleReengageRef.current = window.setTimeout(() => {
         idleReengageRef.current = null;
         if (!followRef.current) return;
-        const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+        const active = (document.querySelector<HTMLElement>("#article-body .audio-word-active") ?? document.querySelector<HTMLElement>("#article-body .audio-active"));
         if (!active) return;
         const r = active.getBoundingClientRect();
-        if (withinComfortBand(r.top, r.bottom, window.innerHeight)) {
+        if (canSilentlyReengage(r.top, r.bottom, window.innerHeight)) {
           setFollowPaused(false);
         }
       }, 5000);

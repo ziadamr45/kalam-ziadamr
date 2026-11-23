@@ -42,3 +42,10 @@ export function isWordOutOfUsableArea(
 export function followReturnAriaLabel(target: FollowTarget): string {
   return target === "here" ? "استئناف تتبع القراءة مع الصوت" : "العودة إلى مكان القراءة";
 }
+/* إعادة الاشتباك الصامتة بعد توقف القارئ عن التمرير: الكلمة داخل نطاق الراحة،
+   أو — عند تظليل فقرة كاملة طويلة لا تسع النطاق — رأس الفقرة داخله أي أن
+   موضع القراءة ما زال مرئيًا بارتياح */
+export function canSilentlyReengage(rectTop: number, rectBottom: number, viewportHeight: number): boolean {
+  if (withinComfortBand(rectTop, rectBottom, viewportHeight)) return true;
+  return rectTop >= viewportHeight * 0.22 && rectTop <= viewportHeight * 0.78;
+}

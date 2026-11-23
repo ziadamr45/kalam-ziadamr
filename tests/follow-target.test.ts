@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  canSilentlyReengage,
   followTargetDirection,
   followReturnLabel,
   followReturnAriaLabel,
@@ -51,4 +52,14 @@ test("return wording names the reading place and preserves resume-in-place", () 
   assert.equal(followReturnLabel("here"), "تابع مع الصوت");
   assert.equal(followReturnAriaLabel("down"), "العودة إلى مكان القراءة");
   assert.equal(followReturnAriaLabel("here"), "استئناف تتبع القراءة مع الصوت");
+});
+test("canSilentlyReengage: tall block anchored inside the band counts as visible", () => {
+  // فقرة طويلة (block mode) رأسها داخل النطاق رغم أن ذيلها خارجه
+  assert.equal(canSilentlyReengage(624, 1400, 844), true);
+  // فقرة رأسها فوق النطاق (تجاوزها القارئ) لا تُعيد الاشتباك
+  assert.equal(canSilentlyReengage(100, 900, 844), false);
+  // كلمة صغيرة داخل النطاق بالكامل
+  assert.equal(canSilentlyReengage(400, 428, 844), true);
+  // كلمة تحت النطاق
+  assert.equal(canSilentlyReengage(700, 728, 844), false);
 });
