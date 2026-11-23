@@ -15,6 +15,15 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 const RATE_KEY = "kalam_audio_rate";
 const FOLLOW_KEY = "kalam_audio_follow";
 
+/* احترام «تقليل الحركة»: قفزة فورية بدل التمرير الناعم */
+function scrollBehavior(): ScrollBehavior {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  } catch {
+    return "smooth";
+  }
+}
+
 function fmtTime(sec: number): string {
   if (!isFinite(sec) || sec < 0) sec = 0;
   const m = Math.floor(sec / 60);
@@ -58,6 +67,10 @@ export function AudioPlayer({
   const [duration, setDuration] = useState(durationSec ?? 0);
   const [rate, setRate] = useState(1);
   const [follow, setFollow] = useState(true);
+  /* إيقاف مؤقت للمتابعة بسبب تحريك القارئ للصفحة بيده — لا يُحفظ، ولا يوقف الصوت أو التظليل */
+  const [followPaused, setFollowPaused] = useState(false);
+  const followActiveRef = useRef(true);
+  const programmaticScrollUntilRef = useRef(0);
   const [sessionActive, setSessionActive] = useState(false);
   const [inlineInView, setInlineInView] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -233,14 +246,15 @@ export function AudioPlayer({
         const blockEl = el.closest("[id^='blk-']");
         blockEl?.classList.add("audio-active");
 
-        const shouldScroll = follow && (!audioRef.current?.paused || allowScrollOnSeekRef.current);
+        const shouldScroll = (followActiveRef.current || allowScrollOnSeekRef.current) && (!audioRef.current?.paused || allowScrollOnSeekRef.current);
         allowScrollOnSeekRef.current = false;
         if (shouldScroll) {
           const rect = el.getBoundingClientRect();
           const topBand = window.innerHeight * 0.22;
           const bottomBand = window.innerHeight * 0.78;
           if (rect.top < topBand || rect.bottom > bottomBand) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            programmaticScrollUntilRef.current = Date.now() + 1500;
+            el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
           }
         }
       } else {
@@ -251,7 +265,7 @@ export function AudioPlayer({
         }
       }
     },
-    [follow, highlightMap, wordElements],
+    [highlightMap, wordElements],
   );
 
   const activeWordIndex = useCallback(
@@ -360,10 +374,14 @@ export function AudioPlayer({
         const el = document.getElementById(activeId);
         if (el) {
           el.classList.add("audio-active");
-          const shouldScroll = follow && (!audioRef.current?.paused || allowScrollOnSeekRef.current);
+          const shouldScroll = (followActiveRef.current || allowScrollOnSeekRef.current) && (!audioRef.current?.paused || allowScrollOnSeekRef.current);
           allowScrollOnSeekRef.current = false;
           if (shouldScroll) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            const r = el.getBoundingClientRect();
+            if (r.top < window.innerHeight * 0.22 || r.bottom > window.innerHeight * 0.78) {
+              programmaticScrollUntilRef.current = Date.now() + 1500;
+              el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+            }
           }
         } else {
           allowScrollOnSeekRef.current = false;
@@ -372,7 +390,7 @@ export function AudioPlayer({
         allowScrollOnSeekRef.current = false;
       }
     },
-    [current, effWords, follow, playing, timings],
+    [current, effWords, playing, timings],
   );
 
   useEffect(() => {
@@ -472,13 +490,70 @@ export function AudioPlayer({
     } catch {}
   }, [rate]);
 
+  /* زر واحد مشترك (المشغل الكبير والمصغّر): تشغيل ← إيقاف ← تشغيل،
+     وعند التوقف المؤقت بسبب تحريك الصفحة يعيد القارئ لموضع الصوت. */
+  const followLabel = !follow
+    ? "تشغيل تتبع الصوت تلقائيًا"
+    : followPaused
+      ? "العودة إلى موضع الصوت"
+      : "إيقاف تتبع الصوت تلقائيًا";
+
   const toggleFollow = useCallback(() => {
+    if (follow && followPaused) {
+      setFollowPaused(false);
+      followActiveRef.current = true;
+      allowScrollOnSeekRef.current = true;
+      const active = document.querySelector<HTMLElement>("#article-body .audio-word-active, #article-body .audio-active");
+      if (active) {
+        programmaticScrollUntilRef.current = Date.now() + 1500;
+        active.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+        allowScrollOnSeekRef.current = false;
+      }
+      return;
+    }
     const next = !follow;
     setFollow(next);
+    setFollowPaused(false);
     try {
       localStorage.setItem(FOLLOW_KEY, next ? "on" : "off");
     } catch {}
-  }, [follow]);
+  }, [follow, followPaused]);
+
+  useEffect(() => {
+    followActiveRef.current = follow && !followPaused;
+  }, [follow, followPaused]);
+
+  /* تحريك القارئ للصفحة بيده (عجلة/لمس/لوحة مفاتيح/سحب شريط التمرير) أثناء التشغيل
+     يوقف المتابعة مؤقتًا؛ التمرير البرمجي لا يُحتسب. */
+  useEffect(() => {
+    if (!playing) return;
+    const pause = () => {
+      if (followActiveRef.current) {
+        followActiveRef.current = false;
+        setFollowPaused(true);
+      }
+    };
+    const onWheel = () => pause();
+    const onTouch = () => pause();
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) pause();
+    };
+    const onScroll = () => {
+      if (Date.now() > programmaticScrollUntilRef.current && !seekingBarRef.current) pause();
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchmove", onTouch, { passive: true });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchmove", onTouch);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [playing]);
 
   useIsomorphicLayoutEffect(() => {
     try {
@@ -554,6 +629,7 @@ export function AudioPlayer({
       } else {
         /* المشغل العائم المصغر: يمكنه الانتقال لموضع الصوت الجديد عند الإفلات دون تلوين مسار السحب */
         allowScrollOnSeekRef.current = true;
+        setFollowPaused(false);
       }
       try {
         audio.currentTime = target;
@@ -831,12 +907,14 @@ export function AudioPlayer({
 
         <button
           onClick={toggleFollow}
-          className={`order-3 rounded-full p-2 transition-colors hover:bg-(--accent-soft) sm:order-none ${follow ? "" : "opacity-40"}`}
+          className={`order-3 flex items-center gap-1 rounded-full p-2 text-[11px] font-bold transition-colors hover:bg-(--accent-soft) sm:order-none ${follow ? "" : "opacity-40"} ${followPaused ? "bg-amber-500/15" : ""}`}
           style={{ color: "var(--accent-strong)" }}
-          title="تتبع القراءة تلقائيًا"
-          aria-pressed={follow}
+          title={followLabel}
+          aria-label={followLabel}
+          aria-pressed={follow && !followPaused}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+          <span className={followPaused ? "" : "sr-only"}>{followPaused ? "ارجع لموضع الصوت" : followLabel}</span>
         </button>
       </div>
       </div>
@@ -934,6 +1012,18 @@ export function AudioPlayer({
                     </span>
                   </div>
                 </div>
+
+                <button
+                  onClick={toggleFollow}
+                  aria-label={followLabel}
+                  aria-pressed={follow && !followPaused}
+                  title={followLabel}
+                  className={`no-touch-grow flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-1.5 text-[11px] font-bold transition-colors hover:bg-(--accent-soft) ${follow ? "" : "opacity-40"} ${followPaused ? "bg-amber-500/20" : ""}`}
+                  style={{ color: "var(--accent-strong)" }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+                  {followPaused ? <span>ارجع للصوت</span> : null}
+                </button>
 
                 <button
                   onClick={cycleRate}

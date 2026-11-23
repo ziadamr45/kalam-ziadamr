@@ -27,6 +27,9 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
   const [dismissed, setDismissed] = useState(false);
   /* موضع مؤشر التقدم فقط، رسالة الاستكمال تبقى داخل المقال. */
   const [audioActive, setAudioActive] = useState(false);
+  /* على الهاتف: المؤشر يظهر أثناء التمرير فقط ويختفي بعد ٢٫٥ ثانية من التوقف */
+  const [scrolling, setScrolling] = useState(false);
+  const hideTimer = useRef<number | null>(null);
 
   const latest = useRef({ pct: 0, scrollY: 0 });
   const maxMilestone = useRef({ pct: 0, scrollY: 0 });
@@ -119,6 +122,9 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
     };
 
     const onScroll = () => {
+      setScrolling(true);
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+      hideTimer.current = window.setTimeout(() => setScrolling(false), 2500);
       if (!ticking) {
         ticking = true;
         requestAnimationFrame(measure);
@@ -145,6 +151,7 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("pagehide", onLeave);
       document.removeEventListener("visibilitychange", onLeave);
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
     };
   }, [slug, articleId, status]);
 
@@ -159,7 +166,7 @@ export default function ContinueReadingBadge({ slug, articleId }: { slug: string
     <>
       {progress > 5 && progress < 96 && !resume && (
         <div
-          className={`no-print pointer-events-none fixed left-1/2 z-30 -translate-x-1/2 rounded-full border px-3.5 py-1.5 text-xs shadow-soft transition-all duration-300 ${
+          className={`no-print pointer-events-none fixed left-1/2 z-30 -translate-x-1/2 rounded-full border px-3.5 py-1.5 text-xs shadow-soft transition-all duration-300 motion-reduce:transition-none ${scrolling ? "opacity-100" : "opacity-0 sm:opacity-100"} ${
             audioActive ? "bottom-36 sm:bottom-19" : "bottom-19"
           }`}
           style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--ink-muted)" }}
