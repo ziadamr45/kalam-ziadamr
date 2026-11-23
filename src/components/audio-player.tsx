@@ -977,12 +977,18 @@ export function AudioPlayer({
                 الشاشات الكبيرة: كبسولة عائمة مدمجة كما كانت */}
             <div style={{ paddingBottom: isMobile ? `${mobileToolbarHeight}px` : undefined }} className="flex justify-start sm:pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pl-[calc(1.5rem+env(safe-area-inset-left))] lg:pl-[max(1.5rem,calc(50%-30.5rem))]">
               <div
-                className={`pointer-events-auto flex w-full items-center gap-1 border-t border-amber-500/30 px-2 py-1.5 shadow-2xl backdrop-blur-md transition-all duration-300 sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)] ${
-                  playing ? "opacity-100" : "opacity-70 [@media(hover:hover)]:hover:opacity-100"
+                className={`pointer-events-auto flex w-full items-center gap-1 border-t border-amber-500/30 px-2 py-1.5 backdrop-blur-md transition-all duration-300 sm:w-auto sm:gap-2.5 sm:rounded-full sm:border sm:px-0 sm:py-2 sm:pl-2 sm:pr-3.5 ${
+                  /* الإيقاف المؤقت يهدّئ الظل لا وضوح الأزرار — القارئ يحتاج أزرارًا مقروءة وهو متوقف */
+                  playing
+                    ? "shadow-2xl sm:hover:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)]"
+                    : "shadow-md"
                 }`}
                 style={{
-                  /* ألوان الموقع نفسها: كريمي فاتح في الوضع الساطع، غامق في الوضع الداكن — والتفاصيل ذهبية */
-                  background: "color-mix(in srgb, var(--bg) 90%, transparent)",
+                  /* ألوان الموقع نفسها: كريمي فاتح في الوضع الساطع، غامق في الوضع الداكن — والتفاصيل ذهبية.
+                     عند الإيقاف خلفية شبه مصمتة حتى لا يتشوش النص خلف الأزرار على الشاشات اللمسية */
+                  background: playing
+                    ? "color-mix(in srgb, var(--bg) 90%, transparent)"
+                    : "color-mix(in srgb, var(--bg) 97%, transparent)",
                   color: "var(--ink)",
                 }}
                 ref={miniPlayerRef}
